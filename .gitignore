@@ -3,11 +3,20 @@ docs/
 
 # Swift Package Manager
 .build/
-# Top-level SwiftPM CLI scratch dir only (anchored so it never over-matches
-# the xcodeproj's `project.xcworkspace/xcshareddata/swiftpm/` resolved state).
-/.swiftpm/
 Packages/
 .netrc
+# Top-level SwiftPM scratch dir is ignored, EXCEPT the committed package workspace definition and
+# its shared schemes — so `xcodebuild test -workspace .swiftpm/xcode/package.xcworkspace` (the iOS
+# snapshot-test path) is reproducible from a clean clone. Per-user xcuserdata stays ignored.
+/.swiftpm/*
+!/.swiftpm/xcode
+/.swiftpm/xcode/*
+!/.swiftpm/xcode/package.xcworkspace
+/.swiftpm/xcode/package.xcworkspace/*
+!/.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+!/.swiftpm/xcode/package.xcworkspace/xcshareddata
+/.swiftpm/xcode/package.xcworkspace/xcshareddata/*
+!/.swiftpm/xcode/package.xcworkspace/xcshareddata/xcschemes
 
 # Xcode build output
 DerivedData/

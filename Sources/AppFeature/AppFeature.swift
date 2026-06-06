@@ -17,7 +17,7 @@ public struct AppFeature {
     Reduce { _, action in
       switch action {
       case .onAppear:
-        return .none
+        .none
       }
     }
   }
