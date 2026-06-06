@@ -7,11 +7,16 @@ import XCTest
 final class CalendarTests: XCTestCase {
   /// Build a `Date` for a wall-clock day in Europe/Sofia (noon, to avoid DST/midnight edges).
   private func sofiaDate(year: Int, month: Int, day: Int) -> Date {
+    sofiaDate(year: year, month: month, day: day, hour: 12)
+  }
+
+  /// Build a `Date` for a wall-clock instant in Europe/Sofia.
+  private func sofiaDate(year: Int, month: Int, day: Int, hour: Int) -> Date {
     var components = DateComponents()
     components.year = year
     components.month = month
     components.day = day
-    components.hour = 12
+    components.hour = hour
     return Calendar.europeSofia.date(from: components)!
   }
 
@@ -42,6 +47,20 @@ final class CalendarTests: XCTestCase {
       $0.calendar = .europeSofia
     } operation: {
       XCTAssertEqual(ISOWeek.containing(sofiaDate(year: 2026, month: 6, day: 8)), ISOWeek(year: 2026, week: 24))
+    }
+  }
+
+  func testTimeZoneIsLoadBearingAtMidnightBoundary() {
+    // 2026-01-05 00:00 *in Europe/Sofia* (UTC+2) is the same instant as 2026-01-04 22:00 UTC.
+    // In Europe/Sofia that wall clock is Monday → ISO week 2; if the timezone were wrong (e.g. UTC),
+    // the instant would still read as Sunday 2026-01-04 → ISO week 1. Asserting week 2 here proves
+    // the *timezone* pinning is load-bearing, not just the .iso8601 calendar identifier.
+    let midnightSofia = sofiaDate(year: 2026, month: 1, day: 5, hour: 0)
+    withDependencies {
+      $0.calendar = .europeSofia
+      $0.date = .constant(midnightSofia)
+    } operation: {
+      XCTAssertEqual(ISOWeek.current, ISOWeek(year: 2026, week: 2))
     }
   }
 
