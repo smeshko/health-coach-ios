@@ -32,9 +32,18 @@ Two distinct run paths (not interchangeable):
 swift test            # or: make test
 
 # iOS snapshot tests — AppFeatureSnapshotTests (SwiftUI image snapshots are UIKit-only and
-# cannot run under `swift test`); run on an iOS 26 simulator:
-xcodebuild test -scheme CoachApp -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0'
+# cannot run under `swift test`); run on an iOS 26 simulator via the committed package workspace
+# + the shared CoachKit-Package scheme:
+xcodebuild test \
+  -workspace .swiftpm/xcode/package.xcworkspace \
+  -scheme CoachKit-Package \
+  -only-testing:AppFeatureSnapshotTests \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0'
 ```
+
+The `CoachKit-Package` scheme (committed under `.swiftpm/xcode/package.xcworkspace/xcshareddata/`)
+also runs the logic test targets, so `xcodebuild test … -scheme CoachKit-Package` (without
+`-only-testing`) runs the whole suite on the simulator.
 
 Snapshot references are recorded on the iOS 26 simulator (light + dark, single reference device).
 To re-record after an intentional view change, wrap the assertion in

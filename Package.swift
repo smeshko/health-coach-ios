@@ -23,6 +23,8 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.4.0"),
     // swift-tagged is pre-1.0; `from: "0.10.0"` is the floor.
     .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
+    // Test-only: SwiftUI image snapshots. Used only by CoachTestSupport + the snapshot test target.
+    .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
   ],
   targets: [
     .target(
@@ -47,11 +49,50 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // Shared test helper (light+dark / single reference device snapshot convention). Links XCTest via
+    // SnapshotTesting, so it must be depended on ONLY by test targets — never by the app or a shipping
+    // library, or the app build breaks. All UIKit-only code is wrapped in `#if canImport(UIKit)` so
+    // this target compiles to an empty module on the macOS host (validation round-2 #A).
+    .target(
+      name: "CoachTestSupport",
+      dependencies: [
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // Logic tests — run on the macOS host via `swift test`. No snapshot/UIKit code.
     .testTarget(
       name: "CoachCoreTests",
       dependencies: [
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    .testTarget(
+      name: "AppFeatureTests",
+      dependencies: [
+        "AppFeature",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // View snapshot tests — run only on an iOS 26 simulator via `xcodebuild test`. The whole body is
+    // `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host (so `swift test`
+    // stays green); SwiftUI image snapshots use the iOS-only ViewImageConfig/.device API.
+    .testTarget(
+      name: "AppFeatureSnapshotTests",
+      dependencies: [
+        "AppFeature",
+        "CoachTestSupport",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
