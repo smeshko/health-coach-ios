@@ -94,6 +94,9 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
+      // Reference images are read from disk by swift-snapshot-testing (not bundled), so exclude them
+      // from the target to avoid SwiftPM's "unhandled files" warning.
+      exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
