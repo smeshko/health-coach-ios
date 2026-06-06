@@ -20,12 +20,13 @@
   /// Assert light + dark snapshots of a SwiftUI view on the single reference device (D16).
   ///
   /// Records two images per call — `<name>-light` and `<name>-dark`. To (re)record references, pass
-  /// `record: true` (or wrap the call in `withSnapshotTesting(record: .all) { … }`), run once on the
-  /// iOS 26 simulator, then revert and commit the images.
+  /// `record: .all` (or wrap the call in `withSnapshotTesting(record: .all) { … }`), run once on the
+  /// iOS 26 simulator, then revert and commit the images. `nil` (the default) uses the ambient
+  /// recording configuration (verify mode unless overridden).
   public func assertCoachSnapshot(
     of view: @autoclosure () -> some View,
     named name: String? = nil,
-    record recording: Bool = false,
+    record recording: SnapshotTestingConfiguration.Record? = nil,
     file: StaticString = #filePath,
     testName: String = #function,
     line: UInt = #line
