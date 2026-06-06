@@ -1,0 +1,15 @@
+#!/bin/sh
+# Optional pre-commit hook: runs SwiftLint (strict) before each commit.
+#
+# Opt in with:
+#   git config core.hooksPath .githooks
+#
+# Requires SwiftLint (see README.md → Tooling). To bypass for a single commit, use
+# `git commit --no-verify`.
+
+if ! command -v swiftlint >/dev/null 2>&1; then
+  echo "pre-commit: swiftlint not installed — skipping lint (brew install swiftlint)" >&2
+  exit 0
+fi
+
+exec make lint

@@ -1,0 +1,12 @@
+# SwiftFormat configuration — conservative; mirrors the point-free / isowords 2-space style.
+# Run via `make format`. Pinned tool version recorded in README.md.
+
+--swiftversion 6.0
+--indent 2
+
+# Preserve hand-authored wrapping rather than reflowing collections/arguments.
+--wraparguments preserve
+--wrapcollections preserve
+
+# Don't touch build output or the planning docs.
+--exclude .build,DerivedData,docs
