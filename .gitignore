@@ -1,3 +1,6 @@
+# Internal planning/design docs — kept locally, not tracked in this repo.
+docs/
+
 # Swift Package Manager
 .build/
 # Top-level SwiftPM CLI scratch dir only (anchored so it never over-matches
