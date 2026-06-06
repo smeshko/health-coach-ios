@@ -1,0 +1,29 @@
+# Swift Package Manager
+.build/
+# Top-level SwiftPM CLI scratch dir only (anchored so it never over-matches
+# the xcodeproj's `project.xcworkspace/xcshareddata/swiftpm/` resolved state).
+/.swiftpm/
+Packages/
+.netrc
+
+# Xcode build output
+DerivedData/
+build/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Per-user Xcode state (NOT xcshareddata — shared schemes and the xcodeproj's
+# resolved Package.resolved live under xcshareddata and must stay tracked).
+**/xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+
+# Note: Package.resolved (root + xcodeproj) is intentionally NOT ignored so
+# dependency versions are reproducible from a clean clone.
