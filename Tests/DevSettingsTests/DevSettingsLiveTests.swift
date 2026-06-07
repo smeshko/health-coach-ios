@@ -90,6 +90,30 @@ final class DevSettingsLiveTests: XCTestCase {
     XCTAssertTrue(store.readMock(), "DEBUG default should be true")
   }
 
+  func test_overrides_canForceMockOff() {
+    let (suite, name) = freshSuite()
+    defer { suite.removePersistentDomain(forName: name) }
+    let store = DevSettingsStore(defaults: suite)
+
+    // launch arg=false beats env=1 and persisted=true (the whole point: a dev forcing mock OFF).
+    store.writeMock(true)
+    DevSettings.applyLaunchOverrides(
+      environment: ["COACH_MOCK": "1"],
+      arguments: ["useMockData": "false"],
+      defaults: suite
+    )
+    XCTAssertFalse(store.readMock(), "launch arg=false should force mock off over env + persisted")
+
+    // env=false beats persisted=true when there is no launch arg.
+    store.writeMock(true)
+    DevSettings.applyLaunchOverrides(
+      environment: ["COACH_MOCK": "no"],
+      arguments: [:],
+      defaults: suite
+    )
+    XCTAssertFalse(store.readMock(), "env=false should force mock off over persisted")
+  }
+
   func test_scenarioEnvVar_seedsSlot() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
