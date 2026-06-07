@@ -37,6 +37,9 @@ let package = Package(
     .library(name: "ProfileRepository", targets: ["ProfileRepository"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
     .library(name: "DesignSystem", targets: ["DesignSystem"]),
+    // TEMPORARY (Epic 5.5): the design-system gallery dev tool, rooted by App until Epic 06 restores
+    // the real AppView shell. Remove this product + target + the App dependency when Epic 06 lands.
+    .library(name: "DesignSystemGallery", targets: ["DesignSystemGallery"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -456,6 +459,20 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // TEMPORARY (Epic 5.5): a navigable design-system gallery (Colors/Typography/Icons + a subpage per
+    // component) rooted by App until Epic 06 restores the real shell. Depends on DesignSystem +
+    // DomainModels + SampleData (the fixture source); never repositories / wire / GRDB / TCA.
+    .target(
+      name: "DesignSystemGallery",
+      dependencies: [
+        "DesignSystem",
+        "DomainModels",
+        "SampleData",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -783,6 +800,7 @@ let package = Package(
       name: "DesignSystemSnapshotTests",
       dependencies: [
         "DesignSystem",
+        "DesignSystemGallery",
         "CoachTestSupport",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],

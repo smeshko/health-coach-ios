@@ -10,6 +10,7 @@
 		CA000000000000000000000C /* CoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000007 /* CoachApp.swift */; };
 		CA000000000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000008 /* Assets.xcassets */; };
 		CA000000000000000000000E /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000016 /* AppFeature */; };
+		CA00000000000000000000E1 /* DesignSystemGallery in Frameworks */ = {isa = PBXBuildFile; productRef = CA00000000000000000000E2 /* DesignSystemGallery */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CA000000000000000000000E /* AppFeature in Frameworks */,
+				CA00000000000000000000E1 /* DesignSystemGallery in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -73,6 +75,7 @@
 			name = CoachApp;
 			packageProductDependencies = (
 				CA0000000000000000000016 /* AppFeature */,
+				CA00000000000000000000E2 /* DesignSystemGallery */,
 			);
 			productName = CoachApp;
 			productReference = CA0000000000000000000006 /* CoachApp.app */;
@@ -349,6 +352,10 @@
 		CA0000000000000000000016 /* AppFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AppFeature;
+		};
+		CA00000000000000000000E2 /* DesignSystemGallery */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DesignSystemGallery;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
