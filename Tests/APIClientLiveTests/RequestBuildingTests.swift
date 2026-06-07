@@ -19,6 +19,12 @@ final class RequestBuildingTests: XCTestCase {
     return WireCalendarDate(calendar.date(from: DateComponents(year: year, month: month, day: day))!)
   }
 
+  func test_baseURLWithPathPrefix_isPreserved() throws {
+    let prefixed = URL(string: "https://api.example.com/v1")!
+    let request = try urlRequest(for: Routes.health, baseURL: prefixed, bearer: nil)
+    XCTAssertEqual(request.url?.absoluteString, "https://api.example.com/v1/health")
+  }
+
   func test_health_isGet_noAuthHeader() throws {
     let request = try urlRequest(for: Routes.health, baseURL: baseURL, bearer: bearer)
     XCTAssertEqual(request.url?.absoluteString, "http://localhost:8000/health")

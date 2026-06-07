@@ -11,7 +11,8 @@ func urlRequest(for endpoint: Endpoint<some Any>, baseURL: URL, bearer: String?)
   guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
     throw URLRequestBuilderError.invalidURL(path: endpoint.path)
   }
-  components.path = endpoint.path
+  // Append onto any base path (e.g. a versioned `/v1`) rather than replacing it.
+  components.path = (components.path as NSString).appendingPathComponent(endpoint.path)
   components.queryItems = endpoint.query.isEmpty ? nil : endpoint.query
   guard let url = components.url else {
     throw URLRequestBuilderError.invalidURL(path: endpoint.path)
