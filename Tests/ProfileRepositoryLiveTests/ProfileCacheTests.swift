@@ -31,13 +31,19 @@ final class ProfileCacheTests: XCTestCase {
     try await database.write { db in try ProfileRecord(domain: domain).save(db) }
   }
 
+  /// A live repository over a fresh recompute stream — isolates each test from the process-wide
+  /// `liveValue` stream. `static` so the `@Sendable` work closures don't capture the test case.
+  private static func makeRepo() -> ProfileRepository {
+    .live(recompute: RecomputeStream())
+  }
+
   func test_cacheMiss_fetchesAndCaches() async throws {
     let db = try DatabaseClient.makeInMemory()
     let fixture = try SampleData.profile()
     let api = StubProfileAPI(result: .success(fixture.dto))
 
     let result = try await run(api: api, database: db) {
-      try await ProfileRepository.liveValue.profile()
+      try await Self.makeRepo().profile()
     }
 
     XCTAssertEqual(result, fixture.domain)
@@ -50,10 +56,10 @@ final class ProfileCacheTests: XCTestCase {
     let db = try DatabaseClient.makeInMemory()
     let fixture = try SampleData.profile()
     try await seedProfile(db, fixture.domain)
-    let api = StubProfileAPI(result: .failure(.unexpectedStatus(0))) // would trap if called via .get()
+    let api = StubProfileAPI(result: .failure(.unexpectedStatus(0))) // throws if called; callCount==0 is the real guard
 
     let result = try await run(api: api, database: db) {
-      try await ProfileRepository.liveValue.profile()
+      try await Self.makeRepo().profile()
     }
 
     XCTAssertEqual(result, fixture.domain)
@@ -69,7 +75,7 @@ final class ProfileCacheTests: XCTestCase {
     let api = StubProfileAPI(result: .success(fixture.dto))
 
     let result = try await run(api: api, database: db) {
-      try await ProfileRepository.liveValue.refresh()
+      try await Self.makeRepo().refresh()
     }
 
     XCTAssertEqual(result, fixture.domain, "refresh returns the fresh fetched profile")
@@ -83,7 +89,7 @@ final class ProfileCacheTests: XCTestCase {
     let api = StubProfileAPI(result: .failure(.transport("offline")))
 
     do {
-      _ = try await run(api: api, database: db) { try await ProfileRepository.liveValue.profile() }
+      _ = try await run(api: api, database: db) { try await Self.makeRepo().profile() }
       XCTFail("expected ProfileRepositoryError")
     } catch let error as ProfileRepositoryError {
       guard case .fetchFailed = error else { return XCTFail("expected .fetchFailed, got \(error)") }
@@ -98,7 +104,7 @@ final class ProfileCacheTests: XCTestCase {
 
     // Cache-first: profile() serves the cache without attempting the (failing) fetch.
     let result = try await run(api: api, database: db) {
-      try await ProfileRepository.liveValue.profile()
+      try await Self.makeRepo().profile()
     }
     XCTAssertEqual(result, fixture.domain)
     XCTAssertEqual(api.callCount, 0)

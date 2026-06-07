@@ -21,15 +21,26 @@ final class ProfileRecomputeTests: XCTestCase {
     try await database.write { db in try ProfileRecord(domain: domain).save(db) }
   }
 
+  private func dtoWithWeek(_ week: String?) throws -> ProfileResponse {
+    var dto = try SampleData.profile().dto
+    dto.meta.constantsRecomputedWeek = week
+    return dto
+  }
+
+  /// The first notice off `repo.recomputeNotices()` (the stream is `.unbounded`-buffered, so an emit
+  /// before iteration is delivered). Used after a sentinel emit so it always terminates.
+  private func firstNotice(_ repo: ProfileRepository) async -> RecomputeNotice? {
+    for await notice in repo.recomputeNotices() {
+      return notice
+    }
+    return nil
+  }
+
   func test_recompute_surfacedOnProfileAndStream() async throws {
     let db = try DatabaseClient.makeInMemory()
     try await seedProfile(db, week: "2026-W01") // previously cached week
-    var dto = try SampleData.profile().dto
-    dto.meta.constantsRecomputedWeek = "2026-W02" // a new recompute week
-    let api = StubProfileAPI(result: .success(dto))
-
-    // One repo instance so refresh() and recomputeNotices() share the same stream.
-    let repo = ProfileRepository.liveValue
+    let api = try StubProfileAPI(result: .success(dtoWithWeek("2026-W02"))) // a new recompute week
+    let repo = ProfileRepository.live(recompute: RecomputeStream())
 
     let result = try await withDependencies {
       $0.apiClient = api.makeClient()
@@ -38,41 +49,69 @@ final class ProfileRecomputeTests: XCTestCase {
       try await repo.refresh()
     }
 
-    // The week rides on the returned Profile...
-    XCTAssertEqual(result.meta.constantsRecomputedWeek, "2026-W02")
-    // ...and a notice is emitted on the stream (buffered, .unbounded).
-    var received: RecomputeNotice?
-    for await notice in repo.recomputeNotices() {
-      received = notice
-      break
+    XCTAssertEqual(result.meta.constantsRecomputedWeek, "2026-W02", "the changed week rides on the Profile")
+    let received = await firstNotice(repo)
+    XCTAssertEqual(received, RecomputeNotice(week: "2026-W02"), "a notice is emitted on the change")
+  }
+
+  func test_recompute_sameWeek_noNotice() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    try await seedProfile(db, week: "2026-W02")
+    let api = try StubProfileAPI(result: .success(dtoWithWeek("2026-W02"))) // unchanged week
+    let repo = ProfileRepository.live(recompute: RecomputeStream())
+
+    _ = try await withDependencies {
+      $0.apiClient = api.makeClient()
+      $0.database = db
+    } operation: {
+      try await repo.refresh()
     }
-    XCTAssertEqual(received, RecomputeNotice(week: "2026-W02"))
+
+    // A refresh with the SAME week must not emit. Emit a sentinel afterwards: if the first stream
+    // element is the sentinel (not "2026-W02"), the same-week refresh emitted nothing.
+    await repo.noteRecompute("SENTINEL")
+    let received = await firstNotice(repo)
+    XCTAssertEqual(received?.week, "SENTINEL", "an unchanged week must not emit a notice")
+  }
+
+  func test_recompute_firstEver_noNotice() async throws {
+    let db = try DatabaseClient.makeInMemory() // empty → first-ever fetch
+    let api = try StubProfileAPI(result: .success(dtoWithWeek("2026-W02")))
+    let repo = ProfileRepository.live(recompute: RecomputeStream())
+
+    _ = try await withDependencies {
+      $0.apiClient = api.makeClient()
+      $0.database = db
+    } operation: {
+      try await repo.profile()
+    }
+
+    // The initial load is not a recompute — no notice. Sentinel proves it.
+    await repo.noteRecompute("SENTINEL")
+    let received = await firstNotice(repo)
+    XCTAssertEqual(received?.week, "SENTINEL", "the first-ever fetch must not emit a notice")
   }
 
   func test_zones_returnsFetchedZones() async throws {
     let db = try DatabaseClient.makeInMemory()
     let fixture = try SampleData.profile()
     let api = StubProfileAPI(result: .success(fixture.dto))
+    let repo = ProfileRepository.live(recompute: RecomputeStream())
 
     let zones = try await withDependencies {
       $0.apiClient = api.makeClient()
       $0.database = db
     } operation: {
-      try await ProfileRepository.liveValue.zones()
+      try await repo.zones()
     }
 
     XCTAssertEqual(zones, fixture.domain.zones, "zones() exposes the five HR zone bpm ranges")
   }
 
   func test_noteRecompute_emitsOnStream() async throws {
-    let repo = ProfileRepository.liveValue
+    let repo = ProfileRepository.live(recompute: RecomputeStream())
     await repo.noteRecompute("2026-W05")
-
-    var received: RecomputeNotice?
-    for await notice in repo.recomputeNotices() {
-      received = notice
-      break
-    }
+    let received = await firstNotice(repo)
     XCTAssertEqual(received, RecomputeNotice(week: "2026-W05"))
   }
 }
