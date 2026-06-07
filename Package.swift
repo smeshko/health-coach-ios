@@ -488,6 +488,7 @@ let package = Package(
         "WireModels",
         "DomainModels",
         "SampleData",
+        "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],

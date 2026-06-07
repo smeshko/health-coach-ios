@@ -13,10 +13,11 @@ final class StubAPIClient: @unchecked Sendable {
   private var _lastWeeklyRefresh: Bool?
   private var _lastWeeklyArg: String??
 
-  /// What `dailyBrief` should do: return a DTO or throw.
-  var dailyResult: Result<WireModels.DailyBrief, APIError>
+  /// What `dailyBrief` should do: return a DTO or throw. `let` — set once at init so the
+  /// `@unchecked Sendable` promise holds without locking these reads.
+  let dailyResult: Result<WireModels.DailyBrief, APIError>
   /// What `weeklyBrief` should do.
-  var weeklyResult: Result<WireModels.WeeklyPlan, APIError>
+  let weeklyResult: Result<WireModels.WeeklyPlan, APIError>
 
   init(
     dailyResult: Result<WireModels.DailyBrief, APIError> = .failure(.unexpectedStatus(0)),
