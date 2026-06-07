@@ -1,0 +1,56 @@
+{
+  "data": {
+    "date": "2026-06-06",
+    "readiness": {
+      "score": 64,
+      "band": "amber",
+      "penalties": [
+        { "factor": "sleep_below_7h", "points": 10 },
+        { "factor": "hrv_below_baseline", "points": 8 }
+      ]
+    },
+    "safetyGate": { "triggered": false, "reasons": [] },
+    "session": {
+      "card": "easy_run",
+      "intensity": "easy",
+      "durationMinLow": 30,
+      "durationMinHigh": 40,
+      "flags": ["auto_reg_downgrade"],
+      "zoneTarget": "z2",
+      "hrCapBpm": 145
+    },
+    "alternatives": [
+      {
+        "card": "active_recovery",
+        "intensity": "recovery",
+        "durationMinLow": 20,
+        "durationMinHigh": 30,
+        "flags": []
+      }
+    ],
+    "skipOk": true,
+    "macroFocus": {
+      "dayType": "moderate",
+      "caloriesKcal": 2500,
+      "proteinG": 170,
+      "carbsG": 280,
+      "fatGLow": 60,
+      "fatGHigh": 80,
+      "hydrationLLow": 2.5,
+      "hydrationLHigh": 3.5
+    },
+    "intakeYesterday": {
+      "date": "2026-06-05",
+      "caloriesKcal": 2300,
+      "proteinG": 150,
+      "vsTarget": { "caloriesPct": 0.88, "proteinHit": false }
+    },
+    "generatedAt": "2026-06-06T07:30:00+03:00",
+    "cached": false,
+    "constitutionVersion": "v3"
+  },
+  "narrative": [
+    { "type": "summary", "heading": "Take it easy", "body": "Amber readiness — the session is auto-reduced." },
+    { "type": "caution", "heading": "Sleep", "body": "Short sleep last night docked readiness." }
+  ]
+}

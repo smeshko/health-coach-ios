@@ -14,6 +14,7 @@ let package = Package(
     .library(name: "WireModels", targets: ["WireModels"]),
     .library(name: "DomainModels", targets: ["DomainModels"]),
     .library(name: "WireDomainMapping", targets: ["WireDomainMapping"]),
+    .library(name: "SampleData", targets: ["SampleData"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -94,6 +95,24 @@ let package = Package(
       name: "DomainModels",
       dependencies: [
         "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // Single source of sample truth — canned wire JSON + DTO/domain factories for previews/tests/
+    // snapshots/mocks. Library (not a test target): imported by previews and *Live previewValues, so
+    // it links NO XCTest and NO GRDB (§4.4). Depends on the model layers + WireDomainMapping (the
+    // DTO→domain free functions live there; 2.2 DECISIONS #1).
+    .target(
+      name: "SampleData",
+      dependencies: [
+        "WireModels",
+        "DomainModels",
+        "WireDomainMapping",
+      ],
+      resources: [
+        .process("Resources"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),

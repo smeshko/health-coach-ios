@@ -1,0 +1,47 @@
+{
+  "data": {
+    "date": "2026-06-06",
+    "readiness": {
+      "score": 80,
+      "band": "green",
+      "penalties": []
+    },
+    "safetyGate": { "triggered": false, "reasons": [] },
+    "session": {
+      "card": "easy_run",
+      "intensity": "easy",
+      "durationMinLow": 40,
+      "durationMinHigh": 55,
+      "flags": ["impact", "moon_phase"],
+      "zoneTarget": "z2",
+      "hrCapBpm": 150
+    },
+    "alternatives": [
+      {
+        "card": "active_recovery",
+        "intensity": "recovery",
+        "durationMinLow": 20,
+        "durationMinHigh": 30,
+        "flags": []
+      }
+    ],
+    "skipOk": true,
+    "macroFocus": {
+      "dayType": "moderate",
+      "caloriesKcal": 2600,
+      "proteinG": 170,
+      "carbsG": 300,
+      "fatGLow": 60,
+      "fatGHigh": 80,
+      "hydrationLLow": 2.5,
+      "hydrationLHigh": 3.5
+    },
+    "intakeYesterday": null,
+    "generatedAt": "2026-06-06T07:30:00+03:00",
+    "cached": false,
+    "constitutionVersion": "v3"
+  },
+  "narrative": [
+    { "type": "summary", "heading": "Ready to run", "body": "Nothing logged yesterday — go by feel today." }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "data": {
+    "isoWeek": "2026-W24",
+    "weekStart": "2026-06-08",
+    "budgets": {
+      "hardDays": 1,
+      "strengthSessions": 2,
+      "longRunKm": null,
+      "deload": true
+    },
+    "core": [
+      {
+        "card": "easy_run",
+        "tier": "core",
+        "intensity": "easy",
+        "isHardDay": false,
+        "flags": ["impact"],
+        "suggestedDay": "tue",
+        "durationMinLow": 30,
+        "durationMinHigh": 45
+      },
+      {
+        "card": "strength_full",
+        "tier": "core",
+        "intensity": "quality",
+        "isHardDay": true,
+        "flags": [],
+        "suggestedDay": "thu"
+      }
+    ],
+    "extras": [
+      {
+        "card": "mobility",
+        "tier": "extra",
+        "intensity": "recovery",
+        "isHardDay": false,
+        "flags": []
+      }
+    ],
+    "targets": {
+      "totalRunKm": 24.0,
+      "easyRunRatio": 0.9,
+      "strengthSessions": 2,
+      "hardDays": 1,
+      "cadenceSpm": 178
+    },
+    "nutrition": {
+      "proteinG": 170,
+      "fatGLow": 60,
+      "fatGHigh": 80,
+      "hydrationLLow": 2.5,
+      "hydrationLHigh": 3.5,
+      "avgCaloriesKcal": 2400,
+      "dayTypePattern": [
+        { "suggestedDay": "tue", "dayType": "moderate", "caloriesKcal": 2500, "carbsG": 280 },
+        { "suggestedDay": "thu", "dayType": "hard", "caloriesKcal": 2700, "carbsG": 330 }
+      ],
+      "restDay": { "caloriesKcal": 2200, "carbsG": 210 },
+      "lastWeek": {
+        "avgCaloriesKcal": 2650,
+        "avgProteinG": 168,
+        "proteinHitDays": 5,
+        "daysOverTarget": 2,
+        "daysUnderTarget": 1
+      }
+    },
+    "constantsRecomputed": false,
+    "generatedAt": "2026-06-06T07:30:00+03:00",
+    "cached": false
+  },
+  "narrative": [
+    { "type": "plan", "heading": "Deload week", "body": "Volume is pulled back to absorb training." }
+  ]
+}
