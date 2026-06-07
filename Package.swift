@@ -30,6 +30,8 @@ let package = Package(
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
     .library(name: "CheckInRepository", targets: ["CheckInRepository"]),
     .library(name: "CheckInRepositoryLive", targets: ["CheckInRepositoryLive"]),
+    .library(name: "StrengthTestRepository", targets: ["StrengthTestRepository"]),
+    .library(name: "StrengthTestRepositoryLive", targets: ["StrengthTestRepositoryLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -338,6 +340,36 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // StrengthTestRepository interface — local upsert-by-Sofia-day of the two weekly strength numbers.
+    // Interface deps: DomainModels + CoachCore + Dependencies only.
+    .target(
+      name: "StrengthTestRepository",
+      dependencies: [
+        "DomainModels",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // StrengthTestRepository.live — GRDB upsert + an at-or-before-latest read via the Database
+    // interface. No network.
+    .target(
+      name: "StrengthTestRepositoryLive",
+      dependencies: [
+        "StrengthTestRepository",
+        "Database",
+        "PersistenceModels",
+        "DomainModels",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -533,6 +565,24 @@ let package = Package(
       dependencies: [
         "CheckInRepositoryLive",
         "CheckInRepository",
+        "Database",
+        "DatabaseLive",
+        "PersistenceModels",
+        "DomainModels",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // StrengthTestRepository.live upsert + at-or-before-latest read tests — host, in-memory Database.
+    .testTarget(
+      name: "StrengthTestRepositoryLiveTests",
+      dependencies: [
+        "StrengthTestRepositoryLive",
+        "StrengthTestRepository",
         "Database",
         "DatabaseLive",
         "PersistenceModels",
