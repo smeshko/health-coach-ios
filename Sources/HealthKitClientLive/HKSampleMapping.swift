@@ -22,6 +22,7 @@
       let kilogram = HKUnit.gramUnit(with: .kilo)
       let millisecond = HKUnit.secondUnit(with: .milli)
       let vo2 = HKUnit.literUnit(with: .milli).unitDivided(by: kilogram.unitMultiplied(by: .minute()))
+      let effort = kcal.unitDivided(by: kilogram.unitMultiplied(by: .hour()))
 
       func quantity(
         _ id: HKQuantityTypeIdentifier, _ type: RecordType, _ unit: HKUnit
@@ -36,6 +37,7 @@
         quantity(.stepCount, .stepCount, .count()),
         quantity(.activeEnergyBurned, .activeEnergyBurned, kcal),
         quantity(.basalEnergyBurned, .basalEnergyBurned, kcal),
+        quantity(.physicalEffort, .physicalEffort, effort),
         quantity(.vo2Max, .vo2Max, vo2),
         quantity(.bodyMass, .bodyMass, kilogram),
         quantity(.runningSpeed, .runningSpeed, HKUnit.meter().unitDivided(by: .second())),
@@ -82,6 +84,9 @@
       return quantitySample.quantity.doubleValue(for: unit)
     }
 
+    // `zoneMinutes` and per-workout `statistics` are intentionally left empty here: their HK→wire
+    // unit mapping is owned by `SyncRepository` (Epic 4.3), which builds the `SyncRequest`. The canned
+    // test value carries a stat to exercise the payload *shape*; live enrichment lands in 4.3.
     static func workoutPayload(from workout: HKWorkout) -> WorkoutPayload {
       let distance = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
         .sumQuantity()?.doubleValue(for: .meter())
