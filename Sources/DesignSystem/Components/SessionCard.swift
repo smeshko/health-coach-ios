@@ -99,23 +99,29 @@ public struct SessionCard: View {
         }
       }
       Spacer(minLength: 0)
-      Pill(model.intensity.label, tone: intensityTone, leading: .icon(model.intensity.iconName))
+      intensityChip
     }
   }
 
-  private var intensityTone: Tone {
-    switch model.intensity {
-    case .easy: .accent
-    case .quality: .negative
-    case .recovery: .positive
+  /// The intensity accent — a soft capsule in the intensity's own token color (`Intensity.color`,
+  /// Phase 5.1 `DisplayColored`) + its icon + label. (`Pill` only takes the 4-case `Tone` palette, so
+  /// the card renders this directly to use the distinct easy/quality/recovery token colors.)
+  private var intensityChip: some View {
+    HStack(spacing: CoachSpacing.space6) {
+      Image(systemName: model.intensity.iconName).font(.system(size: 11, weight: .semibold))
+      Text(model.intensity.label).font(CoachFont.dataEmphasis)
     }
+    .foregroundStyle(model.intensity.color)
+    .padding(.vertical, CoachSpacing.space6)
+    .padding(.horizontal, CoachSpacing.space12)
+    .background(Capsule().fill(model.intensity.color.opacity(0.15)))
   }
 
   @ViewBuilder private var detailRow: some View {
     let cues = detailCues
     if !cues.isEmpty {
       HStack(spacing: CoachSpacing.space8) {
-        ForEach(cues, id: \.self) { cue in
+        ForEach(Array(cues.enumerated()), id: \.offset) { _, cue in
           Chip(cue)
         }
       }
