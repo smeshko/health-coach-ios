@@ -11,10 +11,17 @@ import WireModels
 
 extension ProfileRepository: DependencyKey {
   /// The network + GRDB live value. Cache-first profile fetch with an event-driven recompute notice
-  /// (Decision 1/2). The composition root installs it (optionally wrapped by the 4.1 `routed(dev:)`).
-  public static var liveValue: ProfileRepository {
-    let recompute = RecomputeStream()
-    return ProfileRepository(
+  /// (Decision 1/2). A **`static let`** over a single shared `RecomputeStream`, so the recompute
+  /// emitter (`noteRecompute` / a fetch) and the consumer (`recomputeNotices`) always hold the *same*
+  /// continuation across dependency resolutions (a computed `var` would re-mint the stream per access
+  /// and silently drop notices across scopes). The composition root installs it (optionally wrapped
+  /// by the 4.1 `routed(dev:)`).
+  public static let liveValue: ProfileRepository = .live(recompute: RecomputeStream())
+
+  /// Builds the live value over `recompute`. Shared by `liveValue` (one process-wide stream) and tests
+  /// (a fresh stream per test for isolation).
+  static func live(recompute: RecomputeStream) -> ProfileRepository {
+    ProfileRepository(
       profile: { try await fetchProfile(recompute: recompute, forceRefresh: false) },
       refresh: { try await fetchProfile(recompute: recompute, forceRefresh: true) },
       zones: { try await fetchProfile(recompute: recompute, forceRefresh: false).zones },
@@ -26,6 +33,12 @@ extension ProfileRepository: DependencyKey {
 
 /// Owns the recompute `AsyncStream` + its continuation (mirrors `APIClientLive`'s `SessionEvent`
 /// stream — the interface exposes the accessor only, so features depend on the interface, §3).
+///
+/// **Single-subscriber** (like `SessionEvent`): `recomputeNotices()` returns one shared stream, so a
+/// single consumer (e.g. the Today/Settings recompute banner) iterates it. If a future epic needs to
+/// fan a recompute out to several features simultaneously, this becomes a per-subscriber multicast —
+/// an additive change deferred to that consumer's design (the phase ships the single-subscriber surface
+/// the plan specified).
 final class RecomputeStream: Sendable {
   let stream: AsyncStream<RecomputeNotice>
   private let continuation: AsyncStream<RecomputeNotice>.Continuation
@@ -70,7 +83,9 @@ private func fetchProfile(
 
   try await database.write { db in try ProfileRecord(domain: domain).save(db) }
 
-  if let newWeek = domain.meta.constantsRecomputedWeek, newWeek != previousWeek {
+  // Emit only on a genuine *change* from a known prior week — a first-ever fetch (no cached week) is
+  // the initial load, not a recompute, so it must not fire a notice (review #4).
+  if let newWeek = domain.meta.constantsRecomputedWeek, let previousWeek, newWeek != previousWeek {
     recompute.emit(RecomputeNotice(week: newWeek))
   }
   return domain

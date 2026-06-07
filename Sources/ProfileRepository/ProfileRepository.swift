@@ -19,9 +19,13 @@ public enum ProfileRepositoryError: Error, Equatable, Sendable {
 
 /// The profile-constants repository (ARCHITECTURE §7, §4.3). Cache-first: `profile()` serves the
 /// cached profile (refetch is event-driven on a recompute, not a TTL — Decision 1); `refresh()` forces
-/// a fetch + overwrite; `zones()` exposes the five HR zone bpm ranges the `ZoneChip` consumes;
-/// `recomputeNotices()` streams a notice when a fetch brings a new `constantsRecomputedWeek`;
-/// `noteRecompute(_:)` lets a feature hand off a recompute caught elsewhere (e.g. a weekly brief).
+/// a fetch + overwrite; `zones()` exposes the five HR zone bpm ranges the `ZoneChip` consumes.
+///
+/// `recomputeNotices()` is a **single-subscriber** stream (like `APIClientLive`'s `SessionEvent`
+/// stream) that emits when a fetch brings a *changed* `constantsRecomputedWeek` (the initial load does
+/// not fire). `noteRecompute(_:)` lets a feature **emit** a recompute caught elsewhere (e.g. a weekly
+/// brief) onto that stream; it does not itself refetch — the consumer reacts by calling `refresh()`
+/// (the refetch wiring is an Epic 06/07 concern).
 public struct ProfileRepository: Sendable {
   public var profile: @Sendable () async throws -> DomainModels.Profile
   public var refresh: @Sendable () async throws -> DomainModels.Profile
