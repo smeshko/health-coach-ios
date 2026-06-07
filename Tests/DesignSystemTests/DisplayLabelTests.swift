@@ -38,6 +38,11 @@ final class DisplayLabelTests: XCTestCase {
     XCTAssertEqual(SafetyReason.unknown("weird_thing").label, "Weird Thing")
     XCTAssertEqual(PenaltyFactor.unknown("late_caffeine").label, "Late Caffeine")
     XCTAssertEqual(Flag.unknown("newSpecialFlag").label, "New Special Flag")
+    // letter→digit boundary, both snake_case and camelCase forms.
+    XCTAssertEqual(Flag.unknown("sleep_below_7h").label, "Sleep Below 7h")
+    XCTAssertEqual(Flag.unknown("sleepBelow7h").label, "Sleep Below 7h")
+    // empty / degenerate input never crashes or renders empty.
+    XCTAssertEqual(Flag.unknown("").label, "Unknown")
   }
 
   func test_errorDisplay_allCasesHaveLabels() {

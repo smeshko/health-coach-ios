@@ -50,10 +50,11 @@ extension ErrorDisplay: DisplayLabel {
 /// `"sleepBelow7h"` → `"Sleep Below 7h"` — so a raw key never renders.
 func gracefulLabel(forUnknownRaw raw: String) -> String {
   guard !raw.isEmpty else { return "Unknown" }
-  // Split snake_case and camelCase into words.
+  // Split snake_case and camelCase into words, including a letter→digit boundary ("Below7h" →
+  // "Below 7h") but not a digit→letter one (keep "7h" together).
   var spaced = ""
   for character in raw.replacingOccurrences(of: "_", with: " ") {
-    if character.isUppercase, let last = spaced.last, last != " " {
+    if let last = spaced.last, last != " ", !last.isNumber, character.isUppercase || character.isNumber {
       spaced.append(" ")
     }
     spaced.append(character)

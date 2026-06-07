@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// Typography tokens (the Typography reference — SF Pro standing in for Inter). Built on Dynamic Type
-/// text styles so numbers stay legible at a glance (PRD §9.4); exposed via `CoachFont` and `Font.coach…`.
+/// Typography tokens (the Typography reference — SF Pro standing in for Inter). The scale tokens use
+/// Dynamic Type text styles so they scale with accessibility sizes (PRD §9.4); exposed via `CoachFont`
+/// and `Font.coach…`.
 public enum CoachFont {
-  /// Large display numerals — the readiness score.
+  /// Large display numerals — the readiness score. A deliberately **fixed** large hero size (not a
+  /// scaling text style) so the at-a-glance score keeps its designed prominence.
   public static let displayNumerals = Font.system(size: 48, weight: .bold, design: .rounded)
   /// Page hero.
   public static let pageHero = Font.largeTitle.weight(.bold)
