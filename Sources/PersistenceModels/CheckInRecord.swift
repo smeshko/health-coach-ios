@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 import GRDB
 
@@ -15,5 +16,20 @@ public struct CheckInRecord: Codable, Equatable, Sendable, FetchableRecord, Pers
     self.giSymptoms = giSymptoms
     self.kneePain = kneePain
     self.illness = illness
+  }
+
+  /// Map a domain check-in into a record (straight field copy).
+  public init(domain: DomainModels.CheckIn) {
+    self.init(
+      date: domain.date,
+      giSymptoms: domain.giSymptoms,
+      kneePain: domain.kneePain,
+      illness: domain.illness
+    )
+  }
+
+  /// Reconstruct the domain check-in (straight field copy).
+  public func toDomain() -> DomainModels.CheckIn {
+    DomainModels.CheckIn(date: date, giSymptoms: giSymptoms, kneePain: kneePain, illness: illness)
   }
 }

@@ -16,6 +16,16 @@ public struct SyncWatermarkRecord: Codable, Equatable, Sendable, FetchableRecord
     self.anchor = anchor
     self.serverTime = serverTime
   }
+
+  /// Map a domain watermark into the singleton record.
+  public init(domain: SyncWatermark) {
+    self.init(anchor: domain.anchor, serverTime: domain.serverTime)
+  }
+
+  /// Reconstruct the domain watermark.
+  public func toDomain() -> SyncWatermark {
+    SyncWatermark(anchor: anchor, serverTime: serverTime)
+  }
 }
 
 /// The domain value the ``SyncWatermarkRecord`` maps to/from.

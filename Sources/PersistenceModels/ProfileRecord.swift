@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 import GRDB
 
@@ -15,5 +16,18 @@ public struct ProfileRecord: Codable, Equatable, Sendable, FetchableRecord, Pers
     self.id = id
     self.constitutionVersion = constitutionVersion
     self.body = body
+  }
+
+  /// Serialize the domain profile into the singleton record.
+  public init(domain: DomainModels.Profile) throws {
+    try self.init(
+      constitutionVersion: domain.meta.constitutionVersion,
+      body: DomainBodyCoder.encode(domain)
+    )
+  }
+
+  /// Reconstruct the domain profile from the serialized `body` (lossless).
+  public func toDomain() throws -> DomainModels.Profile {
+    try DomainBodyCoder.decode(DomainModels.Profile.self, from: body)
   }
 }

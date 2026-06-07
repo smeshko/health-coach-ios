@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 import GRDB
 
@@ -19,5 +20,21 @@ public struct DailyBriefRecord: Codable, Equatable, Sendable, FetchableRecord, P
     self.generatedAt = generatedAt
     self.constitutionVersion = constitutionVersion
     self.body = body
+  }
+
+  /// Serialize a domain daily brief into a record (key/stamps copied, full value in `body`).
+  public init(domain: DomainModels.DailyBrief) throws {
+    try self.init(
+      date: domain.date,
+      cached: domain.cached,
+      generatedAt: domain.generatedAt,
+      constitutionVersion: domain.constitutionVersion,
+      body: DomainBodyCoder.encode(domain)
+    )
+  }
+
+  /// Reconstruct the domain daily brief from the serialized `body` (lossless).
+  public func toDomain() throws -> DomainModels.DailyBrief {
+    try DomainBodyCoder.decode(DomainModels.DailyBrief.self, from: body)
   }
 }

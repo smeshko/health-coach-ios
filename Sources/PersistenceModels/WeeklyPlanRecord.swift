@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 import GRDB
 
@@ -27,5 +28,22 @@ public struct WeeklyPlanRecord: Codable, Equatable, Sendable, FetchableRecord, P
     self.generatedAt = generatedAt
     self.cached = cached
     self.body = body
+  }
+
+  /// Serialize a domain weekly plan into a record (key/stamps copied, full value in `body`).
+  public init(domain: DomainModels.WeeklyPlan) throws {
+    try self.init(
+      isoWeek: domain.isoWeek,
+      weekStart: domain.weekStart,
+      constantsRecomputed: domain.constantsRecomputed,
+      generatedAt: domain.generatedAt,
+      cached: domain.cached,
+      body: DomainBodyCoder.encode(domain)
+    )
+  }
+
+  /// Reconstruct the domain weekly plan from the serialized `body` (lossless).
+  public func toDomain() throws -> DomainModels.WeeklyPlan {
+    try DomainBodyCoder.decode(DomainModels.WeeklyPlan.self, from: body)
   }
 }

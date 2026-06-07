@@ -166,6 +166,8 @@ let package = Package(
       name: "PersistenceModelsTests",
       dependencies: [
         "PersistenceModels",
+        "DomainModels",
+        "SampleData",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
