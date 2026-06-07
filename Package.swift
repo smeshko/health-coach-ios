@@ -16,6 +16,8 @@ let package = Package(
     .library(name: "WireDomainMapping", targets: ["WireDomainMapping"]),
     .library(name: "SampleData", targets: ["SampleData"]),
     .library(name: "PersistenceModels", targets: ["PersistenceModels"]),
+    .library(name: "TokenClient", targets: ["TokenClient"]),
+    .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -122,6 +124,27 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // Bearer-token store interface (read/write/clear). Interface target — only Dependencies.
+    .target(
+      name: "TokenClient",
+      dependencies: [
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // Keychain-backed TokenClient.liveValue. Links Security (system framework, imported directly).
+    .target(
+      name: "TokenClientLive",
+      dependencies: [
+        "TokenClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -155,6 +178,18 @@ let package = Package(
       dependencies: [
         "WireModels",
         "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // TokenClient tests — in-memory round-trip + guarded live Keychain round-trip.
+    .testTarget(
+      name: "TokenClientLiveTests",
+      dependencies: [
+        "TokenClient",
+        "TokenClientLive",
+        .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
