@@ -26,13 +26,13 @@ public struct HealthKitClient: Sendable {
 }
 
 extension HealthKitClient: TestDependencyKey {
-  // Real canned-fixture-backed values are wired in TASK-002; these stubs let the target compile.
+  /// Deterministic canned data from the interface-local fixture — no HealthKit, no `SampleData`.
   public static var testValue: HealthKitClient {
     HealthKitClient(
-      isHealthDataAvailable: { false },
+      isHealthDataAvailable: { true },
       requestAuthorization: {},
-      authorizationStatus: { [:] },
-      deltaSamples: { _ in .empty }
+      authorizationStatus: { CannedHealthSamples.authorizationStatusAllAuthorized() },
+      deltaSamples: { since in CannedHealthSamples.cannedSampleSet().filtered(after: since) }
     )
   }
 
