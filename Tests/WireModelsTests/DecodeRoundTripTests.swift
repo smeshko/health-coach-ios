@@ -70,6 +70,24 @@ final class DecodeRoundTripTests: XCTestCase {
     XCTAssertEqual(brief.data.generatedAt.timeIntervalSince1970, expected.timeIntervalSince1970, accuracy: 0.001)
   }
 
+  /// A winter (`+02:00`, no-DST) `date-time` decodes to the right instant and re-encodes with the
+  /// winter Sofia offset — proving the encode path is DST-aware, not just the June `+03:00` case.
+  func test_dateTime_winterInstantIsDstAware() throws {
+    let json = #"{ "status": "ok", "serverTime": "2026-01-15T07:30:00+02:00" }"#
+    let response = try decode(HealthResponse.self, from: json)
+
+    var utc = Calendar(identifier: .iso8601)
+    utc.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+    let expected = try XCTUnwrap(
+      utc.date(from: DateComponents(year: 2026, month: 1, day: 15, hour: 5, minute: 30))
+    )
+    XCTAssertEqual(response.serverTime.timeIntervalSince1970, expected.timeIntervalSince1970, accuracy: 0.001)
+
+    let reencoded = try encodedString(response)
+    XCTAssertTrue(reencoded.contains("+02:00"), "winter instant must encode with Sofia's +02:00 offset: \(reencoded)")
+    try assertRoundTrips(HealthResponse.self, from: json)
+  }
+
   // MARK: - Null vs absent are identical
 
   func test_nullVsAbsent_areIdentical() throws {
