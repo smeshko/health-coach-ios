@@ -127,6 +127,26 @@ final class SyncOrchestrationTests: XCTestCase {
     .envelope(code: code, message: "", detail: nil, status: status)
   }
 
+  func test_sync_envelopeUnauthorized_propagatesAPIError() async throws {
+    // An envelope-form 401 must ALSO be intercepted and re-thrown raw — `syncError` would otherwise
+    // map it to `.transient`, silently swallowing the 401.
+    let db = try DatabaseClient.makeInMemory()
+    let stubs = SyncStubs(apiResult: .failure(
+      .envelope(code: WireEnum(.unauthorized), message: "", detail: nil, status: 401)
+    ))
+
+    do {
+      _ = try await run(stubs: stubs, database: db) { try await SyncRepository.live.sync() }
+      XCTFail("expected a thrown error")
+    } catch let error as APIError {
+      XCTAssertTrue(isUnauthorized(error), "envelope 401 propagates as the raw APIError")
+    } catch {
+      XCTFail("expected APIError, got \(error)")
+    }
+    let mark = try await watermark(db)
+    XCTAssertNil(mark, "an envelope 401 must not advance the watermark")
+  }
+
   func test_apiError_mapsToSyncError() {
     XCTAssertEqual(syncError(env(WireEnum(.validationError), 422)), .validationFailed)
     XCTAssertEqual(syncError(env(WireEnum(.internalError), 500)), .serverError)
@@ -164,6 +184,11 @@ final class SyncOrchestrationTests: XCTestCase {
     )
     _ = try await run(stubs: syncedStubs, database: dbSynced) { try await SyncRepository.live.sync() }
     XCTAssertNil(syncedStubs.capturedRequest?.strengthTest, "already synced this week → omitted")
+    let syncedMark = try await watermark(dbSynced)
+    XCTAssertEqual(
+      syncedMark?.lastStrengthTestSyncedWeek, Self.currentWeek,
+      "the marker is preserved when no test is attached (not nilled)"
+    )
 
     // (c) Stale prior-week test: dated last week → omitted (never attach a stale value).
     let dbStale = try DatabaseClient.makeInMemory()
