@@ -26,6 +26,7 @@ let package = Package(
     .library(name: "HealthKitClientLive", targets: ["HealthKitClientLive"]),
     .library(name: "DevSettings", targets: ["DevSettings"]),
     .library(name: "DevSettingsLive", targets: ["DevSettingsLive"]),
+    .library(name: "BriefRepository", targets: ["BriefRepository"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -269,6 +270,21 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // BriefRepository interface — the daily/weekly get-or-generate seam features see. Depends only on
+    // DomainModels + CoachCore (ISOWeek) + SampleData (for `.mock`) + Dependencies — NO APIClient /
+    // Database / GRDB / *Live (the §3 repo-interface dependency rule). Owns `BriefError`.
+    .target(
+      name: "BriefRepository",
+      dependencies: [
+        "DomainModels",
+        "CoachCore",
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -416,6 +432,19 @@ let package = Package(
         "DevSettings",
         "DevSettingsLive",
         "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // BriefRepository interface tests (BriefError + testValue/.mock) — host, no simulator.
+    .testTarget(
+      name: "BriefRepositoryTests",
+      dependencies: [
+        "BriefRepository",
+        "SampleData",
+        "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       swiftSettings: [
