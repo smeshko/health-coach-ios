@@ -11,6 +11,7 @@ let package = Package(
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
+    .library(name: "WireModels", targets: ["WireModels"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -49,6 +50,17 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // Wire-contract DTOs (Codable mirror of openapi.yaml). Bottom-of-graph: depends only on
+    // CoachCore (+ Foundation). Must NOT import TCA / GRDB / DomainModels (ARCHITECTURE §4.1).
+    .target(
+      name: "WireModels",
+      dependencies: [
+        "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // Shared test helper (light+dark / single reference device snapshot convention). Links XCTest via
     // SnapshotTesting, so it must be depended on ONLY by test targets — never by the app or a shipping
     // library, or the app build breaks. All UIKit-only code is wrapped in `#if canImport(UIKit)` so
@@ -68,6 +80,18 @@ let package = Package(
       dependencies: [
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // Wire decode/round-trip tests — pure Foundation, run on the macOS host via `swift test`
+    // (no simulator needed).
+    .testTarget(
+      name: "WireModelsTests",
+      dependencies: [
+        "WireModels",
+        "CoachCore",
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
