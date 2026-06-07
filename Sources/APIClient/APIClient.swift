@@ -12,7 +12,10 @@ public struct APIClient: Sendable {
   public var dailyBrief: @Sendable (_ date: Date?, _ refresh: Bool) async throws -> DailyBrief
   public var weeklyBrief: @Sendable (_ isoWeek: String?, _ refresh: Bool) async throws -> WeeklyPlan
   public var profile: @Sendable () async throws -> ProfileResponse
-  /// The 401 / session-event stream `AppFeature` subscribes to (Epic 06).
+  /// The 401 / session-event stream `AppFeature` subscribes to (Epic 06). By design there is exactly
+  /// **one** consumer (`AppFeature`'s long-running effect): the live client returns a single shared
+  /// `AsyncStream`, so iterating it from more than one place would split events arbitrarily
+  /// (DECISIONS §3).
   public var sessionEvents: @Sendable () -> AsyncStream<SessionEvent>
 
   public init(
