@@ -163,9 +163,23 @@ final class TransportTests: XCTestCase {
     XCTAssertEqual(URLProtocolStub.box.recordedRequests.count, 1)
   }
 
+  // MARK: - probe (200 → true; 401 → throws via the session-stream path)
+
+  func test_probe_success_returnsTrue() async throws {
+    URLProtocolStub.box.setResponses([.init(status: 200, data: Data(#"{"db":true}"#.utf8))])
+    let result = try await makeClient().probe()
+    XCTAssertTrue(result)
+  }
+
+  func test_probe_401_throwsUnauthorized() async throws {
+    URLProtocolStub.box.setResponses([.init(status: 401, data: Data())])
+    let client = makeClient()
+    await assertThrows(.unauthorized, from: { try await client.probe() })
+  }
+
   // MARK: - 401 stream
 
-  func test_401_emitsUnauthorizedOnce_andThrows_withoutRetry() async throws {
+  func test_401_emitsUnauthorized_andThrows_withoutRetry() async throws {
     URLProtocolStub.box.setResponses([.init(status: 401, data: Data())])
     let client = makeClient()
     let events = client.sessionEvents()
@@ -174,6 +188,7 @@ final class TransportTests: XCTestCase {
     var iterator = events.makeAsyncIterator()
     let event = await iterator.next()
     XCTAssertEqual(event, .unauthorized)
+    // Exactly one request was made (no retry), which means exactly one `.unauthorized` was yielded.
     XCTAssertEqual(URLProtocolStub.box.recordedRequests.count, 1)
   }
 
