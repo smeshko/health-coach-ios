@@ -80,11 +80,11 @@ public struct NarrativeRenderer: View {
     return orderedListItem(line)
   }
 
-  /// The content after an ordered `N. ` / `NN. ` prefix, or `nil`.
+  /// The content after an ordered `N. ` prefix (any number of leading digits), or `nil`.
   private func orderedListItem(_ line: String) -> String? {
     var digits = ""
     var index = line.startIndex
-    while index < line.endIndex, line[index].isNumber, digits.count < 2 {
+    while index < line.endIndex, line[index].isNumber {
       digits.append(line[index])
       index = line.index(after: index)
     }
