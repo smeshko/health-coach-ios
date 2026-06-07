@@ -96,6 +96,25 @@ final class DecodeRoundTripTests: XCTestCase {
     XCTAssertTrue(reencoded.contains("warp_drive"), "unknown card must round-trip its raw value")
   }
 
+  func test_unknownEnum_optionalAndArrayNestedDoNotCrash() throws {
+    // Optional enum field (SafetyGate.overrideTo).
+    let gate = try decode(
+      SafetyGate.self, from: #"{"triggered":true,"reasons":[],"overrideTo":"warp_drive"}"#
+    )
+    XCTAssertEqual(gate.overrideTo, .unknown("warp_drive"))
+
+    // Array-nested enums (narrative[].type, core[].card) + an optional enum nested in an array
+    // (core[].suggestedDay) — all must decode to `.unknown`, never throw.
+    let json = Fixtures.weeklyPlan
+      .replacingOccurrences(of: #""type": "plan""#, with: #""type": "moon_calendar""#)
+      .replacingOccurrences(of: #""card": "long_run""#, with: #""card": "warp_drive""#)
+      .replacingOccurrences(of: #""suggestedDay": "sun""#, with: #""suggestedDay": "someday""#)
+    let plan = try decode(WeeklyPlan.self, from: json)
+    XCTAssertEqual(plan.narrative.first?.type, .unknown("moon_calendar"))
+    XCTAssertEqual(plan.data.core.first?.card, .unknown("warp_drive"))
+    XCTAssertEqual(plan.data.core.first?.suggestedDay, .unknown("someday"))
+  }
+
   func test_unknownFlagString_doesNotCrash() throws {
     let json = Fixtures.dailyBrief.replacingOccurrences(
       of: #""flags": ["zone2"]"#, with: #""flags": ["taper", "moon_phase"]"#
