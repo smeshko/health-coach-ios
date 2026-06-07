@@ -19,6 +19,7 @@ let package = Package(
     .library(name: "TokenClient", targets: ["TokenClient"]),
     .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
     .library(name: "APIClient", targets: ["APIClient"]),
+    .library(name: "APIClientLive", targets: ["APIClientLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -34,6 +35,9 @@ let package = Package(
     // GRDB — SQLite record protocols for the PersistenceModels cache layer (§18: GRDB pinned
     // directly; SharingGRDB wraps it in Epic 04, but only the GRDB record protocols are used here).
     .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
+    // swift-clocks — `TestClock` to advance the APIClient retry backoff instantly in tests. The
+    // `\.continuousClock` dependency key itself is in swift-dependencies; only the test clock is here.
+    .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
     // Test-only: SwiftUI image snapshots. Used only by CoachTestSupport + the snapshot test target.
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
   ],
@@ -160,6 +164,23 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // URLSession-backed APIClient.liveValue — the Endpoint routes, request builder, and the single
+    // generic send<R> transport (auth, retry, envelope decode, 401 stream). Depends on the APIClient
+    // interface + TokenClient + WireModels (§4.2). The `\.continuousClock` retry key comes from
+    // Dependencies.
+    .target(
+      name: "APIClientLive",
+      dependencies: [
+        "APIClient",
+        "TokenClient",
+        "WireModels",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -203,8 +224,11 @@ let package = Package(
       name: "APIClientLiveTests",
       dependencies: [
         "APIClient",
+        "APIClientLive",
+        "TokenClient",
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "Clocks", package: "swift-clocks"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
