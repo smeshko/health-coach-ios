@@ -6,25 +6,9 @@ import XCTest
 final class BriefMappingTests: XCTestCase {
   func test_dailyBrief_fullyPopulated_carriesEveryField() throws {
     let brief = try domainDailyBrief(WireFixtures.dailyBrief())
-
-    XCTAssertEqual(brief.date, WireFixtures.day(2026, 6, 6))
-    XCTAssertEqual(brief.readiness.score, 82)
-    XCTAssertEqual(brief.readiness.band, .green)
-    XCTAssertEqual(brief.readiness.penalties, [ReadinessPenalty(factor: .hrvBelowBaseline, points: 8)])
-    XCTAssertEqual(brief.session.card, .easyRun)
-    XCTAssertEqual(brief.session.intensity, .easy)
-    XCTAssertEqual(brief.session.zoneTarget, .z2)
-    // Free-string flags map to typed flags, unknown preserved verbatim.
-    XCTAssertEqual(brief.session.flags, [.impact, .unknown("totally_new_flag")])
-    XCTAssertEqual(brief.safetyGate.reasons, [.giFlare, .unknown("brand_new_reason")])
-    XCTAssertEqual(brief.macroFocus.dayType, .moderate)
-    XCTAssertEqual(brief.alternatives.count, 1)
-    XCTAssertEqual(brief.alternatives.first?.card, .activeRecovery)
-    XCTAssertEqual(brief.narrative.map(\.type), [.summary])
-    XCTAssertEqual(brief.generatedAt, WireFixtures.generatedAt)
-    XCTAssertEqual(brief.constitutionVersion, "v3")
-    XCTAssertNotNil(brief.intakeYesterday)
-    XCTAssertEqual(brief.intakeYesterday?.vsTarget.proteinHit, true)
+    // Full-struct equality enforces totality structurally — every field must match, so a future
+    // same-typed field transposition (e.g. fatGLow/fatGHigh) cannot pass silently.
+    XCTAssertEqual(brief, DomainFixtures.dailyBrief())
   }
 
   func test_dailyBrief_nullIntakeYesterday_mapsToNil() throws {
@@ -80,19 +64,8 @@ final class BriefMappingTests: XCTestCase {
 
   func test_weeklyPlan_fullyPopulated_carriesEveryField() throws {
     let plan = try domainWeeklyPlan(WireFixtures.weeklyPlan())
-    XCTAssertEqual(plan.isoWeek, "2026-W24")
-    XCTAssertEqual(plan.weekStart, WireFixtures.day(2026, 6, 8))
-    XCTAssertEqual(plan.budgets.longRunKm, 18.0)
-    XCTAssertEqual(plan.core.count, 1)
-    XCTAssertEqual(plan.core.first?.card, .longRun)
-    XCTAssertEqual(plan.core.first?.suggestedDay, .sun)
-    XCTAssertEqual(plan.extras, [])
-    XCTAssertEqual(plan.targets.totalRunKm, 45.0)
-    XCTAssertEqual(plan.nutrition.dayTypePattern.count, 1)
-    XCTAssertEqual(plan.nutrition.dayTypePattern.first?.dayType, .moderate)
-    XCTAssertEqual(plan.nutrition.restDay?.caloriesKcal, 2200)
-    XCTAssertEqual(plan.nutrition.lastWeek?.proteinHitDays, 5)
-    XCTAssertEqual(plan.narrative.map(\.type), [.plan])
+    // Full-struct equality — totality enforced structurally (see daily-brief note above).
+    XCTAssertEqual(plan, DomainFixtures.weeklyPlan())
   }
 
   func test_weeklyPlan_nilRestDayAndLastWeek_mapToNil() throws {
