@@ -777,6 +777,20 @@ let package = Package(
     // View snapshot tests — run only on an iOS 26 simulator via `xcodebuild test`. The whole body is
     // `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host (so `swift test`
     // stays green); SwiftUI image snapshots use the iOS-only ViewImageConfig/.device API.
+    // DesignSystem view snapshots (the token/label catalog) — iOS 26 simulator only, via
+    // `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host.
+    .testTarget(
+      name: "DesignSystemSnapshotTests",
+      dependencies: [
+        "DesignSystem",
+        "CoachTestSupport",
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     .testTarget(
       name: "AppFeatureSnapshotTests",
       dependencies: [
