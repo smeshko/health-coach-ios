@@ -18,6 +18,7 @@ let package = Package(
     .library(name: "PersistenceModels", targets: ["PersistenceModels"]),
     .library(name: "TokenClient", targets: ["TokenClient"]),
     .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
+    .library(name: "APIClient", targets: ["APIClient"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -145,6 +146,20 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // The network client interface — concrete typed closures for the six routes + a session-event
+    // stream, plus `APIError`/`SessionEvent`. No URLSession here (that's APIClientLive). Repos/
+    // features depend only on this (§4.2/§6.1).
+    .target(
+      name: "APIClient",
+      dependencies: [
+        "CoachCore",
+        "WireModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -178,6 +193,18 @@ let package = Package(
       dependencies: [
         "WireModels",
         "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // APIClient interface + transport tests (transport bits land in TASK-003/004).
+    .testTarget(
+      name: "APIClientLiveTests",
+      dependencies: [
+        "APIClient",
+        "WireModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
