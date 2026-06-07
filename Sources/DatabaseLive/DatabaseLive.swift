@@ -6,16 +6,17 @@ import GRDB
 // `Database` is ambiguous in this file (this module's client struct vs `GRDB.Database`), so the
 // client is referenced via the `DatabaseClient` alias the interface exports.
 public extension DatabaseClient {
-  /// Open (or create) the on-disk SQLite database at `path`. Migrations are run by ``makeLive`` /
-  /// ``makeInMemory`` once the migrator is wired (TASK-002).
+  /// Open (or create) the on-disk SQLite database at `path` and run migrations.
   static func makeLive(path: String) throws -> DatabaseClient {
     let queue = try DatabaseQueue(path: path)
+    try migrator.migrate(queue)
     return make(queue: queue)
   }
 
-  /// An in-memory database (migrated once the migrator is wired) — the fixture DB-backed tests use.
+  /// A migrated in-memory database — the fixture DB-backed tests use.
   static func makeInMemory() throws -> DatabaseClient {
     let queue = try DatabaseQueue()
+    try migrator.migrate(queue)
     return make(queue: queue)
   }
 
