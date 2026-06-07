@@ -69,8 +69,9 @@ enum WireDateFormatters {
     calendarDate.string(from: date)
   }
 
-  /// Render an instant as a Europe/Sofia ISO-8601 `date-time` string.
+  /// Render an instant as a Europe/Sofia ISO-8601 `date-time` string, **with** fractional seconds
+  /// so a sub-second instant survives a decode → encode → decode round-trip exactly.
   static func isoString(from date: Date) -> String {
-    isoInstant.string(from: date)
+    isoInstantWithFractionalSeconds.string(from: date)
   }
 }
