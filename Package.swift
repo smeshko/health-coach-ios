@@ -36,6 +36,7 @@ let package = Package(
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
     .library(name: "ProfileRepository", targets: ["ProfileRepository"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
+    .library(name: "DesignSystem", targets: ["DesignSystem"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -437,6 +438,19 @@ let package = Package(
         "WireDomainMapping",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The design system — color/typography/spacing tokens + the enum→label boundary (§9, §4.4, D19).
+    // Pure SwiftUI value code; depends ONLY on DomainModels + CoachCore (never repositories /
+    // WireModels / APIClient / GRDB).
+    .target(
+      name: "DesignSystem",
+      dependencies: [
+        "DomainModels",
+        "CoachCore",
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
