@@ -12,7 +12,7 @@ import XCTest
 @testable import CheckInRepositoryLive
 
 final class CheckInRepositoryLiveTests: XCTestCase {
-  /// A fixed Europe/Sofia instant (~08:00 on 2026-06-06). `static` so the `@Sendable` work closures
+  /// A fixed Europe/Sofia instant (~09:00 on 2026-06-06). `static` so the `@Sendable` work closures
   /// capture it without capturing the (non-Sendable) test case.
   private static let now = Date(timeIntervalSince1970: 1_780_725_600)
 

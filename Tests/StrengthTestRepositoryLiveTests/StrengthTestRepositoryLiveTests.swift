@@ -12,7 +12,7 @@ import XCTest
 @testable import StrengthTestRepositoryLive
 
 final class StrengthTestRepositoryLiveTests: XCTestCase {
-  /// ~08:00 on 2026-06-08 (Europe/Sofia). `static` so the `@Sendable` work closures don't capture the
+  /// ~09:00 on 2026-06-08 (Europe/Sofia). `static` so the `@Sendable` work closures don't capture the
   /// test case.
   private static let now = Date(timeIntervalSince1970: 1_780_898_400)
 
