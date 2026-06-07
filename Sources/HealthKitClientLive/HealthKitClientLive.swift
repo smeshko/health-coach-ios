@@ -7,8 +7,8 @@ import HealthKitClient
 
   /// A `Sendable` holder for the (non-`Sendable`) `HKHealthStore`. `HKHealthStore` is thread-safe for
   /// queries/authorization, so an `@unchecked Sendable` box is sound and keeps the `@Sendable` client
-  /// closures strict-concurrency-clean.
-  private final class HealthStoreBox: @unchecked Sendable {
+  /// closures (and the concurrent delta-read tasks) strict-concurrency-clean.
+  final class HealthStoreBox: @unchecked Sendable {
     let store = HKHealthStore()
   }
 
@@ -22,7 +22,7 @@ import HealthKitClient
           try await box.store.requestAuthorization(toShare: [], read: HKTypeCatalog.allReadTypes)
         },
         authorizationStatus: { liveAuthorizationStatus(store: box.store) },
-        deltaSamples: { since in try await liveDeltaSamples(store: box.store, since: since) }
+        deltaSamples: { since in try await liveDeltaSamples(box: box, since: since) }
       )
     }()
   }
