@@ -25,6 +25,7 @@ let package = Package(
     .library(name: "HealthKitClient", targets: ["HealthKitClient"]),
     .library(name: "HealthKitClientLive", targets: ["HealthKitClientLive"]),
     .library(name: "DevSettings", targets: ["DevSettings"]),
+    .library(name: "DevSettingsLive", targets: ["DevSettingsLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -254,6 +255,20 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // UserDefaults-backed DevSettings.liveValue + the launch-arg/env override seed. DEBUG-only
+    // behaviour; in RELEASE `useMockData()` is hard-`false`, the override body is empty, and the
+    // writers are no-ops (`#if DEBUG` guards). Depends only on DevSettings + SampleData + Foundation.
+    .target(
+      name: "DevSettingsLive",
+      dependencies: [
+        "DevSettings",
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -399,6 +414,7 @@ let package = Package(
       name: "DevSettingsTests",
       dependencies: [
         "DevSettings",
+        "DevSettingsLive",
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
