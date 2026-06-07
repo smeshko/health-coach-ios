@@ -6,7 +6,7 @@ import Foundation
 /// Use `ISOWeek.current` / `ISOWeek.containing(_:)` so the math runs against the injected
 /// `\.calendar` and `\.date` dependencies — deterministic in tests, and pinned to Europe/Sofia
 /// at the composition root (see ``useEuropeSofia()``).
-public struct ISOWeek: Equatable, Hashable, Sendable {
+public struct ISOWeek: Equatable, Hashable, Sendable, Codable {
   /// The ISO week-numbering year (`yearForWeekOfYear`) — may differ from the calendar year near
   /// year boundaries (e.g. 2025-12-29 belongs to ISO year 2026).
   public let year: Int

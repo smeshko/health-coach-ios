@@ -32,6 +32,8 @@ let package = Package(
     .library(name: "CheckInRepositoryLive", targets: ["CheckInRepositoryLive"]),
     .library(name: "StrengthTestRepository", targets: ["StrengthTestRepository"]),
     .library(name: "StrengthTestRepositoryLive", targets: ["StrengthTestRepositoryLive"]),
+    .library(name: "SyncRepository", targets: ["SyncRepository"]),
+    .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -370,6 +372,42 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // SyncRepository interface — the no-args sync() orchestrator seam. Interface deps: DomainModels +
+    // Dependencies only (SyncResult/SyncError are domain types). No HealthKit/APIClient/Database here.
+    .target(
+      name: "SyncRepository",
+      dependencies: [
+        "DomainModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // SyncRepository.live — reads HK deltas since the watermark, attaches inputs, POSTs /sync, advances
+    // the watermark only on success. Depends on the data-source + repo INTERFACES + model layers. The
+    // HK→wire mapping lives here (3.3 boundary decision).
+    .target(
+      name: "SyncRepositoryLive",
+      dependencies: [
+        "SyncRepository",
+        "HealthKitClient",
+        "APIClient",
+        "Database",
+        "CheckInRepository",
+        "StrengthTestRepository",
+        "WireModels",
+        "DomainModels",
+        "PersistenceModels",
+        "SampleData",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -455,6 +493,7 @@ let package = Package(
         "DatabaseLive",
         "Database",
         "PersistenceModels",
+        "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
@@ -469,6 +508,7 @@ let package = Package(
         "PersistenceModels",
         "DomainModels",
         "SampleData",
+        "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
@@ -587,6 +627,43 @@ let package = Package(
         "DatabaseLive",
         "PersistenceModels",
         "DomainModels",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // SyncRepository interface tests (SyncResult/SyncError + testValue) — host.
+    .testTarget(
+      name: "SyncRepositoryTests",
+      dependencies: [
+        "SyncRepository",
+        "DomainModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // SyncRepository.live orchestration + HK→wire mapping + APIError mapping tests — host, all client
+    // deps stubbed + a migrated in-memory Database.
+    .testTarget(
+      name: "SyncRepositoryLiveTests",
+      dependencies: [
+        "SyncRepositoryLive",
+        "SyncRepository",
+        "HealthKitClient",
+        "APIClient",
+        "Database",
+        "DatabaseLive",
+        "CheckInRepository",
+        "StrengthTestRepository",
+        "WireModels",
+        "DomainModels",
+        "PersistenceModels",
+        "SampleData",
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),

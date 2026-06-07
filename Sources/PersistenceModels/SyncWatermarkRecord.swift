@@ -1,8 +1,10 @@
+import CoachCore
 import Foundation
 import GRDB
 
 /// The sync watermark — a singleton row (fixed primary key `id == 1`) holding the last HealthKit
-/// anchor and the server time of the last successful sync.
+/// anchor, the server time of the last successful sync, and the year-qualified ISO week of the last
+/// *synced* strength test.
 public struct SyncWatermarkRecord: Codable, Equatable, Sendable, FetchableRecord, PersistableRecord {
   public static let databaseTableName = "syncWatermark"
 
@@ -10,21 +12,39 @@ public struct SyncWatermarkRecord: Codable, Equatable, Sendable, FetchableRecord
   public var id: Int
   public var anchor: String?
   public var serverTime: Date
+  /// The year-qualified ISO week of the last *synced* strength test (Phase 4.3 — gates "attach a
+  /// strength test only when due"). `nil` = none synced yet. A nested `Codable` value, so GRDB stores
+  /// it as JSON in the additive `lastStrengthTestSyncedWeek` column.
+  public var lastStrengthTestSyncedWeek: ISOWeek?
 
-  public init(id: Int = 1, anchor: String?, serverTime: Date) {
+  public init(
+    id: Int = 1,
+    anchor: String?,
+    serverTime: Date,
+    lastStrengthTestSyncedWeek: ISOWeek? = nil
+  ) {
     self.id = id
     self.anchor = anchor
     self.serverTime = serverTime
+    self.lastStrengthTestSyncedWeek = lastStrengthTestSyncedWeek
   }
 
   /// Map a domain watermark into the singleton record.
   public init(domain: SyncWatermark) {
-    self.init(anchor: domain.anchor, serverTime: domain.serverTime)
+    self.init(
+      anchor: domain.anchor,
+      serverTime: domain.serverTime,
+      lastStrengthTestSyncedWeek: domain.lastStrengthTestSyncedWeek
+    )
   }
 
   /// Reconstruct the domain watermark.
   public func toDomain() -> SyncWatermark {
-    SyncWatermark(anchor: anchor, serverTime: serverTime)
+    SyncWatermark(
+      anchor: anchor,
+      serverTime: serverTime,
+      lastStrengthTestSyncedWeek: lastStrengthTestSyncedWeek
+    )
   }
 }
 
@@ -36,9 +56,11 @@ public struct SyncWatermarkRecord: Codable, Equatable, Sendable, FetchableRecord
 public struct SyncWatermark: Equatable, Sendable {
   public var anchor: String?
   public var serverTime: Date
+  public var lastStrengthTestSyncedWeek: ISOWeek?
 
-  public init(anchor: String?, serverTime: Date) {
+  public init(anchor: String?, serverTime: Date, lastStrengthTestSyncedWeek: ISOWeek? = nil) {
     self.anchor = anchor
     self.serverTime = serverTime
+    self.lastStrengthTestSyncedWeek = lastStrengthTestSyncedWeek
   }
 }
