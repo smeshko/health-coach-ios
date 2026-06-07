@@ -47,6 +47,20 @@ final class DailyCachePolicyTests: XCTestCase {
     XCTAssertEqual(stub.dailyCallCount, 0, "an un-synced miss must not hit the network")
   }
 
+  func test_dailyBrief_refreshUnsynced_throwsSyncRequired() async throws {
+    // A refresh on an un-synced state is still gated (locked: PLAN line 66 / Decisions).
+    let (_, domain) = try greenFixture()
+    let db = try TestDatabase.makeInMemory() // no watermark
+    let stub = StubAPIClient()
+
+    await expectBriefError(.syncRequired) {
+      try await runWithSofia(now: domain.date, stub: stub, database: db) {
+        try await BriefRepository.live.dailyBrief(true)
+      }
+    }
+    XCTAssertEqual(stub.dailyCallCount, 0, "an un-synced refresh must not hit the network")
+  }
+
   func test_dailyBrief_missSynced_generatesAndPersists() async throws {
     let (dto, domain) = try greenFixture()
     let db = try TestDatabase.makeInMemory()

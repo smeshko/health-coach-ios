@@ -53,6 +53,39 @@ final class WeeklyCachePolicyTests: XCTestCase {
     XCTAssertEqual(stub.weeklyCallCount, 0)
   }
 
+  func test_weeklyBrief_refreshUnsynced_throwsSyncRequired() async throws {
+    let (_, domain) = try deloadFixture()
+    let db = try TestDatabase.makeInMemory() // no watermark
+    let stub = StubAPIClient()
+
+    await expectBriefError(.syncRequired) {
+      try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
+        try await BriefRepository.live.weeklyBrief(nil, true)
+      }
+    }
+    XCTAssertEqual(stub.weeklyCallCount, 0, "an un-synced refresh must not hit the network")
+  }
+
+  func test_weeklyBrief_specificWeek_passesKeyAndRoundTrips() async throws {
+    let (dto, domain) = try deloadFixture()
+    let week = ISOWeek(year: 2026, week: 24) // matches the deload fixture's isoWeek "2026-W24"
+    let db = try TestDatabase.makeInMemory()
+    try await TestDatabase.seedWatermark(db)
+    let stub = StubAPIClient(weeklyResult: .success(dto))
+
+    let first = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
+      try await BriefRepository.live.weeklyBrief(week, false)
+    }
+    let second = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
+      try await BriefRepository.live.weeklyBrief(week, false)
+    }
+
+    XCTAssertEqual(first, domain)
+    XCTAssertEqual(second, domain)
+    XCTAssertEqual(stub.weeklyCallCount, 1, "a specific-week generate then re-read is a cache hit (key↔PK agree)")
+    XCTAssertEqual(stub.lastWeeklyArg, .some("2026-W24"), "a specific week passes the formatted key as the API arg")
+  }
+
   func test_weeklyBrief_missSynced_generatesAndPersists() async throws {
     let (dto, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory()
