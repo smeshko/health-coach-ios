@@ -34,6 +34,8 @@ let package = Package(
     .library(name: "StrengthTestRepositoryLive", targets: ["StrengthTestRepositoryLive"]),
     .library(name: "SyncRepository", targets: ["SyncRepository"]),
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
+    .library(name: "ProfileRepository", targets: ["ProfileRepository"]),
+    .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -408,6 +410,38 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // ProfileRepository interface — cache-first profile fetch + zone-range accessor + recompute stream.
+    // Interface deps: DomainModels + SampleData (for .mock/testValue) + Dependencies only.
+    .target(
+      name: "ProfileRepository",
+      dependencies: [
+        "DomainModels",
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ProfileRepository.live — fetch GET /profile, map via WireDomainMapping, cache via Database; owns
+    // the recompute AsyncStream. Depends on the data-source INTERFACES + model layers + WireDomainMapping.
+    .target(
+      name: "ProfileRepositoryLive",
+      dependencies: [
+        "ProfileRepository",
+        "APIClient",
+        "Database",
+        "WireModels",
+        "DomainModels",
+        "PersistenceModels",
+        "WireDomainMapping",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -665,6 +699,39 @@ let package = Package(
         "PersistenceModels",
         "SampleData",
         "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ProfileRepository interface + mock tests — host.
+    .testTarget(
+      name: "ProfileRepositoryTests",
+      dependencies: [
+        "ProfileRepository",
+        "DomainModels",
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ProfileRepository.live cache/refresh/recompute tests — host, stubbed APIClient + in-memory DB.
+    .testTarget(
+      name: "ProfileRepositoryLiveTests",
+      dependencies: [
+        "ProfileRepositoryLive",
+        "ProfileRepository",
+        "APIClient",
+        "Database",
+        "DatabaseLive",
+        "WireModels",
+        "DomainModels",
+        "PersistenceModels",
+        "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
