@@ -24,7 +24,8 @@ enum WireFixtures {
       durationMinHigh: 55,
       flags: flags,
       zoneTarget: .known(.z2),
-      hrCapBpm: 150
+      hrCapBpm: 150,
+      cadenceSpm: 180
     )
   }
 
@@ -84,7 +85,9 @@ enum WireFixtures {
 
   static func weeklyPlan(
     restDay: WireModels.RestDayNutrition? = WireModels.RestDayNutrition(caloriesKcal: 2200, carbsG: 220),
-    lastWeek: WireModels.LastWeekNutrition? = WireModels.LastWeekNutrition(avgCaloriesKcal: 2550, proteinHitDays: 5)
+    lastWeek: WireModels.LastWeekNutrition? = WireModels.LastWeekNutrition(
+      avgCaloriesKcal: 2550, avgProteinG: 168, proteinHitDays: 5, daysOverTarget: 1, daysUnderTarget: 2
+    )
   ) -> WireModels.WeeklyPlan {
     WireModels.WeeklyPlan(
       data: WireModels.WeeklyPlanData(
@@ -96,7 +99,8 @@ enum WireFixtures {
         core: [
           WireModels.PlannedSession(
             card: .known(.longRun), tier: .known(.core), intensity: .known(.easy),
-            isHardDay: false, flags: ["impact"], suggestedDay: .known(.sun)
+            isHardDay: false, flags: ["impact"], suggestedDay: .known(.sun),
+            durationMinLow: 80, durationMinHigh: 100
           ),
         ],
         extras: [],

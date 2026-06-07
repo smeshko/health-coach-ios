@@ -12,6 +12,7 @@ enum DomainFixtures {
       durationMinLow: 40,
       durationMinHigh: 55,
       hrCapBpm: 150,
+      cadenceSpm: 180,
       flags: [.impact, .unknown("totally_new_flag")]
     )
   }
@@ -67,6 +68,8 @@ enum DomainFixtures {
           intensity: .easy,
           isHardDay: false,
           suggestedDay: .sun,
+          durationMinLow: 80,
+          durationMinHigh: 100,
           flags: [.impact]
         ),
       ],
@@ -87,7 +90,9 @@ enum DomainFixtures {
           ),
         ],
         restDay: DomainModels.RestDayNutrition(caloriesKcal: 2200, carbsG: 220),
-        lastWeek: DomainModels.LastWeekNutrition(avgCaloriesKcal: 2550, proteinHitDays: 5)
+        lastWeek: DomainModels.LastWeekNutrition(
+          avgCaloriesKcal: 2550, avgProteinG: 168, proteinHitDays: 5, daysOverTarget: 1, daysUnderTarget: 2
+        )
       ),
       constantsRecomputed: false,
       generatedAt: WireFixtures.generatedAt,
