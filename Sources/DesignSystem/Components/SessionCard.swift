@@ -26,6 +26,19 @@ struct SessionCardModel {
     flags = block.flags
     isHardDay = false
   }
+
+  init(_ planned: PlannedSession) {
+    card = planned.card
+    intensity = planned.intensity
+    zoneTarget = planned.zoneTarget
+    durationMinLow = planned.durationMinLow
+    durationMinHigh = planned.durationMinHigh
+    // Weekly sessions carry no HR cap / cadence.
+    hrCapBpm = nil
+    cadenceSpm = nil
+    flags = planned.flags
+    isHardDay = planned.isHardDay
+  }
 }
 
 /// The hero session component — renders a session's card name, duration range, an embedded `ZoneChip`,
@@ -40,8 +53,8 @@ public struct SessionCard: View {
     self.zoneRange = zoneRange
   }
 
-  init(model: SessionCardModel, zoneRange: ZoneRange?) {
-    self.model = model
+  public init(_ planned: PlannedSession, zoneRange: ZoneRange? = nil) {
+    model = SessionCardModel(planned)
     self.zoneRange = zoneRange
   }
 
@@ -50,6 +63,11 @@ public struct SessionCard: View {
     return low == high ? "\(low) min" : "\(low)–\(high) min"
   }
 
+  /// `effort_based` (long run) — de-emphasize the HR ceiling; lean on duration + cadence ("by feel").
+  var isEffortBased: Bool { model.flags.contains(.effortBased) }
+  /// `append_to_easy` (strides) — render an add-on attached to the run, not a standalone card.
+  var hasStridesAddon: Bool { model.flags.contains(.appendToEasy) }
+
   public var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.space12) {
       header
@@ -57,6 +75,12 @@ public struct SessionCard: View {
         ZoneChip(zone: zone, range: zoneRange)
       }
       detailRow
+      if model.isHardDay {
+        Pill("Hard day", tone: .warning, leading: .dot)
+      }
+      if hasStridesAddon {
+        stridesAddon
+      }
       if !model.flags.isEmpty {
         flagRow
       }
@@ -98,16 +122,31 @@ public struct SessionCard: View {
     }
   }
 
-  /// Numeric cues authored over the session's `data` (not enum keys): HR cap + cadence when present.
+  /// Numeric cues authored over the session's `data` (not enum keys). For an `effort_based` run the HR
+  /// cap is suppressed in favor of a "By feel" cue + cadence (the cap stays in the model, just quieted).
   var detailCues: [String] {
     var cues: [String] = []
-    if let cap = model.hrCapBpm {
+    if isEffortBased {
+      cues.append("By feel")
+    } else if let cap = model.hrCapBpm {
       cues.append("HR ≤\(cap) bpm")
     }
     if let cadence = model.cadenceSpm {
       cues.append("~\(cadence) spm")
     }
     return cues
+  }
+
+  private var stridesAddon: some View {
+    HStack(spacing: CoachSpacing.space6) {
+      Image(systemName: Icon.prehab.systemName).foregroundStyle(CoachColor.accent)
+      Text("Strides — attached to this run")
+        .font(CoachFont.caption)
+        .foregroundStyle(CoachColor.foregroundMuted)
+    }
+    .padding(.horizontal, CoachSpacing.space10)
+    .padding(.vertical, CoachSpacing.space6)
+    .background(RoundedRectangle(cornerRadius: CoachRadius.sm).fill(CoachColor.accentSoft))
   }
 
   private var flagRow: some View {
