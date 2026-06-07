@@ -54,6 +54,15 @@ extension DatabaseClient {
       }
     }
 
+    // Additive (Phase 4.3 / TASK-006): the year-qualified ISO-week marker the sync orchestrator uses
+    // to attach a strength test only when due. Nullable, stored as JSON; `DatabaseMigrator` records
+    // applied identifiers so a re-run is a no-op. Existing anchor/serverTime are untouched.
+    migrator.registerMigration("v2_addLastStrengthTestSyncedWeek") { db in
+      try db.alter(table: SyncWatermarkRecord.databaseTableName) { table in
+        table.add(column: "lastStrengthTestSyncedWeek", .text)
+      }
+    }
+
     return migrator
   }
 }

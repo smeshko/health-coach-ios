@@ -468,6 +468,7 @@ let package = Package(
         "DatabaseLive",
         "Database",
         "PersistenceModels",
+        "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
@@ -482,6 +483,7 @@ let package = Package(
         "PersistenceModels",
         "DomainModels",
         "SampleData",
+        "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
