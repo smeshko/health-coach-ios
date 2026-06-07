@@ -153,4 +153,63 @@ enum Fixtures {
     }
   }
   """
+
+  // MARK: - Edge-case fixtures (null-vs-absent, forced-REST)
+
+  /// `IntakeSummary` with the optional macro totals **explicitly `null`** (`vsTarget` still present).
+  static let intakeNullMacros = """
+  {
+    "date": "2026-06-06",
+    "caloriesKcal": null,
+    "proteinG": null,
+    "carbsG": null,
+    "fatG": null,
+    "fiberG": null,
+    "waterL": null,
+    "vsTarget": { "caloriesPct": 0.0, "proteinHit": false }
+  }
+  """
+
+  /// The same `IntakeSummary` with the optional macro-total keys **absent** — must decode identically.
+  static let intakeAbsentMacros = """
+  {
+    "date": "2026-06-06",
+    "vsTarget": { "caloriesPct": 0.0, "proteinHit": false }
+  }
+  """
+
+  /// A forced-REST `DailyBrief` — a tripped safety gate is a normal `200`, not an error envelope.
+  static let dailyBriefForcedRest = """
+  {
+    "data": {
+      "date": "2026-06-06",
+      "readiness": { "score": 28, "band": "red", "penalties": [{ "factor": "illness", "points": 50 }] },
+      "safetyGate": { "triggered": true, "reasons": ["illness", "knee_pain"], "overrideTo": "rest" },
+      "session": {
+        "card": "rest",
+        "intensity": "recovery",
+        "durationMinLow": 0,
+        "durationMinHigh": 0,
+        "flags": ["forced_rest"]
+      },
+      "alternatives": [],
+      "skipOk": true,
+      "macroFocus": {
+        "dayType": "rest",
+        "caloriesKcal": 2200,
+        "proteinG": 160,
+        "carbsG": 220,
+        "fatGLow": 60,
+        "fatGHigh": 80,
+        "hydrationLLow": 2.0,
+        "hydrationLHigh": 3.0
+      },
+      "generatedAt": "2026-06-06T07:30:00+03:00",
+      "cached": false
+    },
+    "narrative": [
+      { "type": "caution", "heading": "Rest today", "body": "Illness flagged." }
+    ]
+  }
+  """
 }
