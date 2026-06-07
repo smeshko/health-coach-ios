@@ -12,6 +12,7 @@ let package = Package(
     .library(name: "AppFeature", targets: ["AppFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
     .library(name: "WireModels", targets: ["WireModels"]),
+    .library(name: "DomainModels", targets: ["DomainModels"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -85,6 +86,18 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // App-tailored domain models + semantic enums consumed by reducers/views. Depends ONLY on
+    // CoachCore — NO Codable, NO GRDB, NO WireModels (ARCHITECTURE §4.1 / §5). The only model
+    // layer features import.
+    .target(
+      name: "DomainModels",
+      dependencies: [
+        "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // Wire decode/round-trip tests — pure Foundation, run on the macOS host via `swift test`
     // (no simulator needed).
     .testTarget(
@@ -92,6 +105,16 @@ let package = Package(
       dependencies: [
         "WireModels",
         "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // DomainModels pure value/enum tests — host (no simulator).
+    .testTarget(
+      name: "DomainModelsTests",
+      dependencies: [
+        "DomainModels",
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
