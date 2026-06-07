@@ -22,6 +22,7 @@ let package = Package(
     .library(name: "APIClientLive", targets: ["APIClientLive"]),
     .library(name: "Database", targets: ["Database"]),
     .library(name: "DatabaseLive", targets: ["DatabaseLive"]),
+    .library(name: "HealthKitClient", targets: ["HealthKitClient"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -183,6 +184,19 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // HealthKit data-source interface — plain payload structs + auth status + delta reads. NO
+    // HealthKit import (that's HealthKitClientLive); reuses `WireModels.RecordType` as a type tag.
+    .target(
+      name: "HealthKitClient",
+      dependencies: [
+        "CoachCore",
+        "WireModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // The dumb persistence data-source interface — generic read/write/observe over a GRDB
     // transaction block (Decision #2 puts `GRDB.Database` on the closure signatures, so the
     // interface imports GRDB). No domain methods, no PersistenceModels, no cache policy (§6/D9).
@@ -270,6 +284,18 @@ let package = Package(
       dependencies: [
         "TokenClient",
         "TokenClientLive",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // HealthKitClient interface + test-value tests — host (no HealthKit, no simulator).
+    .testTarget(
+      name: "HealthKitClientTests",
+      dependencies: [
+        "HealthKitClient",
+        "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       swiftSettings: [
