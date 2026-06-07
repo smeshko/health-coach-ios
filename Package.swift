@@ -20,6 +20,8 @@ let package = Package(
     .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
     .library(name: "APIClient", targets: ["APIClient"]),
     .library(name: "APIClientLive", targets: ["APIClientLive"]),
+    .library(name: "Database", targets: ["Database"]),
+    .library(name: "DatabaseLive", targets: ["DatabaseLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -181,6 +183,34 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // The dumb persistence data-source interface — generic read/write/observe over a GRDB
+    // transaction block (Decision #2 puts `GRDB.Database` on the closure signatures, so the
+    // interface imports GRDB). No domain methods, no PersistenceModels, no cache policy (§6/D9).
+    .target(
+      name: "Database",
+      dependencies: [
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The live DB: a single DatabaseQueue, the DatabaseMigrator (definitions live here per
+    // Decision #1), and the read/write/observe implementations. Depends on Database + the record
+    // types + GRDB.
+    .target(
+      name: "DatabaseLive",
+      dependencies: [
+        "Database",
+        "PersistenceModels",
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -241,6 +271,19 @@ let package = Package(
         "TokenClient",
         "TokenClientLive",
         .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // Database migrate / read / write / observe tests — host, on an in-memory queue.
+    .testTarget(
+      name: "DatabaseLiveTests",
+      dependencies: [
+        "DatabaseLive",
+        "Database",
+        "PersistenceModels",
+        .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
