@@ -20,19 +20,23 @@ public struct ZoneBar: View {
   }
 
   public var body: some View {
-    VStack(spacing: CoachSpacing.space6) {
+    let clampedTarget = min(max(target, 1), 5)
+    return VStack(spacing: CoachSpacing.space6) {
       GeometryReader { geometry in
+        // Segments are equal-width with `space4` gaps, so the marker is centered on the *actual*
+        // segment center (accounting for the gaps the layout uses), not an idealized gap-free split.
+        let gap = CoachSpacing.space4
+        let segmentWidth = (geometry.size.width - gap * 4) / 5
+        let centerX = CGFloat(clampedTarget - 1) * (segmentWidth + gap) + segmentWidth / 2
         ZStack(alignment: .leading) {
-          HStack(spacing: CoachSpacing.space4) {
+          HStack(spacing: gap) {
             ForEach(1 ... 5, id: \.self) { zone in
               Capsule().fill(zoneColor(zone))
             }
           }
           .frame(height: ComponentMetrics.barSegmentHeight)
-          Marker(glow: zoneColor(target))
-            .offset(
-              x: geometry.size.width * (CGFloat(target) - 0.5) / 5 - ComponentMetrics.markerWidth / 2
-            )
+          Marker(glow: zoneColor(clampedTarget))
+            .offset(x: centerX - ComponentMetrics.markerWidth / 2)
         }
         .frame(height: ComponentMetrics.barHeight, alignment: .center)
       }
@@ -41,7 +45,7 @@ public struct ZoneBar: View {
         ForEach(1 ... 5, id: \.self) { zone in
           Text("Z\(zone)")
             .font(CoachFont.eyebrow)
-            .foregroundStyle(zone == target ? zoneColor(zone) : CoachColor.foregroundSubtle)
+            .foregroundStyle(zone == clampedTarget ? zoneColor(zone) : CoachColor.foregroundSubtle)
             .frame(maxWidth: .infinity)
         }
       }

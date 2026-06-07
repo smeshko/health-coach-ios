@@ -29,4 +29,8 @@ enum ComponentMetrics {
   // Screen icon circles.
   static let restIconCircle: CGFloat = 96
   static let messageIconCircle: CGFloat = 88
+
+  // RestDay inner shapes.
+  static let signalSquare: CGFloat = 40
+  static let arrowCircle: CGFloat = 32
 }

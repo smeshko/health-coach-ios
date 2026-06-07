@@ -27,5 +27,15 @@
         secondaryTitle: "Not now"
       ))
     }
+
+    /// A positive/success state with no secondary — covers the other tone + the no-secondary path.
+    func test_messageState_success() {
+      assertCoachSnapshot(of: MessageState(
+        icon: Icon.success.systemName,
+        tone: .positive,
+        title: "All synced",
+        body: "Your latest data is in. Today's plan is up to date."
+      ))
+    }
   }
 #endif

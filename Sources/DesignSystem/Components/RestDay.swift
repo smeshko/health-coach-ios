@@ -68,7 +68,7 @@ public struct RestDay: View {
     HStack(spacing: CoachSpacing.space12) {
       Image(systemName: signalIcon)
         .foregroundStyle(CoachColor.accent)
-        .frame(width: 40, height: 40)
+        .frame(width: ComponentMetrics.signalSquare, height: ComponentMetrics.signalSquare)
         .background(RoundedRectangle(cornerRadius: CoachRadius.sm).fill(CoachColor.accentSoft))
       VStack(alignment: .leading, spacing: CoachSpacing.space2) {
         Text(signalLabel).font(CoachFont.dataEmphasis).foregroundStyle(CoachColor.foregroundSubtle)
@@ -100,8 +100,8 @@ public struct RestDay: View {
       Spacer(minLength: 0)
       Image(systemName: Icon.arrowRight.systemName)
         .foregroundStyle(CoachColor.onAccent)
-        .frame(width: 32, height: 32)
-        .background(Circle().fill(CoachColor.onAccent.opacity(0.15)))
+        .frame(width: ComponentMetrics.arrowCircle, height: ComponentMetrics.arrowCircle)
+        .background(Circle().fill(CoachColor.onAccentSoft))
     }
     .padding(CoachSpacing.space16)
     .background(RoundedRectangle(cornerRadius: CoachRadius.md).fill(CoachColor.accent))

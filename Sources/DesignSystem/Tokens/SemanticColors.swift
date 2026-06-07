@@ -19,6 +19,10 @@ public extension CoachColor {
   static let tabSelected = accent.opacity(0.14)
   /// A muted on-accent for sub-labels on accent fills.
   static let onAccentMuted = onAccent.opacity(0.72)
+  /// A faint on-accent fill (e.g. the trailing-arrow circle on an accent row).
+  static let onAccentSoft = onAccent.opacity(0.15)
+  /// The card/nav drop-shadow color (a subtle dark; deliberately the same in both modes).
+  static let shadow = Color.black.opacity(0.06)
 }
 
 /// The semantic tone the soft-tint primitives (`Pill`, `MessageState`) and the `Chip` flag variant key

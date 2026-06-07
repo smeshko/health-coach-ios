@@ -40,10 +40,11 @@ public struct TabBar: View {
         item(tab)
       }
     }
+    .frame(height: ComponentMetrics.tabBarHeight)
     .padding(CoachSpacing.space4)
     .background(Capsule().fill(CoachColor.surfaceGlass))
     .overlay(Capsule().stroke(CoachColor.border, lineWidth: 1))
-    .shadow(color: .black.opacity(0.06), radius: 16, y: 4)
+    .shadow(color: CoachColor.shadow, radius: 16, y: 4)
     .padding(.top, CoachSpacing.space12)
     .padding(.horizontal, CoachSpacing.space24)
     .padding(.bottom, CoachSpacing.space24)

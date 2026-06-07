@@ -44,21 +44,21 @@ public struct ReadinessBar: View {
   public var body: some View {
     VStack(spacing: CoachSpacing.space6) {
       GeometryReader { geometry in
-        let gap = CoachSpacing.space4
-        let available = geometry.size.width - gap * 2
+        let clampedScore = CGFloat(min(max(score, 0), 100))
         ZStack(alignment: .leading) {
-          HStack(spacing: gap) {
+          // A CONTINUOUS bar (no inter-band gaps), so the marker's `width·score/100` lands exactly on
+          // the band edges (Recover→Ease-off at 50, Ease-off→Ready at 75). Outer ends rounded via clip.
+          HStack(spacing: 0) {
             ForEach(Band.allCases, id: \.label) { band in
-              RoundedRectangle(cornerRadius: 5)
+              Rectangle()
                 .fill(band.color)
-                .frame(width: available * band.fraction)
+                .frame(width: geometry.size.width * band.fraction)
             }
           }
           .frame(height: ComponentMetrics.barSegmentHeight)
+          .clipShape(Capsule())
           Marker(glow: activeBand.color)
-            .offset(
-              x: geometry.size.width * CGFloat(min(max(score, 0), 100)) / 100 - ComponentMetrics.markerWidth / 2
-            )
+            .offset(x: geometry.size.width * clampedScore / 100 - ComponentMetrics.markerWidth / 2)
         }
         .frame(height: ComponentMetrics.barHeight, alignment: .center)
       }
