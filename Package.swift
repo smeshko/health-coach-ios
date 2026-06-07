@@ -15,6 +15,7 @@ let package = Package(
     .library(name: "DomainModels", targets: ["DomainModels"]),
     .library(name: "WireDomainMapping", targets: ["WireDomainMapping"]),
     .library(name: "SampleData", targets: ["SampleData"]),
+    .library(name: "PersistenceModels", targets: ["PersistenceModels"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -27,6 +28,9 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.4.0"),
     // swift-tagged is pre-1.0; `from: "0.10.0"` is the floor.
     .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
+    // GRDB — SQLite record protocols for the PersistenceModels cache layer (§18: GRDB pinned
+    // directly; SharingGRDB wraps it in Epic 04, but only the GRDB record protocols are used here).
+    .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
     // Test-only: SwiftUI image snapshots. Used only by CoachTestSupport + the snapshot test target.
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
   ],
@@ -118,6 +122,19 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
+    // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
+    .target(
+      name: "PersistenceModels",
+      dependencies: [
+        "CoachCore",
+        "DomainModels",
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // Pure DTO→domain mapping functions (the read path). Sits at/above the repository-live tier
     // (ARCHITECTURE §3: a repo *Live may depend on all model layers), below features. Depends on
     // BOTH model layers; DomainModels itself never imports WireModels (DECISIONS Decision 1).
@@ -138,6 +155,18 @@ let package = Package(
       dependencies: [
         "WireModels",
         "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // PersistenceModels record + domain round-trip tests — host. GRDB for the record protocols;
+    // `SampleData`/`DomainModels` (added in TASK-004) source domain inputs for the round-trip.
+    .testTarget(
+      name: "PersistenceModelsTests",
+      dependencies: [
+        "PersistenceModels",
+        .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
