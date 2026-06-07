@@ -59,7 +59,7 @@ public struct SessionCard: View {
   }
 
   var durationText: String? {
-    guard let low = model.durationMinLow, let high = model.durationMinHigh else { return nil }
+    guard let low = model.durationMinLow, let high = model.durationMinHigh, high > 0 else { return nil }
     return low == high ? "\(low) min" : "\(low)–\(high) min"
   }
 
