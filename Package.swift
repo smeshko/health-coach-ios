@@ -27,6 +27,7 @@ let package = Package(
     .library(name: "DevSettings", targets: ["DevSettings"]),
     .library(name: "DevSettingsLive", targets: ["DevSettingsLive"]),
     .library(name: "BriefRepository", targets: ["BriefRepository"]),
+    .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -285,6 +286,27 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // BriefRepository.live — the network+GRDB daily/weekly cache policy. Depends on the data-source
+    // INTERFACES (APIClient owns APIError; Database owns the GRDB transaction block) + all model
+    // layers + WireDomainMapping + GRDB. Never a *Live or a feature (§3/§4.3 repo-live rule).
+    .target(
+      name: "BriefRepositoryLive",
+      dependencies: [
+        "BriefRepository",
+        "APIClient",
+        "Database",
+        "WireModels",
+        "DomainModels",
+        "PersistenceModels",
+        "WireDomainMapping",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -446,6 +468,28 @@ let package = Package(
         "SampleData",
         "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // BriefRepositoryLive cache-policy + APIError-mapping tests — host, with a migrated in-memory
+    // Database (DatabaseLive.makeInMemory) and a stubbed APIClient. DatabaseLive is a test-only dep
+    // here (the live target itself depends only on the Database interface).
+    .testTarget(
+      name: "BriefRepositoryLiveTests",
+      dependencies: [
+        "BriefRepositoryLive",
+        "BriefRepository",
+        "APIClient",
+        "Database",
+        "DatabaseLive",
+        "PersistenceModels",
+        "WireModels",
+        "DomainModels",
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "GRDB", package: "GRDB.swift"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
