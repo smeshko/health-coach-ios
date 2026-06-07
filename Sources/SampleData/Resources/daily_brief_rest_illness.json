@@ -1,0 +1,41 @@
+{
+  "data": {
+    "date": "2026-06-06",
+    "readiness": {
+      "score": 22,
+      "band": "red",
+      "penalties": [{ "factor": "rhr_above_baseline", "points": 18 }]
+    },
+    "safetyGate": {
+      "triggered": true,
+      "reasons": ["illness"],
+      "overrideTo": "rest"
+    },
+    "session": {
+      "card": "rest",
+      "intensity": "recovery",
+      "durationMinLow": 0,
+      "durationMinHigh": 0,
+      "flags": ["auto_reg_downgrade"]
+    },
+    "alternatives": [],
+    "skipOk": true,
+    "macroFocus": {
+      "dayType": "rest",
+      "caloriesKcal": 2200,
+      "proteinG": 160,
+      "carbsG": 220,
+      "fatGLow": 60,
+      "fatGHigh": 80,
+      "hydrationLLow": 2.0,
+      "hydrationLHigh": 3.0
+    },
+    "intakeYesterday": null,
+    "generatedAt": "2026-06-06T07:30:00+03:00",
+    "cached": false,
+    "constitutionVersion": "v3"
+  },
+  "narrative": [
+    { "type": "caution", "heading": "Rest today", "body": "Illness flagged — recovery takes priority." }
+  ]
+}

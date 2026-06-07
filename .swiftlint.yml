@@ -21,3 +21,10 @@ line_length:
   error: 200
   ignores_comments: true
   ignores_urls: true
+
+identifier_name:
+  # `id` is the SwiftLint default exception; `db` is GRDB's idiomatic Database-handle closure
+  # parameter, used pervasively in the persistence layer.
+  excluded:
+    - id
+    - db
