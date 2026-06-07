@@ -3,9 +3,10 @@ import HealthKitClient
 import HealthKitClientLive
 import XCTest
 
-/// Host-compilable smoke for the live target. HealthKit is iOS-only, so on the macOS host this
-/// exercises the `#else` branch (`liveValue` reports `.healthDataUnavailable`). The real iOS path is
-/// the TASK-005 manual checklist.
+/// Host-compilable smoke for the live target. HealthKit *is* importable on macOS, so on the host the
+/// real `#if canImport(HealthKit)` branch runs — but `HKHealthStore.isHealthDataAvailable()` returns
+/// `false` on the Mac, so `liveValue` reports `.healthDataUnavailable` and `deltaSamples` short-
+/// circuits to `.empty`. The real on-device auth/delta behaviour is the TASK-005 manual checklist.
 final class HealthKitClientLiveTests: XCTestCase {
   func test_liveValue_onHost_reportsHealthDataUnavailable() async throws {
     let client = HealthKitClient.liveValue
