@@ -22,6 +22,22 @@ final class HealthKitClientTestValueTests: XCTestCase {
     XCTAssertEqual(set.workouts.first?.statistics.count, 1)
   }
 
+  func test_filteredAfter_isInclusiveAtTheBoundary() {
+    // The filter must agree with the live `predicateForSamples(withStart:)`, which is inclusive of
+    // the start bound (round-1 review #2): a sample exactly at the anchor is kept.
+    let anchor = Date(timeIntervalSinceReferenceDate: 1000)
+    let set = HealthSampleSet(
+      records: [HealthRecordPayload(uuid: "r", type: .heartRate, start: anchor, end: anchor)],
+      activity: [
+        ActivitySummaryPayload(date: anchor, activeEnergyKcal: 1, exerciseMinutes: 1, standHours: 1),
+      ]
+    )
+    XCTAssertEqual(set.filtered(after: anchor).records.count, 1)
+    XCTAssertEqual(set.filtered(after: anchor).activity.count, 1)
+    // Strictly after the sample → excluded.
+    XCTAssertTrue(set.filtered(after: anchor.addingTimeInterval(1)).records.isEmpty)
+  }
+
   func test_deltaSamples_honoursAnchor_excludesBeforeAnchor() async throws {
     let set = try await HealthKitClient.testValue.deltaSamples(CannedHealthSamples.healthAnchorFixture)
     // Only the after-anchor samples survive (the before-anchor step_count record is excluded).
