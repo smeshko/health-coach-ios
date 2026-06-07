@@ -461,13 +461,13 @@ let package = Package(
     ),
     // TEMPORARY (Epic 5.5): a navigable design-system gallery (Colors/Typography/Icons + a subpage per
     // component) rooted by App until Epic 06 restores the real shell. Depends on DesignSystem +
-    // DomainModels + SampleData (the fixture source); never repositories / wire / GRDB / TCA.
+    // DomainModels only (component states are built from inline DomainModels literals); never
+    // repositories / wire / GRDB / TCA.
     .target(
       name: "DesignSystemGallery",
       dependencies: [
         "DesignSystem",
         "DomainModels",
-        "SampleData",
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
