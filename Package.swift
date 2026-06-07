@@ -24,6 +24,8 @@ let package = Package(
     .library(name: "DatabaseLive", targets: ["DatabaseLive"]),
     .library(name: "HealthKitClient", targets: ["HealthKitClient"]),
     .library(name: "HealthKitClientLive", targets: ["HealthKitClientLive"]),
+    .library(name: "DevSettings", targets: ["DevSettings"]),
+    .library(name: "DevSettingsLive", targets: ["DevSettingsLive"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -240,6 +242,33 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // DEBUG mock/live routing control: a persisted `useMockData` flag + per-endpoint `SampleScenario`
+    // selection. Interface target — depends only on swift-dependencies + SampleData (for the scenario
+    // vocabulary). Inert in RELEASE (DevSettingsLive collapses it; see §4.2/§7.1).
+    .target(
+      name: "DevSettings",
+      dependencies: [
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // UserDefaults-backed DevSettings.liveValue + the launch-arg/env override seed. DEBUG-only
+    // behaviour; in RELEASE `useMockData()` is hard-`false`, the override body is empty, and the
+    // writers are no-ops (`#if DEBUG` guards). Depends only on DevSettings + SampleData + Foundation.
+    .target(
+      name: "DevSettingsLive",
+      dependencies: [
+        "DevSettings",
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -374,6 +403,20 @@ let package = Package(
       name: "DomainModelsTests",
       dependencies: [
         "DomainModels",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // DevSettings interface + DevSettingsLive persistence/override/routing tests — pure Foundation,
+    // run on the macOS host via `swift test` (no simulator needed).
+    .testTarget(
+      name: "DevSettingsTests",
+      dependencies: [
+        "DevSettings",
+        "DevSettingsLive",
+        "SampleData",
+        .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
