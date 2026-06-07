@@ -49,12 +49,15 @@ private func runSync() async throws -> SyncResult {
   let today = readInstant
   let checkin = try? await checkInRepository.current(today)
   let currentWeek = ISOWeek.current
+  // The gate decides due-ness on the test's *own* date (must be in the current ISO week); the payload
+  // is then sent with **today's date** — the app sends the numbers dated today and the server derives
+  // the ISO week (PRD §7.3).
   let strengthTest = try await dueStrengthTest(
     strengthTestRepository,
     today: today,
     currentWeek: currentWeek,
     lastSyncedWeek: existing.lastStrengthTestSyncedWeek
-  )
+  ).map { DomainModels.StrengthTest(date: today, maxPushups: $0.maxPushups, maxPullups: $0.maxPullups) }
 
   // 5. Build the request.
   let request = buildSyncRequest(samples: samples, checkin: checkin, strengthTest: strengthTest)

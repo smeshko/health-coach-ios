@@ -24,11 +24,12 @@ final class SyncOrchestrationTests: XCTestCase {
   private func run<T>(
     stubs: SyncStubs,
     database: DatabaseClient,
+    now: Date = SyncOrchestrationTests.now,
     _ work: @escaping @Sendable () async throws -> T
   ) async throws -> T {
     try await withDependencies {
       $0.useEuropeSofia()
-      $0.date = .constant(Self.now)
+      $0.date = .constant(now)
       $0.healthKitClient = stubs.healthKit()
       $0.apiClient = stubs.api()
       $0.database = database
@@ -174,6 +175,25 @@ final class SyncOrchestrationTests: XCTestCase {
     )
     _ = try await run(stubs: staleStubs, database: dbStale) { try await SyncRepository.live.sync() }
     XCTAssertNil(staleStubs.capturedRequest?.strengthTest, "a prior-week test is not due this week")
+  }
+
+  func test_strengthTest_sentWithTodaysDate() async throws {
+    // A test logged Monday (week 24), synced on Wednesday (same week): the gate passes on the test's
+    // own date, but the payload must carry TODAY's date (Wednesday) — the server derives the ISO week.
+    let db = try DatabaseClient.makeInMemory()
+    let wednesday = Self.now.addingTimeInterval(2 * 86400) // still ISO week 24
+    let mondayTest = DomainModels.StrengthTest(date: Self.now, maxPushups: 30, maxPullups: 8)
+    let stubs = SyncStubs(apiResult: .success(syncResponse()), strengthTest: mondayTest)
+
+    _ = try await run(stubs: stubs, database: db, now: wednesday) {
+      try await SyncRepository.live.sync()
+    }
+
+    XCTAssertEqual(
+      stubs.capturedRequest?.strengthTest?.date, WireCalendarDate(wednesday),
+      "the strength test is sent dated today, not the day it was logged"
+    )
+    XCTAssertEqual(stubs.capturedRequest?.strengthTest?.maxPushups, 30, "the logged numbers are preserved")
   }
 
   func test_firstEverSync_usesBackfillAnchor() async throws {
