@@ -36,6 +36,7 @@ let package = Package(
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
     .library(name: "ProfileRepository", targets: ["ProfileRepository"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
+    .library(name: "DesignSystem", targets: ["DesignSystem"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -442,6 +443,19 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // The design system — color/typography/spacing tokens + the enum→label boundary (§9, §4.4, D19).
+    // Pure SwiftUI value code; depends ONLY on DomainModels + CoachCore (never repositories /
+    // WireModels / APIClient / GRDB).
+    .target(
+      name: "DesignSystem",
+      dependencies: [
+        "DomainModels",
+        "CoachCore",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -739,6 +753,17 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // DesignSystem enum→label boundary tests — pure logic, host (no UIKit/snapshot).
+    .testTarget(
+      name: "DesignSystemTests",
+      dependencies: [
+        "DesignSystem",
+        "DomainModels",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     .testTarget(
       name: "AppFeatureTests",
       dependencies: [
@@ -752,6 +777,20 @@ let package = Package(
     // View snapshot tests — run only on an iOS 26 simulator via `xcodebuild test`. The whole body is
     // `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host (so `swift test`
     // stays green); SwiftUI image snapshots use the iOS-only ViewImageConfig/.device API.
+    // DesignSystem view snapshots (the token/label catalog) — iOS 26 simulator only, via
+    // `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host.
+    .testTarget(
+      name: "DesignSystemSnapshotTests",
+      dependencies: [
+        "DesignSystem",
+        "CoachTestSupport",
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     .testTarget(
       name: "AppFeatureSnapshotTests",
       dependencies: [
