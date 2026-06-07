@@ -753,6 +753,17 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // DesignSystem enum→label boundary tests — pure logic, host (no UIKit/snapshot).
+    .testTarget(
+      name: "DesignSystemTests",
+      dependencies: [
+        "DesignSystem",
+        "DomainModels",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     .testTarget(
       name: "AppFeatureTests",
       dependencies: [
