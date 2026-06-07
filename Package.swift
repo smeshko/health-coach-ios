@@ -143,6 +143,18 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // SampleData decode-every-scenario tests — host. Links XCTest; `SampleData` itself does not.
+    .testTarget(
+      name: "SampleDataTests",
+      dependencies: [
+        "SampleData",
+        "WireModels",
+        "DomainModels",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // Mapping tests — pure functions, host (no simulator).
     .testTarget(
       name: "WireDomainMappingTests",
