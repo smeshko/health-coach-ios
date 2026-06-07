@@ -205,6 +205,7 @@ let package = Package(
       name: "HealthKitClientLive",
       dependencies: [
         "HealthKitClient",
+        "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       swiftSettings: [
