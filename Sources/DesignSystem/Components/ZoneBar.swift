@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// A 5-segment HR zone meter (Z1–Z5) with a `Marker` over the target zone, labels below. The marker x
-/// is recomputed from the measured track width (`width·(target−0.5)/5`).
+/// A 5-segment HR zone meter (Z1–Z5) with a `Marker` over the target zone, labels below. The marker is
+/// centered on the target segment, computed from the measured track width *and the inter-segment gaps*
+/// (`(target−1)·(segW+gap) + segW/2`, where `segW = (width − gap·4)/5`).
 public struct ZoneBar: View {
   public let target: Int
 
