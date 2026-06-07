@@ -32,6 +32,7 @@ let package = Package(
     .library(name: "CheckInRepositoryLive", targets: ["CheckInRepositoryLive"]),
     .library(name: "StrengthTestRepository", targets: ["StrengthTestRepository"]),
     .library(name: "StrengthTestRepositoryLive", targets: ["StrengthTestRepositoryLive"]),
+    .library(name: "SyncRepository", targets: ["SyncRepository"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -370,6 +371,18 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // SyncRepository interface — the no-args sync() orchestrator seam. Interface deps: DomainModels +
+    // Dependencies only (SyncResult/SyncError are domain types). No HealthKit/APIClient/Database here.
+    .target(
+      name: "SyncRepository",
+      dependencies: [
+        "DomainModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // GRDB record types for the six cached entities + their lossless domain↔record mapping. Depends
     // on CoachCore + GRDB + DomainModels only — NO WireModels, NO SharingGRDB API (§4.1).
     .target(
@@ -590,6 +603,18 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // SyncRepository interface tests (SyncResult/SyncError + testValue) — host.
+    .testTarget(
+      name: "SyncRepositoryTests",
+      dependencies: [
+        "SyncRepository",
+        "DomainModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
