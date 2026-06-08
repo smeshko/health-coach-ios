@@ -9,18 +9,30 @@ struct GalleryScaffold<Content: View>: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: CoachSpacing.space16) {
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
         content
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(CoachSpacing.space16)
+      .padding(CoachSpacing.spaceMd)
     }
-    .background(CoachColor.background)
+    .background(.coachBackground)
     .navigationTitle(title)
   }
 }
 
 /// A small caption above a state in a component subpage.
 func stateLabel(_ text: String) -> some View {
-  Text(text).font(CoachFont.eyebrow).foregroundStyle(CoachColor.foregroundSubtle)
+  Text(text).font(.coachText2xs).foregroundStyle(.coachForegroundSubtle)
+}
+
+/// Wraps content in a surface card (card radius + `spaceLg` padding) so a component shows on its real
+/// product surface rather than the gallery's sunken background — used for the bar/chart pages, where the
+/// pale track needs a surface behind it.
+func galleryCard(@ViewBuilder _ content: () -> some View) -> some View {
+  content()
+    .padding(CoachSpacing.spaceLg)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous).fill(.coachSurface)
+    )
 }
