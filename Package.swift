@@ -92,6 +92,7 @@ let package = Package(
       dependencies: [
         "CoachCore",
       ],
+      path: "Sources/Models/WireModels/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -128,6 +129,7 @@ let package = Package(
       dependencies: [
         "CoachCore",
       ],
+      path: "Sources/Models/DomainModels/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -143,6 +145,7 @@ let package = Package(
         "DomainModels",
         "WireDomainMapping",
       ],
+      path: "Sources/Models/SampleData/Sources",
       resources: [
         .process("Resources"),
       ],
@@ -504,6 +507,7 @@ let package = Package(
         "DomainModels",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Models/PersistenceModels/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -517,6 +521,7 @@ let package = Package(
         "WireModels",
         "DomainModels",
       ],
+      path: "Sources/Models/WireDomainMapping/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -529,6 +534,7 @@ let package = Package(
         "WireModels",
         "CoachCore",
       ],
+      path: "Sources/Models/WireModels/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -602,6 +608,7 @@ let package = Package(
         "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Models/PersistenceModels/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -614,6 +621,7 @@ let package = Package(
         "WireModels",
         "DomainModels",
       ],
+      path: "Sources/Models/SampleData/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -626,6 +634,7 @@ let package = Package(
         "WireModels",
         "DomainModels",
       ],
+      path: "Sources/Models/WireDomainMapping/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -636,6 +645,7 @@ let package = Package(
       dependencies: [
         "DomainModels",
       ],
+      path: "Sources/Models/DomainModels/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
