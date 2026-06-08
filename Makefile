@@ -12,7 +12,8 @@ SNAPSHOT_TARGETS = -only-testing:DesignSystemSnapshotTests -only-testing:AppFeat
 format:
 	swiftformat .
 
-# Lint Sources/ + Tests/; --strict makes any warning a failure.
+# Lint the package source tree under Sources/ (Repositories/ Clients/ Features/ Models/ Core/
+# DesignSystem/, tests co-located under each module); --strict makes any warning a failure.
 lint:
 	swiftlint lint --strict
 

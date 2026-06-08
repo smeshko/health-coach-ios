@@ -81,6 +81,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "Tagged", package: "swift-tagged"),
       ],
+      path: "Sources/Core/CoachCore/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -92,6 +93,7 @@ let package = Package(
       dependencies: [
         "CoachCore",
       ],
+      path: "Sources/Models/WireModels/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -105,6 +107,7 @@ let package = Package(
       dependencies: [
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
+      path: "Sources/Core/CoachTestSupport/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -116,6 +119,7 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Core/CoachCore/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -128,6 +132,7 @@ let package = Package(
       dependencies: [
         "CoachCore",
       ],
+      path: "Sources/Models/DomainModels/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -143,6 +148,7 @@ let package = Package(
         "DomainModels",
         "WireDomainMapping",
       ],
+      path: "Sources/Models/SampleData/Sources",
       resources: [
         .process("Resources"),
       ],
@@ -476,6 +482,7 @@ let package = Package(
         "DomainModels",
         "CoachCore",
       ],
+      path: "Sources/DesignSystem/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -504,6 +511,7 @@ let package = Package(
         "DomainModels",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Models/PersistenceModels/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -517,6 +525,7 @@ let package = Package(
         "WireModels",
         "DomainModels",
       ],
+      path: "Sources/Models/WireDomainMapping/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -529,6 +538,7 @@ let package = Package(
         "WireModels",
         "CoachCore",
       ],
+      path: "Sources/Models/WireModels/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -602,6 +612,7 @@ let package = Package(
         "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Models/PersistenceModels/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -614,6 +625,7 @@ let package = Package(
         "WireModels",
         "DomainModels",
       ],
+      path: "Sources/Models/SampleData/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -626,6 +638,7 @@ let package = Package(
         "WireModels",
         "DomainModels",
       ],
+      path: "Sources/Models/WireDomainMapping/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -636,6 +649,7 @@ let package = Package(
       dependencies: [
         "DomainModels",
       ],
+      path: "Sources/Models/DomainModels/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -812,6 +826,7 @@ let package = Package(
         "DesignSystem",
         "DomainModels",
       ],
+      path: "Sources/DesignSystem/Tests/DesignSystemTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -841,6 +856,7 @@ let package = Package(
         "CoachTestSupport",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
+      path: "Sources/DesignSystem/Tests/DesignSystemSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),

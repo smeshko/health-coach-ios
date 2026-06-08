@@ -2,8 +2,10 @@
 # warning fails). Pinned tool version recorded in README.md.
 
 included:
+  # The whole package source tree now lives under Sources/, organized into the layer/module folders
+  # Repositories/ Clients/ Features/ Models/ Core/ DesignSystem/ (each module's tests are co-located
+  # under its own Tests/ subfolder), so linting Sources/ covers both library and test code.
   - Sources
-  - Tests
 
 excluded:
   - .build
