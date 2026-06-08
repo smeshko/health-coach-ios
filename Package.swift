@@ -490,6 +490,7 @@ let package = Package(
         "DesignSystem",
         "DomainModels",
       ],
+      path: "Sources/Features/DesignSystemGallery/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
