@@ -269,6 +269,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/DevSettings/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -283,6 +284,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/DevSettings/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -640,6 +642,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/DevSettings/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
