@@ -482,6 +482,7 @@ let package = Package(
         "DomainModels",
         "CoachCore",
       ],
+      path: "Sources/DesignSystem/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -825,6 +826,7 @@ let package = Package(
         "DesignSystem",
         "DomainModels",
       ],
+      path: "Sources/DesignSystem/Tests/DesignSystemTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -854,6 +856,7 @@ let package = Package(
         "CoachTestSupport",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
+      path: "Sources/DesignSystem/Tests/DesignSystemSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
