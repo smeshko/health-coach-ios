@@ -212,6 +212,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/HealthKitClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -226,6 +227,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/HealthKitClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -564,6 +566,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/HealthKitClient/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
