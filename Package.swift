@@ -66,6 +66,11 @@ let package = Package(
       name: "AppFeature",
       dependencies: [
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        // The app spine subscribes to the session-event stream (401 routing) via the APIClient
+        // INTERFACE — the one app-spine exception to the feature dependency rule (§13). Never *Live.
+        "APIClient",
+        // Shell views (onboarding + tab bar) use design tokens/primitives.
+        "DesignSystem",
       ],
       path: "Sources/Features/AppFeature/Sources",
       swiftSettings: [
@@ -330,6 +335,9 @@ let package = Package(
         "PersistenceModels",
         "WireDomainMapping",
         "CoachCore",
+        // `routed(dev:)` mock/live toggle: DevSettings (devRoute) + SampleData (the mock fixtures).
+        "DevSettings",
+        "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -431,6 +439,8 @@ let package = Package(
         "PersistenceModels",
         "SampleData",
         "CoachCore",
+        // `routed(dev:)` mock/live toggle (devRoute).
+        "DevSettings",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -465,6 +475,9 @@ let package = Package(
         "DomainModels",
         "PersistenceModels",
         "WireDomainMapping",
+        // `routed(dev:)` mock/live toggle: DevSettings (devRoute) + SampleData (the mock fixtures).
+        "DevSettings",
+        "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -699,6 +712,8 @@ let package = Package(
         "DomainModels",
         "SampleData",
         "CoachCore",
+        // The `routed(dev:)` mock-toggle test builds a fake DevSettings.
+        "DevSettings",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -835,6 +850,8 @@ let package = Package(
       name: "AppFeatureTests",
       dependencies: [
         "AppFeature",
+        // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
+        "APIClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/AppFeature/Tests/AppFeatureTests",

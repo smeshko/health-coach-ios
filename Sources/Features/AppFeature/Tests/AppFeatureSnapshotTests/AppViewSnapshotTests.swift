@@ -1,7 +1,8 @@
-// Sample view snapshot test — proves the `CoachTestSupport` harness is wired (light + dark, single
-// reference device). The whole body is `#if canImport(UIKit)`-guarded so this target compiles to an
-// empty module on the macOS host (so `swift test` stays green); it runs on an iOS 26 simulator via
-// `xcodebuild test`.
+// Shell snapshot tests (ARCHITECTURE D16): the two top-level `AppView` shell states — the onboarding
+// branch (neutral + token-invalid) and the main tab bar — in light + dark on the single reference
+// device. The whole body is `#if canImport(UIKit)`-guarded so this target compiles to an empty module
+// on the macOS host (so `swift test` stays green); it runs on the iOS 26 simulator via
+// `make test-snapshots`. Per-feature state matrices belong to the tab features (Epics 8/9/10).
 
 #if canImport(UIKit)
   import AppFeature
@@ -12,9 +13,31 @@
 
   @MainActor
   final class AppViewSnapshotTests: XCTestCase {
-    func testAppViewPlaceholder() {
+    func test_onboardingShell_neutral() {
       let view = AppView(
-        store: Store(initialState: AppFeature.State()) { AppFeature() }
+        store: Store(initialState: .onboarding(OnboardingFeature.State(step: .connect(reason: nil)))) {
+          AppFeature()
+        }
+      )
+      assertCoachSnapshot(of: view)
+    }
+
+    func test_onboardingShell_tokenInvalid() {
+      let view = AppView(
+        store: Store(
+          initialState: .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
+        ) {
+          AppFeature()
+        }
+      )
+      assertCoachSnapshot(of: view)
+    }
+
+    func test_mainTabBar() {
+      let view = AppView(
+        store: Store(initialState: .main(MainTabs.State())) {
+          AppFeature()
+        }
       )
       assertCoachSnapshot(of: view)
     }

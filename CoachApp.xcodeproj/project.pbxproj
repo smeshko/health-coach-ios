@@ -10,7 +10,17 @@
 		CA000000000000000000000C /* CoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000007 /* CoachApp.swift */; };
 		CA000000000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000008 /* Assets.xcassets */; };
 		CA000000000000000000000E /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000016 /* AppFeature */; };
-		CA00000000000000000000E1 /* DesignSystemGallery in Frameworks */ = {isa = PBXBuildFile; productRef = CA00000000000000000000E2 /* DesignSystemGallery */; };
+		CA0000000000000000000030 /* CoachCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000020 /* CoachCore */; };
+		CA0000000000000000000031 /* DevSettingsLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000021 /* DevSettingsLive */; };
+		CA0000000000000000000032 /* APIClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000022 /* APIClientLive */; };
+		CA0000000000000000000033 /* DatabaseLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000023 /* DatabaseLive */; };
+		CA0000000000000000000034 /* HealthKitClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000024 /* HealthKitClientLive */; };
+		CA0000000000000000000035 /* TokenClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000025 /* TokenClientLive */; };
+		CA0000000000000000000036 /* BriefRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000026 /* BriefRepositoryLive */; };
+		CA0000000000000000000037 /* SyncRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000027 /* SyncRepositoryLive */; };
+		CA0000000000000000000038 /* ProfileRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000028 /* ProfileRepositoryLive */; };
+		CA0000000000000000000039 /* CheckInRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000029 /* CheckInRepositoryLive */; };
+		CA000000000000000000003A /* StrengthTestRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA000000000000000000002A /* StrengthTestRepositoryLive */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,7 +35,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				CA000000000000000000000E /* AppFeature in Frameworks */,
-				CA00000000000000000000E1 /* DesignSystemGallery in Frameworks */,
+				CA0000000000000000000030 /* CoachCore in Frameworks */,
+				CA0000000000000000000031 /* DevSettingsLive in Frameworks */,
+				CA0000000000000000000032 /* APIClientLive in Frameworks */,
+				CA0000000000000000000033 /* DatabaseLive in Frameworks */,
+				CA0000000000000000000034 /* HealthKitClientLive in Frameworks */,
+				CA0000000000000000000035 /* TokenClientLive in Frameworks */,
+				CA0000000000000000000036 /* BriefRepositoryLive in Frameworks */,
+				CA0000000000000000000037 /* SyncRepositoryLive in Frameworks */,
+				CA0000000000000000000038 /* ProfileRepositoryLive in Frameworks */,
+				CA0000000000000000000039 /* CheckInRepositoryLive in Frameworks */,
+				CA000000000000000000003A /* StrengthTestRepositoryLive in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,7 +95,17 @@
 			name = CoachApp;
 			packageProductDependencies = (
 				CA0000000000000000000016 /* AppFeature */,
-				CA00000000000000000000E2 /* DesignSystemGallery */,
+				CA0000000000000000000020 /* CoachCore */,
+				CA0000000000000000000021 /* DevSettingsLive */,
+				CA0000000000000000000022 /* APIClientLive */,
+				CA0000000000000000000023 /* DatabaseLive */,
+				CA0000000000000000000024 /* HealthKitClientLive */,
+				CA0000000000000000000025 /* TokenClientLive */,
+				CA0000000000000000000026 /* BriefRepositoryLive */,
+				CA0000000000000000000027 /* SyncRepositoryLive */,
+				CA0000000000000000000028 /* ProfileRepositoryLive */,
+				CA0000000000000000000029 /* CheckInRepositoryLive */,
+				CA000000000000000000002A /* StrengthTestRepositoryLive */,
 			);
 			productName = CoachApp;
 			productReference = CA0000000000000000000006 /* CoachApp.app */;
@@ -353,9 +383,49 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = AppFeature;
 		};
-		CA00000000000000000000E2 /* DesignSystemGallery */ = {
+		CA0000000000000000000020 /* CoachCore */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = DesignSystemGallery;
+			productName = CoachCore;
+		};
+		CA0000000000000000000021 /* DevSettingsLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DevSettingsLive;
+		};
+		CA0000000000000000000022 /* APIClientLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = APIClientLive;
+		};
+		CA0000000000000000000023 /* DatabaseLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DatabaseLive;
+		};
+		CA0000000000000000000024 /* HealthKitClientLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HealthKitClientLive;
+		};
+		CA0000000000000000000025 /* TokenClientLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TokenClientLive;
+		};
+		CA0000000000000000000026 /* BriefRepositoryLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = BriefRepositoryLive;
+		};
+		CA0000000000000000000027 /* SyncRepositoryLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SyncRepositoryLive;
+		};
+		CA0000000000000000000028 /* ProfileRepositoryLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ProfileRepositoryLive;
+		};
+		CA0000000000000000000029 /* CheckInRepositoryLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CheckInRepositoryLive;
+		};
+		CA000000000000000000002A /* StrengthTestRepositoryLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StrengthTestRepositoryLive;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

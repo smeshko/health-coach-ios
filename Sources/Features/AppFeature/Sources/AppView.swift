@@ -1,6 +1,12 @@
 import ComposableArchitecture
 import SwiftUI
 
+/// The app root view: an onboarding shell **or** the main tab bar, chosen by the store's enum case.
+///
+/// The `.task` lifecycle hook lives on the single outer container that wraps the branch switch and does
+/// **not** re-mount when the case swaps — so `._appWillAppear` fires exactly once per process and the
+/// single-subscriber session stream is never re-iterated on an onboarding↔main swap (TASK-002's
+/// once-per-process requirement). Never move it inside a branch.
 public struct AppView: View {
   let store: StoreOf<AppFeature>
 
@@ -9,12 +15,13 @@ public struct AppView: View {
   }
 
   public var body: some View {
-    VStack(spacing: 12) {
-      Image(systemName: "figure.run")
-        .font(.largeTitle)
-      Text("Coach")
-        .font(.headline)
+    Group {
+      if let store = store.scope(state: \.onboarding, action: \.onboarding) {
+        OnboardingShellView(store: store)
+      } else if let store = store.scope(state: \.main, action: \.main) {
+        MainTabsView(store: store)
+      }
     }
-    .onAppear { store.send(.onAppear) }
+    .task { store.send(._appWillAppear) }
   }
 }
