@@ -31,24 +31,25 @@ Two distinct run paths (not interchangeable):
 # Host logic tests — CoachCoreTests + AppFeatureTests (exhaustive TestStore):
 swift test            # or: make test
 
-# iOS snapshot tests — AppFeatureSnapshotTests (SwiftUI image snapshots are UIKit-only and
-# cannot run under `swift test`); run on an iOS 26 simulator via the committed package workspace
-# + the shared CoachKit-Package scheme:
-xcodebuild test \
-  -workspace .swiftpm/xcode/package.xcworkspace \
-  -scheme CoachKit-Package \
-  -only-testing:AppFeatureSnapshotTests \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0'
+# iOS snapshot tests — DesignSystemSnapshotTests + AppFeatureSnapshotTests (SwiftUI image
+# snapshots are UIKit-only and cannot run under `swift test`):
+make test-snapshots
 ```
+
+`make test-snapshots` always runs on the **single canonical simulator — `iPhone 17 Pro, OS 26.0`**
+(pinned via `SNAPSHOT_DEVICE` in the `Makefile`). This matters: snapshot references are recorded on
+that exact device, and running on any other simulator produces sub-pixel rendering diffs that fail at
+the default exact precision. Run snapshots through the make target, never a hand-rolled `-destination`,
+so the device never drifts.
 
 The `CoachKit-Package` scheme (committed under `.swiftpm/xcode/package.xcworkspace/xcshareddata/`)
 also runs the logic test targets, so `xcodebuild test … -scheme CoachKit-Package` (without
 `-only-testing`) runs the whole suite on the simulator.
 
-Snapshot references are recorded on the iOS 26 simulator (light + dark, single reference device).
-To re-record after an intentional view change, wrap the assertion in
-`withSnapshotTesting(record: .all) { … }`, run once on the simulator, then revert and commit the
-new references.
+Snapshot references are recorded on the canonical simulator above (light + dark, single reference
+device — geometry pinned to `coachReferenceDevice` in `Sources/CoachTestSupport/SnapshotConvention.swift`).
+To re-record after an intentional view change, run `make record-snapshots` (same pinned device), then
+review the regenerated PNGs with `git diff` before committing. Record mode exits non-zero by design.
 
 ## Tooling — SwiftFormat & SwiftLint
 
