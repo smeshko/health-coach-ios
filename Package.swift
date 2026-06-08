@@ -240,6 +240,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Clients/Database/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -254,6 +255,7 @@ let package = Package(
         "PersistenceModels",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Clients/Database/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -574,6 +576,7 @@ let package = Package(
         "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Clients/Database/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
