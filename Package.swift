@@ -801,6 +801,7 @@ let package = Package(
       dependencies: [
         "DesignSystem",
         "DesignSystemGallery",
+        "DomainModels",
         "CoachTestSupport",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
