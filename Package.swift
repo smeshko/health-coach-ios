@@ -155,6 +155,7 @@ let package = Package(
       dependencies: [
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/TokenClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -166,6 +167,7 @@ let package = Package(
         "TokenClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/TokenClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -180,6 +182,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/APIClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -197,6 +200,7 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/APIClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -210,6 +214,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/HealthKitClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -224,6 +229,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/HealthKitClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -238,6 +244,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Clients/Database/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -252,6 +259,7 @@ let package = Package(
         "PersistenceModels",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Clients/Database/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -265,6 +273,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/DevSettings/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -279,6 +288,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/DevSettings/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -532,6 +542,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "Clocks", package: "swift-clocks"),
       ],
+      path: "Sources/Clients/APIClient/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -544,6 +555,7 @@ let package = Package(
         "TokenClientLive",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/TokenClient/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -557,6 +569,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/HealthKitClient/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -571,6 +584,7 @@ let package = Package(
         "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Clients/Database/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -634,6 +648,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/DevSettings/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]

@@ -16,10 +16,8 @@ public enum CoachSpacing {
 /// Corner radii (the Spacing & Radii reference): `sm` 12 · `md` 16 · `card` 24 · `pill` 999 (fully
 /// rounded / capsule).
 public enum CoachRadius {
-  // swiftlint:disable identifier_name
   public static let sm: CGFloat = 12
   public static let md: CGFloat = 16
-  // swiftlint:enable identifier_name
   public static let card: CGFloat = 24
   public static let pill: CGFloat = 999
 }
