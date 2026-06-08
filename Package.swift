@@ -67,6 +67,7 @@ let package = Package(
       dependencies: [
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
+      path: "Sources/Features/AppFeature/Sources",
       swiftSettings: [
         // Explicit Swift 6 language mode = complete strict concurrency. Already the default from
         // `swift-tools-version: 6.3`; stated here to self-document and to satisfy the epic's
@@ -489,6 +490,7 @@ let package = Package(
         "DesignSystem",
         "DomainModels",
       ],
+      path: "Sources/Features/DesignSystemGallery/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -820,6 +822,7 @@ let package = Package(
         "AppFeature",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
+      path: "Sources/Features/AppFeature/Tests/AppFeatureTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -851,6 +854,7 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
+      path: "Sources/Features/AppFeature/Tests/AppFeatureSnapshotTests",
       // Reference images are read from disk by swift-snapshot-testing (not bundled), so exclude them
       // from the target to avoid SwiftPM's "unhandled files" warning.
       exclude: ["__Snapshots__"],

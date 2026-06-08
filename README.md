@@ -7,7 +7,7 @@ generators. iOS 26+, Swift 6.3 (full strict concurrency), TCA.
 ## Layout
 
 - `Package.swift` — the `CoachKit` package (all features/services land here as targets).
-- `Sources/AppFeature/` — the root TCA feature + `AppView`.
+- `Sources/Features/AppFeature/Sources/` — the root TCA feature + `AppView`.
 - `Sources/CoachCore/` — foundation utilities: the Europe/Sofia calendar/date dependency,
   ISO-week helpers, and the `Tagged` ID convention.
 - `App/` — the `@main` composition root (`CoachApp.swift`); launches `AppView(store:)`.
