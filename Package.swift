@@ -335,6 +335,9 @@ let package = Package(
         "PersistenceModels",
         "WireDomainMapping",
         "CoachCore",
+        // `routed(dev:)` mock/live toggle: DevSettings (devRoute) + SampleData (the mock fixtures).
+        "DevSettings",
+        "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -436,6 +439,8 @@ let package = Package(
         "PersistenceModels",
         "SampleData",
         "CoachCore",
+        // `routed(dev:)` mock/live toggle (devRoute).
+        "DevSettings",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -470,6 +475,9 @@ let package = Package(
         "DomainModels",
         "PersistenceModels",
         "WireDomainMapping",
+        // `routed(dev:)` mock/live toggle: DevSettings (devRoute) + SampleData (the mock fixtures).
+        "DevSettings",
+        "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -704,6 +712,8 @@ let package = Package(
         "DomainModels",
         "SampleData",
         "CoachCore",
+        // The `routed(dev:)` mock-toggle test builds a fake DevSettings.
+        "DevSettings",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
