@@ -180,6 +180,7 @@ let package = Package(
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/APIClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -197,6 +198,7 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/APIClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -532,6 +534,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "Clocks", package: "swift-clocks"),
       ],
+      path: "Sources/Clients/APIClient/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
