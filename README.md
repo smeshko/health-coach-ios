@@ -6,10 +6,21 @@ generators. iOS 26+, Swift 6.3 (full strict concurrency), TCA.
 
 ## Layout
 
+The whole package source tree lives under `Sources/`, organized into one folder per layer. Every
+target declares an explicit `path:` in `Package.swift` — no target relies on the default
+`Sources/<TargetName>` convention — and each module's tests are co-located under its own `Tests/`
+subfolder (one test target → files directly under `Tests/`; more than one → `Tests/<TestTargetName>/`).
+
 - `Package.swift` — the `CoachKit` package (all features/services land here as targets).
-- `Sources/Features/AppFeature/Sources/` — the root TCA feature + `AppView`.
-- `Sources/CoachCore/` — foundation utilities: the Europe/Sofia calendar/date dependency,
-  ISO-week helpers, and the `Tagged` ID convention.
+- `Sources/Repositories/<Name>/{Interface,Live,Tests}` — repository modules (the get-or-generate seams).
+- `Sources/Clients/<Name>/{Interface,Live,Tests}` — data-source clients (API, Database, HealthKit, …).
+- `Sources/Features/<Name>/{Sources,Tests}` — TCA features; `Sources/Features/AppFeature/Sources/` is
+  the root feature + `AppView`.
+- `Sources/Models/<Name>/{Sources,Tests}` — the wire/domain/persistence model + sample-data modules.
+- `Sources/Core/CoachCore/Sources/` — foundation utilities: the Europe/Sofia calendar/date dependency,
+  ISO-week helpers, and the `Tagged` ID convention (`Sources/Core/CoachTestSupport/` holds the shared
+  snapshot test helper).
+- `Sources/DesignSystem/{Sources,Tests}` — color/typography/spacing tokens + the enum→label boundary.
 - `App/` — the `@main` composition root (`CoachApp.swift`); launches `AppView(store:)`.
 - `CoachApp.xcodeproj` — the thin app target (references the local package).
 
