@@ -11,16 +11,16 @@ public struct Chip: View {
     case icon(String)
   }
 
-  public let text: String
-  public let leading: Leading
-  public let textColor: Color
-  public let font: Font
+  let text: String
+  let leading: Leading
+  let textColor: Color
+  let font: Font
 
   public init(
     _ text: String,
     leading: Leading = .none,
-    textColor: Color = CoachColor.foregroundMuted,
-    font: Font = CoachFont.caption
+    textColor: Color = .coachForegroundMuted,
+    font: Font = .coachTextXs
   ) {
     self.text = text
     self.leading = leading
@@ -29,7 +29,7 @@ public struct Chip: View {
   }
 
   public var body: some View {
-    HStack(spacing: CoachSpacing.space6) {
+    HStack(spacing: CoachSpacing.spaceXs) {
       switch leading {
       case .none:
         EmptyView()
@@ -41,9 +41,9 @@ public struct Chip: View {
       Text(text).font(font)
     }
     .foregroundStyle(textColor)
-    .padding(.vertical, CoachSpacing.space6)
-    .padding(.horizontal, CoachSpacing.space10)
-    .background(Capsule().fill(CoachColor.background))
-    .overlay(Capsule().stroke(CoachColor.border, lineWidth: 1))
+    .padding(.vertical, CoachSpacing.spaceXs)
+    .padding(.horizontal, CoachSpacing.spaceSm)
+    .background(Capsule().fill(.coachBackground))
+    .overlay(Capsule().stroke(.coachBorder, lineWidth: 1))
   }
 }

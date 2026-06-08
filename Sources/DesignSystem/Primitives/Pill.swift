@@ -10,10 +10,10 @@ public struct Pill: View {
     case icon(String)
   }
 
-  public let text: String
-  public let tone: Tone
-  public let leading: Leading
-  public let uppercase: Bool
+  let text: String
+  let tone: Tone
+  let leading: Leading
+  let uppercase: Bool
 
   public init(_ text: String, tone: Tone = .accent, leading: Leading = .none, uppercase: Bool = false) {
     self.text = text
@@ -23,7 +23,7 @@ public struct Pill: View {
   }
 
   public var body: some View {
-    HStack(spacing: CoachSpacing.space6) {
+    HStack(spacing: CoachSpacing.spaceXs) {
       switch leading {
       case .none:
         EmptyView()
@@ -33,12 +33,12 @@ public struct Pill: View {
         Image(systemName: name).font(.system(size: 11, weight: .semibold))
       }
       Text(uppercase ? text.uppercased() : text)
-        .font(uppercase ? CoachFont.eyebrow : CoachFont.dataEmphasis)
+        .font(uppercase ? .coachText2xs : .coachTextSm)
         .tracking(uppercase ? 0.4 : 0)
     }
     .foregroundStyle(tone.foreground)
-    .padding(.vertical, CoachSpacing.space6)
-    .padding(.horizontal, CoachSpacing.space12)
+    .padding(.vertical, CoachSpacing.space2xs)
+    .padding(.horizontal, CoachSpacing.spaceSm)
     .background(Capsule().fill(tone.fill))
   }
 }
