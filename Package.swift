@@ -392,6 +392,7 @@ let package = Package(
         "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/SyncRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -416,6 +417,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/SyncRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -720,6 +722,7 @@ let package = Package(
         "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -745,6 +748,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
