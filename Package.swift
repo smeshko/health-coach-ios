@@ -69,6 +69,8 @@ let package = Package(
         // The app spine subscribes to the session-event stream (401 routing) via the APIClient
         // INTERFACE — the one app-spine exception to the feature dependency rule (§13). Never *Live.
         "APIClient",
+        // Shell views (onboarding + tab bar) use design tokens/primitives.
+        "DesignSystem",
       ],
       path: "Sources/Features/AppFeature/Sources",
       swiftSettings: [
