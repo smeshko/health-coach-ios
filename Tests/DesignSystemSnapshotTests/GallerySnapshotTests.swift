@@ -24,6 +24,10 @@
       assertCoachSnapshot(of: NavigationStack { TypographyGalleryPage() })
     }
 
+    func test_spacingPage() {
+      assertCoachSnapshot(of: NavigationStack { SpacingGalleryPage() })
+    }
+
     func test_iconsPage() {
       assertCoachSnapshot(of: NavigationStack { IconsGalleryPage() })
     }

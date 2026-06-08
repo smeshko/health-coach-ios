@@ -44,11 +44,11 @@ extension Zone: DisplayLabel, DisplayColored {
 
   public var color: Color {
     switch self {
-    case .z1: CoachColor.z1
-    case .z2: CoachColor.z2
-    case .z3: CoachColor.z3
-    case .z4: CoachColor.z4
-    case .z5: CoachColor.z5
+    case .z1: .coachZ1
+    case .z2: .coachZ2
+    case .z3: .coachZ3
+    case .z4: .coachZ4
+    case .z5: .coachZ5
     }
   }
 }
@@ -64,9 +64,9 @@ extension ReadinessBand: DisplayLabel, DisplayColored, DisplayIconed {
 
   public var color: Color {
     switch self {
-    case .green: CoachColor.green
-    case .amber: CoachColor.amber
-    case .red: CoachColor.red
+    case .green: .coachPositive
+    case .amber: .coachWarning
+    case .red: .coachNegative
     }
   }
 
@@ -100,9 +100,9 @@ extension Intensity: DisplayLabel, DisplayColored, DisplayIconed {
 
   public var color: Color {
     switch self {
-    case .easy: CoachColor.easy
-    case .quality: CoachColor.quality
-    case .recovery: CoachColor.recovery
+    case .easy: .coachEasy
+    case .quality: .coachQuality
+    case .recovery: .coachRecovery
     }
   }
 

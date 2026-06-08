@@ -294,6 +294,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/BriefRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -315,6 +316,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/BriefRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -328,6 +330,7 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/CheckInRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -344,6 +347,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/CheckInRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -357,6 +361,7 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/StrengthTestRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -374,6 +379,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/StrengthTestRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -386,6 +392,7 @@ let package = Package(
         "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/SyncRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -410,6 +417,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/SyncRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -423,6 +431,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/ProfileRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -442,6 +451,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/ProfileRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -637,6 +647,7 @@ let package = Package(
         "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/BriefRepository/Tests/BriefRepositoryTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -660,6 +671,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/BriefRepository/Tests/BriefRepositoryLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -678,6 +690,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/CheckInRepository/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -696,6 +709,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/StrengthTestRepository/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -708,6 +722,7 @@ let package = Package(
         "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -733,6 +748,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -746,6 +762,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/ProfileRepository/Tests/ProfileRepositoryTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -766,6 +783,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/ProfileRepository/Tests/ProfileRepositoryLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -801,6 +819,7 @@ let package = Package(
       dependencies: [
         "DesignSystem",
         "DesignSystemGallery",
+        "DomainModels",
         "CoachTestSupport",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
