@@ -9,12 +9,14 @@ public struct AppView: View {
   }
 
   public var body: some View {
-    VStack(spacing: 12) {
-      Image(systemName: "figure.run")
-        .font(.largeTitle)
-      Text("Coach")
-        .font(.headline)
+    // Phase 7.1 TASK-001 scaffold — TASK-003 renders the real onboarding shell + tab bar and attaches
+    // the once-per-process `._appWillAppear` lifecycle hook.
+    Group {
+      if store.scope(state: \.onboarding, action: \.onboarding) != nil {
+        Text("Onboarding")
+      } else {
+        Text("Main")
+      }
     }
-    .onAppear { store.send(.onAppear) }
   }
 }
