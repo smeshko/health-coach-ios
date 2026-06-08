@@ -8,6 +8,7 @@
   import AppFeature
   import CoachTestSupport
   import ComposableArchitecture
+  import OnboardingFeature
   import SnapshotTesting
   import XCTest
 

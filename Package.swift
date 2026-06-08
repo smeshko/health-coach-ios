@@ -10,6 +10,7 @@ let package = Package(
   platforms: [.iOS(.v26), .macOS(.v14)],
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
+    .library(name: "OnboardingFeature", targets: ["OnboardingFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
     .library(name: "WireModels", targets: ["WireModels"]),
     .library(name: "DomainModels", targets: ["DomainModels"]),
@@ -69,6 +70,9 @@ let package = Package(
         // The app spine subscribes to the session-event stream (401 routing) via the APIClient
         // INTERFACE — the one app-spine exception to the feature dependency rule (§13). Never *Live.
         "APIClient",
+        // The onboarding branch is its own feature module (ARCHITECTURE §4.5/§10); AppFeature composes
+        // it and renders its root view.
+        "OnboardingFeature",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
       ],
@@ -77,6 +81,25 @@ let package = Package(
         // Explicit Swift 6 language mode = complete strict concurrency. Already the default from
         // `swift-tools-version: 6.3`; stated here to self-document and to satisfy the epic's
         // "strict-concurrency build settings" wording.
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The onboarding feature (ARCHITECTURE §4.5/§10): the Connect step (`ConnectComponent`) + the
+    // HealthKit-priming step (Phase 7.3). An app-spine feature that may use the `APIClient`/`TokenClient`
+    // INTERFACES directly (the §13/D12/§4.5 carve-out) alongside DesignSystem + DomainModels/CoachCore —
+    // never a `*Live`, GRDB, HealthKit, or WireModels.
+    .target(
+      name: "OnboardingFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "APIClient",
+        "TokenClient",
+        "DesignSystem",
+        "DomainModels",
+        "CoachCore",
+      ],
+      path: "Sources/Features/OnboardingFeature/Sources",
+      swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
     ),
@@ -850,11 +873,28 @@ let package = Package(
       name: "AppFeatureTests",
       dependencies: [
         "AppFeature",
+        // The switch/401 tests construct `OnboardingFeature.State` (the onboarding branch payload).
+        "OnboardingFeature",
         // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
         "APIClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/AppFeature/Tests/AppFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ConnectComponent exhaustive TestStore (host) — write→probe→clear ordering, success/failure
+    // branches, binding-reset, paste, and the `canSubmit` gate (PLAN.md D18). No snapshot/UIKit code.
+    .testTarget(
+      name: "OnboardingFeatureTests",
+      dependencies: [
+        "OnboardingFeature",
+        "APIClient",
+        "TokenClient",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -883,6 +923,8 @@ let package = Package(
       name: "AppFeatureSnapshotTests",
       dependencies: [
         "AppFeature",
+        // The shell snapshots construct `OnboardingFeature.State` for the onboarding branch.
+        "OnboardingFeature",
         "CoachTestSupport",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),

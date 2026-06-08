@@ -1,5 +1,6 @@
 import APIClient
 import ComposableArchitecture
+import OnboardingFeature
 
 /// The app root (ARCHITECTURE §10 / D7): a sum type that is **either** onboarding **or** the main tab
 /// bar — never both. The app starts in `.onboarding` and flips to `.main` on the onboarding `connected`

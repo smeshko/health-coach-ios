@@ -1,5 +1,6 @@
 import APIClient
 import ComposableArchitecture
+import OnboardingFeature
 
 /// The global 401 path (ARCHITECTURE §13 / D12 / D13, PRD §8.4): a single long-running effect
 /// subscribes to `apiClient.sessionEvents()` and, on `.unauthorized`, clears in-flight app-spine work
