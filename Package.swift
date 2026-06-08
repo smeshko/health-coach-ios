@@ -66,6 +66,9 @@ let package = Package(
       name: "AppFeature",
       dependencies: [
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        // The app spine subscribes to the session-event stream (401 routing) via the APIClient
+        // INTERFACE — the one app-spine exception to the feature dependency rule (§13). Never *Live.
+        "APIClient",
       ],
       path: "Sources/Features/AppFeature/Sources",
       swiftSettings: [
@@ -835,6 +838,8 @@ let package = Package(
       name: "AppFeatureTests",
       dependencies: [
         "AppFeature",
+        // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
+        "APIClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/AppFeature/Tests/AppFeatureTests",
