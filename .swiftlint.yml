@@ -24,7 +24,11 @@ line_length:
 
 identifier_name:
   # `id` is the SwiftLint default exception; `db` is GRDB's idiomatic Database-handle closure
-  # parameter, used pervasively in the persistence layer.
+  # parameter, used pervasively in the persistence layer. `sm`/`md`/`lg` are the design-system
+  # size-token vocabulary (e.g. `IconBadge.Size`), intentionally two letters.
   excluded:
     - id
     - db
+    - sm
+    - md
+    - lg
