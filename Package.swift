@@ -155,6 +155,7 @@ let package = Package(
       dependencies: [
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/TokenClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -166,6 +167,7 @@ let package = Package(
         "TokenClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/TokenClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -553,6 +555,7 @@ let package = Package(
         "TokenClientLive",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Clients/TokenClient/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
