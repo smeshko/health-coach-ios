@@ -81,6 +81,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "Tagged", package: "swift-tagged"),
       ],
+      path: "Sources/Core/CoachCore/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -106,6 +107,7 @@ let package = Package(
       dependencies: [
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
+      path: "Sources/Core/CoachTestSupport/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -117,6 +119,7 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Core/CoachCore/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
