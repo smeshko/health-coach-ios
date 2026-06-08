@@ -294,6 +294,7 @@ let package = Package(
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/BriefRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -315,6 +316,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/BriefRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -637,6 +639,7 @@ let package = Package(
         "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/BriefRepository/Tests/BriefRepositoryTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -660,6 +663,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/BriefRepository/Tests/BriefRepositoryLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
