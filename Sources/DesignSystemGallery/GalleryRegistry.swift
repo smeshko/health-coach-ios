@@ -13,6 +13,7 @@ extension GalleryComponent {
     GalleryComponent(name: "Chip") { AnyView(ChipPage()) },
     GalleryComponent(name: "Banner") { AnyView(BannerPage()) },
     GalleryComponent(name: "DayBadge") { AnyView(DayBadgePage()) },
+    GalleryComponent(name: "IconBadge") { AnyView(IconBadgePage()) },
     GalleryComponent(name: "SegmentedBar") { AnyView(SegmentedBarPage()) },
     GalleryComponent(name: "BarColumns") { AnyView(BarColumnsPage()) },
   ]

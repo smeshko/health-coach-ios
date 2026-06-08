@@ -22,6 +22,12 @@ struct AtomsCatalogView: View {
           DayBadge("Tue", tone: .negative, isCore: true)
           DayBadge("Fri", tone: .warning, isCore: false)
         }
+        group("IconBadge") {
+          IconBadge("drop", shape: .square, size: .lg, tone: .accent)
+          IconBadge("drop", shape: .circle, size: .lg, tone: .accent)
+          IconBadge("exclamationmark.triangle.fill", tone: .warning)
+          IconBadge("xmark", tone: .negative)
+        }
         VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
           Text("Banner").font(.coachText2xs).foregroundStyle(.coachForegroundSubtle)
           Banner(

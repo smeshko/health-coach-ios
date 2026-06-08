@@ -82,6 +82,31 @@ struct DayBadgePage: View {
   }
 }
 
+struct IconBadgePage: View {
+  var body: some View {
+    GalleryScaffold(title: "IconBadge") {
+      stateLabel("Shapes (· lg)")
+      HStack(spacing: CoachSpacing.spaceMd) {
+        IconBadge(Icon.drop.systemName, shape: .square, size: .lg)
+        IconBadge(Icon.drop.systemName, shape: .circle, size: .lg)
+      }
+      stateLabel("Sizes (square)")
+      HStack(alignment: .center, spacing: CoachSpacing.spaceMd) {
+        IconBadge(Icon.drop.systemName, size: .sm)
+        IconBadge(Icon.drop.systemName, size: .md)
+        IconBadge(Icon.drop.systemName, size: .lg)
+      }
+      stateLabel("Tones")
+      HStack(spacing: CoachSpacing.spaceMd) {
+        IconBadge("drop", tone: .accent)
+        IconBadge("exclamationmark.triangle.fill", tone: .warning)
+        IconBadge("xmark", tone: .negative)
+        IconBadge("checkmark", tone: .positive)
+      }
+    }
+  }
+}
+
 struct BannerPage: View {
   var body: some View {
     GalleryScaffold(title: "Banner") {
