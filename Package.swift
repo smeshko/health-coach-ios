@@ -361,6 +361,7 @@ let package = Package(
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
+      path: "Sources/Repositories/StrengthTestRepository/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -378,6 +379,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/StrengthTestRepository/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -705,6 +707,7 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
+      path: "Sources/Repositories/StrengthTestRepository/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
