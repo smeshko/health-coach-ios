@@ -19,6 +19,9 @@
     static let mockKey = "coach.dev.useMockData"
     /// Persisted scenario map key: `[DevEndpoint.rawValue: SampleScenario.rawValue]`.
     static let scenariosKey = "coach.dev.scenarios"
+    /// Persisted log-category enabled map key: `[LogCategory.rawValue: Bool]`. String-keyed so the
+    /// store stays free of a `LogClient` import; `LogClientLive` maps `LogCategory.rawValue` in.
+    static let logCategoriesKey = "coach.dev.logCategories"
 
     /// Shared across instances so the cross-instance scenario-map read-modify-write is serialized.
     private static let lock = NSLock()
@@ -61,6 +64,23 @@
     /// override precedence).
     func hasPersistedMock() -> Bool {
       Self.lock.withLock { defaults.object(forKey: Self.mockKey) != nil }
+    }
+
+    /// Whether the log category keyed by `rawValue` is enabled — **false** when the slot is missing
+    /// (default-off; verbose categories stay quiet until explicitly toggled on).
+    func isLogCategoryEnabled(_ rawValue: String) -> Bool {
+      Self.lock.withLock {
+        let map = defaults.dictionary(forKey: Self.logCategoriesKey) as? [String: Bool]
+        return map?[rawValue] ?? false
+      }
+    }
+
+    func setLogCategoryEnabled(_ enabled: Bool, for rawValue: String) {
+      Self.lock.withLock {
+        var map = (defaults.dictionary(forKey: Self.logCategoriesKey) as? [String: Bool]) ?? [:]
+        map[rawValue] = enabled
+        defaults.set(map, forKey: Self.logCategoriesKey)
+      }
     }
   }
 #endif
