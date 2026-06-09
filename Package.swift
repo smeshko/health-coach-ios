@@ -101,6 +101,10 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         "APIClient",
         "TokenClient",
+        // The HealthKit-priming step (Phase 7.3) drives auth + the degraded-detection delta probe via
+        // the `HealthKitClient` INTERFACE only (the §13/D12/§4.5 onboarding carve-out) — never HealthKit
+        // / `*Live`.
+        "HealthKitClient",
         "DesignSystem",
         "DomainModels",
         "CoachCore",
@@ -558,6 +562,10 @@ let package = Package(
       dependencies: [
         "DomainModels",
         "CoachCore",
+        // The `HealthDataCategory` → label mapping (Phase 7.3 / DECISIONS #1) — a recorded §4.4 widening:
+        // DesignSystem imports the `HealthKitClient` INTERFACE (a pure value enum, never `*Live`/HealthKit)
+        // so the priming/degraded category labels live at the single enum→label boundary (principle #2 / D19).
+        "HealthKitClient",
       ],
       path: "Sources/DesignSystem/Sources",
       swiftSettings: [
@@ -966,6 +974,10 @@ let package = Package(
         "OnboardingFeature",
         "APIClient",
         "TokenClient",
+        // The HealthKit-priming TestStore stubs `HealthKitClient` + constructs `HealthDataCategory`/
+        // `HealthSampleSet` fixtures; the label tests reach the `DesignSystem` category labels.
+        "HealthKitClient",
+        "DesignSystem",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureTests",
