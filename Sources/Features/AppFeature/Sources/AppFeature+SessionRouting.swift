@@ -23,8 +23,13 @@ extension AppFeature {
       .cancellable(id: CancelID.sessionStream, cancelInFlight: true)
 
     case ._sessionEvent(.unauthorized):
-      // Route to Connect with the token-invalid reason and clear in-flight app work (§13). Do NOT
-      // cancel `sessionStream`, do NOT re-subscribe, do NOT retry / refresh the token.
+      // Route to Connect ONLY from `.main`: a 401 while in the app means a previously-valid session went
+      // invalid, so bounce to Connect (token-invalid) and clear in-flight app work (§13). Do NOT cancel
+      // `sessionStream`, do NOT re-subscribe, do NOT retry / refresh the token. While already
+      // `.onboarding` (an active connect attempt) the event is a NO-OP: the Connect screen surfaces probe
+      // failures inline, and reconstructing state here would wipe the typed token + flash the reason
+      // banner mid-connect (the 7.2 double-bounce; DECISIONS 5).
+      guard case .main = state else { return .none }
       state = .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
       return .cancel(id: CancelID.appWork)
 
