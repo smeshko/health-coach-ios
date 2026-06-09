@@ -2,11 +2,11 @@ import ComposableArchitecture
 import DesignSystem
 import SwiftUI
 
-/// The onboarding branch's root view — renders the current `Step`. The `.connect` step's screen is a
-/// **placeholder here in TASK-001** (the real `ConnectView` lands in TASK-002); the `.healthKitPriming`
-/// step is a placeholder until Phase 7.3. The 401-bounce `reason: .tokenInvalid` shows a reconnect
-/// banner above the connect content (a separate concern from `ConnectComponent`'s probe-failure error
-/// row).
+/// The onboarding branch's root view — renders the current `Step`. The `.connect` step renders
+/// `ConnectView` (Phase 7.2); the `.healthKitPriming` step is a placeholder until Phase 7.3. The
+/// 401-bounce `reason: .tokenInvalid` shows a reconnect banner pinned over the top of the connect
+/// content — a separate concern from `ConnectComponent`'s probe-failure error row (which keys off
+/// `validation == .invalid`).
 public struct OnboardingView: View {
   let store: StoreOf<OnboardingFeature>
 
@@ -17,24 +17,19 @@ public struct OnboardingView: View {
   public var body: some View {
     switch store.step {
     case let .connect(reason):
-      VStack(spacing: CoachSpacing.spaceLg) {
-        if reason == .tokenInvalid {
-          Banner(
-            icon: "exclamationmark.triangle.fill",
-            tone: .negative,
-            title: "Token invalid",
-            message: ErrorDisplay.unauthorized.label
-          )
+      ConnectView(store: store.scope(state: \.connect, action: \.connect))
+        .safeAreaInset(edge: .top) {
+          if reason == .tokenInvalid {
+            Banner(
+              icon: "exclamationmark.triangle.fill",
+              tone: .negative,
+              title: "Token invalid",
+              message: ErrorDisplay.unauthorized.label
+            )
+            .padding(.horizontal, CoachSpacing.spaceLg)
+            .padding(.top, CoachSpacing.spaceLg)
+          }
         }
-        Spacer()
-        Text("Let's connect you")
-          .font(.coachText2xl)
-          .foregroundStyle(.coachForeground)
-        Spacer()
-      }
-      .padding(CoachSpacing.spaceLg)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(.coachBackground)
 
     case .healthKitPriming:
       Text("Setting up…")
