@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import OnboardingFeature
 import SwiftUI
 
 /// The app root view: an onboarding shell **or** the main tab bar, chosen by the store's enum case.
@@ -17,7 +18,7 @@ public struct AppView: View {
   public var body: some View {
     Group {
       if let store = store.scope(state: \.onboarding, action: \.onboarding) {
-        OnboardingShellView(store: store)
+        OnboardingView(store: store)
       } else if let store = store.scope(state: \.main, action: \.main) {
         MainTabsView(store: store)
       }

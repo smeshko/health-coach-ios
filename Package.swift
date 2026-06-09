@@ -10,6 +10,7 @@ let package = Package(
   platforms: [.iOS(.v26), .macOS(.v14)],
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
+    .library(name: "OnboardingFeature", targets: ["OnboardingFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
     .library(name: "WireModels", targets: ["WireModels"]),
     .library(name: "DomainModels", targets: ["DomainModels"]),
@@ -18,6 +19,8 @@ let package = Package(
     .library(name: "PersistenceModels", targets: ["PersistenceModels"]),
     .library(name: "TokenClient", targets: ["TokenClient"]),
     .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
+    .library(name: "LogClient", targets: ["LogClient"]),
+    .library(name: "LogClientLive", targets: ["LogClientLive"]),
     .library(name: "APIClient", targets: ["APIClient"]),
     .library(name: "APIClientLive", targets: ["APIClientLive"]),
     .library(name: "Database", targets: ["Database"]),
@@ -60,6 +63,11 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
     // Test-only: SwiftUI image snapshots. Used only by CoachTestSupport + the snapshot test target.
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
+    // swift-log — the app-wide logging mechanism (DECISIONS 1). `LogClient` (interface) depends only
+    // on its `Logging` product; `LogClientLive` adds a custom `LogHandler` (console + rotating file +
+    // category gating). Floor 1.13.0: `CoachLogHandler` implements the current `log(event:)` requirement
+    // (older `log(level:…)` is deprecated), and `LogEvent` only exists from this version.
+    .package(url: "https://github.com/apple/swift-log", from: "1.13.0"),
   ],
   targets: [
     .target(
@@ -69,6 +77,9 @@ let package = Package(
         // The app spine subscribes to the session-event stream (401 routing) via the APIClient
         // INTERFACE — the one app-spine exception to the feature dependency rule (§13). Never *Live.
         "APIClient",
+        // The onboarding branch is its own feature module (ARCHITECTURE §4.5/§10); AppFeature composes
+        // it and renders its root view.
+        "OnboardingFeature",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
       ],
@@ -77,6 +88,25 @@ let package = Package(
         // Explicit Swift 6 language mode = complete strict concurrency. Already the default from
         // `swift-tools-version: 6.3`; stated here to self-document and to satisfy the epic's
         // "strict-concurrency build settings" wording.
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The onboarding feature (ARCHITECTURE §4.5/§10): the Connect step (`ConnectComponent`) + the
+    // HealthKit-priming step (Phase 7.3). An app-spine feature that may use the `APIClient`/`TokenClient`
+    // INTERFACES directly (the §13/D12/§4.5 carve-out) alongside DesignSystem + DomainModels/CoachCore —
+    // never a `*Live`, GRDB, HealthKit, or WireModels.
+    .target(
+      name: "OnboardingFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "APIClient",
+        "TokenClient",
+        "DesignSystem",
+        "DomainModels",
+        "CoachCore",
+      ],
+      path: "Sources/Features/OnboardingFeature/Sources",
+      swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
     ),
@@ -184,6 +214,37 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // App-wide logging interface — `@Dependency(\.log)`: a Sendable closure-struct + `LogLevel` /
+    // `LogCategory` (`.http` always-on) + a host-assertable `LogRecorder`. Depends ONLY on swift-log
+    // (`Logging`) + Dependencies — no app types, no DevSettings (the gate lives in LogClientLive).
+    .target(
+      name: "LogClient",
+      dependencies: [
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Interface",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // LogClient.liveValue — a custom swift-log `LogHandler` (CoachLogHandler) writing human-readable
+    // lines to console + a rotating file (LogFileWriter), with category gating read from the persisted
+    // DevSettings toggles. Depends on the LogClient interface + DevSettings (interface) + swift-log +
+    // Dependencies. Imported only by the composition root (TASK-004) + APIClientLive (via the interface).
+    .target(
+      name: "LogClientLive",
+      dependencies: [
+        "LogClient",
+        "DevSettings",
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // The network client interface — concrete typed closures for the six routes + a session-event
     // stream, plus `APIError`/`SessionEvent`. No URLSession here (that's APIClientLive). Repos/
     // features depend only on this (§4.2/§6.1).
@@ -210,6 +271,9 @@ let package = Package(
         "TokenClient",
         "WireModels",
         "CoachCore",
+        // The transport logs every request/response/error under `.http` via the LogClient INTERFACE
+        // (no LogClientLive — the composition root installs the live value).
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/APIClient/Live",
@@ -564,6 +628,9 @@ let package = Package(
         "APIClientLive",
         "TokenClient",
         "WireModels",
+        // The transport-logging test builds a recorder `LogClient`; SwiftPM doesn't re-export the
+        // transitive import, so the test target lists it directly.
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "Clocks", package: "swift-clocks"),
       ],
@@ -581,6 +648,36 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/TokenClient/Tests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // LogClient interface tests — recorder capture + level-helper routing + always-on rule. Host, no
+    // simulator. LogClient has TWO test targets (this + LogClientLiveTests, TASK-002), so each sits in
+    // its own subfolder under `Tests/` — the repository-style nested layout (e.g. BriefRepository),
+    // not the flat single-`Tests/` layout the single-test-target clients use.
+    .testTarget(
+      name: "LogClientTests",
+      dependencies: [
+        "LogClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Tests/LogClientTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // LogClientLive tests — file write (via the writer's `flush` seam) + rotation cap + DevSettings
+    // category gating. Host, no simulator. Sibling subfolder to LogClientTests under `Tests/`.
+    .testTarget(
+      name: "LogClientLiveTests",
+      dependencies: [
+        "LogClient",
+        "LogClientLive",
+        "DevSettings",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Tests/LogClientLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -850,11 +947,28 @@ let package = Package(
       name: "AppFeatureTests",
       dependencies: [
         "AppFeature",
+        // The switch/401 tests construct `OnboardingFeature.State` (the onboarding branch payload).
+        "OnboardingFeature",
         // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
         "APIClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/AppFeature/Tests/AppFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ConnectComponent exhaustive TestStore (host) — write→probe→clear ordering, success/failure
+    // branches, binding-reset, paste, and the `canSubmit` gate (PLAN.md D18). No snapshot/UIKit code.
+    .testTarget(
+      name: "OnboardingFeatureTests",
+      dependencies: [
+        "OnboardingFeature",
+        "APIClient",
+        "TokenClient",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -883,6 +997,8 @@ let package = Package(
       name: "AppFeatureSnapshotTests",
       dependencies: [
         "AppFeature",
+        // The shell snapshots construct `OnboardingFeature.State` for the onboarding branch.
+        "OnboardingFeature",
         "CoachTestSupport",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
@@ -890,6 +1006,22 @@ let package = Package(
       path: "Sources/Features/AppFeature/Tests/AppFeatureSnapshotTests",
       // Reference images are read from disk by swift-snapshot-testing (not bundled), so exclude them
       // from the target to avoid SwiftPM's "unhandled files" warning.
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ConnectView snapshots (connect + error states, light + dark) — iOS 26 simulator only, via
+    // `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host.
+    .testTarget(
+      name: "OnboardingFeatureSnapshotTests",
+      dependencies: [
+        "OnboardingFeature",
+        "CoachTestSupport",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),

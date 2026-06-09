@@ -27,7 +27,9 @@ extension DevSettings: DependencyKey {
         useMockData: { store.readMock() },
         scenario: { store.scenario(for: $0) },
         setUseMockData: { store.writeMock($0) },
-        setScenario: { store.setScenario($0, for: $1) }
+        setScenario: { store.setScenario($0, for: $1) },
+        isLogCategoryEnabled: { store.isLogCategoryEnabled($0) },
+        setLogCategoryEnabled: { store.setLogCategoryEnabled($0, for: $1) }
       )
     }
   #endif

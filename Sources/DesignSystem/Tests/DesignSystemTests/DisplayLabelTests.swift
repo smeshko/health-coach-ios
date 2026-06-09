@@ -51,6 +51,15 @@ final class DisplayLabelTests: XCTestCase {
     }
   }
 
+  func test_errorDisplay_tokenRejected_hasConnectCopy() {
+    XCTAssertEqual(
+      ErrorDisplay.tokenRejected.label,
+      "That token doesn't look right. Check it and paste again."
+    )
+    // Distinct from the 401 *banner* copy, which stays `.unauthorized`.
+    XCTAssertNotEqual(ErrorDisplay.tokenRejected.label, ErrorDisplay.unauthorized.label)
+  }
+
   func test_colorCues_existForBandZoneIntensity() {
     // Compile-proof that the color cue is paired with each band/zone/intensity (color is never sole).
     _ = ReadinessBand.green.color

@@ -1,5 +1,6 @@
 import APIClient
 import ComposableArchitecture
+import OnboardingFeature
 import XCTest
 
 @testable import AppFeature
@@ -68,7 +69,7 @@ final class AppFeature401Tests: XCTestCase {
     await store.finish()
   }
 
-  func test_unauthorized_twice_reappliesSwap_noRetry() async {
+  func test_unauthorized_whenAlreadyOnboarding_isNoOp() async {
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
@@ -78,15 +79,42 @@ final class AppFeature401Tests: XCTestCase {
 
     await store.send(._appWillAppear)
 
+    // First 401 from `.main` → swap to onboarding/connect.
     continuation.yield(.unauthorized)
     await store.receive(\._sessionEvent, .unauthorized) {
       $0 = self.tokenInvalid
     }
 
-    // A second 401 on the still-live stream re-applies the same swap and emits only `.cancel(.appWork)`
-    // — no new subscription, no retry (exhaustive store catches any extra effect).
+    // A second 401 — now delivered while already `.onboarding` — is a NO-OP under the `.main`-only
+    // guard: no state change (the `receive` carries no mutation closure), no `.cancel(.appWork)`, no
+    // re-subscribe (the exhaustive store would catch any extra effect).
     continuation.yield(.unauthorized)
     await store.receive(\._sessionEvent, .unauthorized)
+
+    continuation.finish()
+    await store.finish()
+  }
+
+  func test_unauthorized_whileOnboarding_preservesTypedToken() async {
+    let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
+    var onboarding = OnboardingFeature.State(step: .connect(reason: nil))
+    onboarding.connect.token = "typed-token-123"
+    let store = TestStore(initialState: AppFeature.State.onboarding(onboarding)) {
+      AppFeature()
+    } withDependencies: {
+      $0.apiClient.sessionEvents = { stream }
+    }
+
+    await store.send(._appWillAppear)
+
+    // A 401 arriving during an active connect attempt must NOT reconstruct onboarding state: the typed
+    // token + the (nil) reason are preserved (no banner flash, no field wipe) — the Connect screen owns
+    // its inline error. No mutation closure ⇒ the exhaustive store asserts the state is unchanged.
+    continuation.yield(.unauthorized)
+    await store.receive(\._sessionEvent, .unauthorized)
+
+    XCTAssertEqual(store.state.onboarding?.connect.token, "typed-token-123")
+    XCTAssertEqual(store.state.onboarding?.step, .connect(reason: nil))
 
     continuation.finish()
     await store.finish()

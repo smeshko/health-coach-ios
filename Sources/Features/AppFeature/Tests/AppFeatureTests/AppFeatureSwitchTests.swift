@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import OnboardingFeature
 import XCTest
 
 @testable import AppFeature
