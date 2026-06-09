@@ -20,6 +20,7 @@ let package = Package(
     .library(name: "TokenClient", targets: ["TokenClient"]),
     .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
     .library(name: "LogClient", targets: ["LogClient"]),
+    .library(name: "LogClientLive", targets: ["LogClientLive"]),
     .library(name: "APIClient", targets: ["APIClient"]),
     .library(name: "APIClientLive", targets: ["APIClientLive"]),
     .library(name: "Database", targets: ["Database"]),
@@ -64,8 +65,9 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
     // swift-log — the app-wide logging mechanism (DECISIONS 1). `LogClient` (interface) depends only
     // on its `Logging` product; `LogClientLive` adds a custom `LogHandler` (console + rotating file +
-    // category gating).
-    .package(url: "https://github.com/apple/swift-log", from: "1.5.0"),
+    // category gating). Floor 1.13.0: `CoachLogHandler` implements the current `log(event:)` requirement
+    // (older `log(level:…)` is deprecated), and `LogEvent` only exists from this version.
+    .package(url: "https://github.com/apple/swift-log", from: "1.13.0"),
   ],
   targets: [
     .target(
@@ -222,6 +224,23 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/LogClient/Interface",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // LogClient.liveValue — a custom swift-log `LogHandler` (CoachLogHandler) writing human-readable
+    // lines to console + a rotating file (LogFileWriter), with category gating read from the persisted
+    // DevSettings toggles. Depends on the LogClient interface + DevSettings (interface) + swift-log +
+    // Dependencies. Imported only by the composition root (TASK-004) + APIClientLive (via the interface).
+    .target(
+      name: "LogClientLive",
+      dependencies: [
+        "LogClient",
+        "DevSettings",
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -638,6 +657,21 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/LogClient/Tests/LogClientTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // LogClientLive tests — file write (via the writer's `flush` seam) + rotation cap + DevSettings
+    // category gating. Host, no simulator. Sibling subfolder to LogClientTests under `Tests/`.
+    .testTarget(
+      name: "LogClientLiveTests",
+      dependencies: [
+        "LogClient",
+        "LogClientLive",
+        "DevSettings",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Tests/LogClientLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
