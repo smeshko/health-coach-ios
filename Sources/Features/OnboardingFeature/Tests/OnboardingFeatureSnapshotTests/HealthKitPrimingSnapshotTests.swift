@@ -15,13 +15,13 @@
   import CoachTestSupport
   import ComposableArchitecture
   import SnapshotTesting
-  import XCTest
+  import Testing
 
   @testable import OnboardingFeature
 
   @MainActor
-  final class HealthKitPrimingSnapshotTests: XCTestCase {
-    func test_healthKitPriming_idleState() {
+  struct HealthKitPrimingSnapshotTests {
+    @Test func test_healthKitPriming_idleState() {
       let view = HealthKitPrimingView(
         store: Store(initialState: HealthKitPriming.State()) {
           HealthKitPriming()
@@ -30,7 +30,7 @@
       assertCoachSnapshot(of: view)
     }
 
-    func test_degradedPermissions_partialState() {
+    @Test func test_degradedPermissions_partialState() {
       let summary = HealthKitPriming.DegradedSummary(missing: [.sleep, .vo2Max], bannerSignal: .sleep)
       let view = DegradedPermissionsView(
         store: Store(initialState: HealthKitPriming.State(phase: .degraded(summary))) {

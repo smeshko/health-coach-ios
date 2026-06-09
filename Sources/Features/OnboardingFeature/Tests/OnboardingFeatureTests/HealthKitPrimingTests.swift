@@ -1,7 +1,8 @@
 import ComposableArchitecture
 import DesignSystem
+import Foundation
 import HealthKitClient
-import XCTest
+import Testing
 
 @testable import OnboardingFeature
 
@@ -9,33 +10,33 @@ import XCTest
 /// and the `DesignSystem` label boundary (Phase 7.3 TASK-001 — pure transitions only; the authorize +
 /// degraded-probe effects are exercised in TASK-002). Host-runnable: no HealthKit, no simulator.
 @MainActor
-final class HealthKitPrimingTests: XCTestCase {
+struct HealthKitPrimingTests {
   // MARK: PrimingRow grouping (the degraded-inference seam)
 
   /// The union of every row's categories **equals** the full `HealthDataCategory` set — every category
   /// has exactly one home (disjoint + exhaustive), incl. `respiratoryRate` (folds into Heart rate) and
   /// `activity` (folds into Active & basal energy).
-  func test_primingRows_categoriesAreDisjointAndCoverEveryCategory() {
+  @Test func test_primingRows_categoriesAreDisjointAndCoverEveryCategory() {
     var seen = Set<HealthDataCategory>()
     for row in PrimingRow.allCases {
-      XCTAssertFalse(row.categories.isEmpty, "\(row) maps to no category")
-      XCTAssertTrue(seen.isDisjoint(with: row.categories), "\(row) double-maps a category")
+      #expect(!row.categories.isEmpty, "\(row) maps to no category")
+      #expect(seen.isDisjoint(with: row.categories), "\(row) double-maps a category")
       seen.formUnion(row.categories)
     }
-    XCTAssertEqual(seen, Set(HealthDataCategory.allCases), "rows must cover every HealthDataCategory")
+    #expect(seen == Set(HealthDataCategory.allCases), "rows must cover every HealthDataCategory")
   }
 
   /// `runningForm` is the sole home for `runningDynamics` (so the row is mandatory, not conditional).
-  func test_runningForm_isSoleHomeOfRunningDynamics() {
+  @Test func test_runningForm_isSoleHomeOfRunningDynamics() {
     let homes = PrimingRow.allCases.filter { $0.categories.contains(.runningDynamics) }
-    XCTAssertEqual(homes, [.runningForm])
+    #expect(homes == [.runningForm])
   }
 
   /// `primingGroups` collapses the 11 degraded rows into the 8 priming-screen groups.
-  func test_primingGroups_areTheEightDesignGroups() {
-    XCTAssertEqual(
-      PrimingRow.primingGroups,
-      [.heartRate, .sleep, .steps, .vo2Max, .runningForm, .workoutsEffort, .bodyWeight, .dietary]
+  @Test func test_primingGroups_areTheEightDesignGroups() {
+    #expect(
+      PrimingRow.primingGroups
+        == [.heartRate, .sleep, .steps, .vo2Max, .runningForm, .workoutsEffort, .bodyWeight, .dietary]
     )
   }
 
@@ -43,45 +44,45 @@ final class HealthKitPrimingTests: XCTestCase {
 
   /// Every `HealthDataCategory` and every `PrimingRow` resolves to a non-empty human title via the
   /// `DesignSystem` boundary, never the raw case name.
-  func test_labels_areNonEmpty_andNotRawCaseNames() {
+  @Test func test_labels_areNonEmpty_andNotRawCaseNames() {
     for category in HealthDataCategory.allCases {
       let label = category.signalLabel
-      XCTAssertFalse(label.title.isEmpty, "\(category) has an empty signal label")
-      XCTAssertNotEqual(label.title, category.rawValue, "\(category) renders its raw value")
-      XCTAssertNotEqual(label.title, String(describing: category), "\(category) renders its raw case name")
-      XCTAssertFalse(label.iconName.isEmpty, "\(category) has no icon")
+      #expect(!label.title.isEmpty, "\(category) has an empty signal label")
+      #expect(label.title != category.rawValue, "\(category) renders its raw value")
+      #expect(label.title != String(describing: category), "\(category) renders its raw case name")
+      #expect(!label.iconName.isEmpty, "\(category) has no icon")
     }
     for row in PrimingRow.allCases {
-      XCTAssertFalse(row.rowLabel.title.isEmpty, "\(row) has an empty row label")
-      XCTAssertNotEqual(row.rowLabel.title, String(describing: row), "\(row) renders its raw case name")
+      #expect(!row.rowLabel.title.isEmpty, "\(row) has an empty row label")
+      #expect(row.rowLabel.title != String(describing: row), "\(row) renders its raw case name")
     }
     for group in PrimingRow.primingGroups {
-      XCTAssertFalse(group.groupLabel.title.isEmpty, "\(group) has an empty group label")
-      XCTAssertFalse(group.groupLabel.subtitle.isEmpty, "\(group) has an empty group subtitle")
+      #expect(!group.groupLabel.title.isEmpty, "\(group) has an empty group label")
+      #expect(!group.groupLabel.subtitle.isEmpty, "\(group) has an empty group subtitle")
     }
   }
 
   /// The priming-group head copy matches the design (and is distinct from the per-row label for the
   /// grouped heads — `heartRate` heads "Heart & recovery", not "Heart rate").
-  func test_groupHeads_useGroupCopy_distinctFromRowCopy() {
-    XCTAssertEqual(PrimingRow.heartRate.groupLabel.title, "Heart & recovery")
-    XCTAssertEqual(PrimingRow.heartRate.rowLabel.title, "Heart rate")
-    XCTAssertEqual(PrimingRow.steps.groupLabel.title, "Activity & energy")
-    XCTAssertEqual(PrimingRow.steps.rowLabel.title, "Steps")
+  @Test func test_groupHeads_useGroupCopy_distinctFromRowCopy() {
+    #expect(PrimingRow.heartRate.groupLabel.title == "Heart & recovery")
+    #expect(PrimingRow.heartRate.rowLabel.title == "Heart rate")
+    #expect(PrimingRow.steps.groupLabel.title == "Activity & energy")
+    #expect(PrimingRow.steps.rowLabel.title == "Steps")
   }
 
   // MARK: Pure state transitions (no effects in TASK-001)
 
   /// The step opens in `.priming` (the `connectTapped` → `.authorizing` edge is asserted in every effect
   /// scenario below, since `connectTapped` now also kicks off the authorize/probe effect).
-  func test_initialState_isPriming() {
+  @Test func test_initialState_isPriming() {
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
     }
-    XCTAssertEqual(store.state.phase, .priming)
+    #expect(store.state.phase == .priming)
   }
 
-  func test_continueTapped_fromDegraded_emitsFinished() async {
+  @Test func test_continueTapped_fromDegraded_emitsFinished() async {
     let summary = HealthKitPriming.DegradedSummary(missing: [.sleep], bannerSignal: .sleep)
     let store = TestStore(initialState: HealthKitPriming.State(phase: .degraded(summary))) {
       HealthKitPriming()
@@ -94,7 +95,7 @@ final class HealthKitPrimingTests: XCTestCase {
 
   /// Grant: `requestAuthorization` succeeds and the probe returns samples for **every** row → granted →
   /// `finished`.
-  func test_grant_allCategoriesPresent_landsGranted_andFinishes() async {
+  @Test func test_grant_allCategoriesPresent_landsGranted_andFinishes() async {
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
     } withDependencies: {
@@ -116,7 +117,7 @@ final class HealthKitPrimingTests: XCTestCase {
   /// Partial: the probe returns no `sleep`/`vo2Max` samples (others present) → only those rows are
   /// missing and the banner names `sleep` — **derived from empty slices**, NOT the status map (the hint
   /// is deliberately all-`.notDetermined` to prove inference ignores it).
-  func test_partial_inferenceFromEmptySlices_ignoresStatusMap() async {
+  @Test func test_partial_inferenceFromEmptySlices_ignoresStatusMap() async {
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
     } withDependencies: {
@@ -143,14 +144,14 @@ final class HealthKitPrimingTests: XCTestCase {
 
   /// Deny: `requestAuthorization` throws → straight to fully-degraded **without a probe** (the degraded
   /// path never throws to the UI), and a non-blocking `continueTapped` → `finished`.
-  func test_deny_goesFullyDegraded_withoutProbe_andContinues() async {
+  @Test func test_deny_goesFullyDegraded_withoutProbe_andContinues() async {
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
     } withDependencies: {
       $0.healthKitClient.isHealthDataAvailable = { true }
       $0.healthKitClient.requestAuthorization = { throw StubAuthError() }
       $0.healthKitClient.deltaSamples = { _ in
-        XCTFail("deltaSamples must not run when authorization fails")
+        Issue.record("deltaSamples must not run when authorization fails")
         return .empty
       }
     }
@@ -168,14 +169,16 @@ final class HealthKitPrimingTests: XCTestCase {
 
   /// Unavailable: `isHealthDataAvailable() == false` → fully degraded **without** requesting auth or
   /// probing (DECISIONS #2 — `.healthDataUnavailable` is degraded, not an error).
-  func test_unavailable_goesFullyDegraded_withoutRequestingAuthOrProbe() async {
+  @Test func test_unavailable_goesFullyDegraded_withoutRequestingAuthOrProbe() async {
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
     } withDependencies: {
       $0.healthKitClient.isHealthDataAvailable = { false }
-      $0.healthKitClient.requestAuthorization = { XCTFail("requestAuthorization must not run when HK is unavailable") }
+      $0.healthKitClient.requestAuthorization = {
+        Issue.record("requestAuthorization must not run when HK is unavailable")
+      }
       $0.healthKitClient.deltaSamples = { _ in
-        XCTFail("deltaSamples must not run when HK is unavailable")
+        Issue.record("deltaSamples must not run when HK is unavailable")
         return .empty
       }
     }
@@ -191,7 +194,7 @@ final class HealthKitPrimingTests: XCTestCase {
 
   /// "Open Health settings" opens the `x-apple-health://` deep link via `openURL` (the Continue path
   /// never depends on it succeeding).
-  func test_openHealthSettings_opensHealthDeepLink() async {
+  @Test func test_openHealthSettings_opensHealthDeepLink() async {
     let opened = LockIsolated<[URL]>([])
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
@@ -204,29 +207,29 @@ final class HealthKitPrimingTests: XCTestCase {
 
     await store.send(.openHealthSettingsTapped)
     await store.finish()
-    XCTAssertEqual(opened.value, [URL(string: "x-apple-health://")!])
+    #expect(opened.value == [URL(string: "x-apple-health://")!])
   }
 
   // MARK: Pure helpers (unit-tested directly — independent of the reducer)
 
   /// Per-category emptiness derivation, incl. `workouts`/`activity` (not `RecordType`-backed).
-  func test_missingRows_derivesPerCategoryEmptinessFromSlices() {
-    XCTAssertEqual(missingRows(from: .empty), Set(PrimingRow.allCases), "empty set → every row missing")
-    XCTAssertEqual(missingRows(from: HKFixtures.allPresentSamples), [], "every category present → no row missing")
+  @Test func test_missingRows_derivesPerCategoryEmptinessFromSlices() {
+    #expect(missingRows(from: .empty) == Set(PrimingRow.allCases), "empty set → every row missing")
+    #expect(missingRows(from: HKFixtures.allPresentSamples) == [], "every category present → no row missing")
     // workouts is not a RecordType — presence comes from the workouts array.
     let onlyWorkouts = missingRows(from: HealthSampleSet(workouts: [HKFixtures.sampleWorkout]))
-    XCTAssertFalse(onlyWorkouts.contains(.workoutsEffort))
+    #expect(!onlyWorkouts.contains(.workoutsEffort))
     // activity is not a RecordType — presence comes from the activity array (folds into Active & basal).
     let onlyActivity = missingRows(from: HealthSampleSet(activity: [HKFixtures.sampleActivity]))
-    XCTAssertFalse(onlyActivity.contains(.activeBasalEnergy))
+    #expect(!onlyActivity.contains(.activeBasalEnergy))
   }
 
   /// The banner priority is total and resolves a fully-missing set to `sleep`.
-  func test_topSignal_isTotal_andPrioritizesSleep() {
-    XCTAssertEqual(topSignal(Set(PrimingRow.allCases)), .sleep)
-    XCTAssertEqual(topSignal([.bodyWeight, .vo2Max]), .vo2Max)
-    XCTAssertEqual(topSignal([.dietary]), .dietary)
-    XCTAssertNil(topSignal([]))
+  @Test func test_topSignal_isTotal_andPrioritizesSleep() {
+    #expect(topSignal(Set(PrimingRow.allCases)) == .sleep)
+    #expect(topSignal([.bodyWeight, .vo2Max]) == .vo2Max)
+    #expect(topSignal([.dietary]) == .dietary)
+    #expect(topSignal([]) == nil)
   }
 }
 
