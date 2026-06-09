@@ -4,13 +4,13 @@
 #if canImport(UIKit)
   import CoachTestSupport
   import SnapshotTesting
-  import XCTest
+  import Testing
 
   @testable import DesignSystem
 
   @MainActor
-  final class AtomsSnapshotTests: XCTestCase {
-    func test_atomsCatalog() {
+  struct AtomsSnapshotTests {
+    @Test func test_atomsCatalog() {
       assertCoachSnapshot(of: AtomsCatalogView())
     }
   }

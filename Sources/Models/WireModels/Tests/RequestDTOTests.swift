@@ -1,8 +1,9 @@
 import Foundation
-@testable import WireModels
-import XCTest
+import Testing
 
-final class RequestDTOTests: XCTestCase {
+@testable import WireModels
+
+struct RequestDTOTests {
   private func decode<T: Decodable>(_ type: T.Type, from json: String) throws -> T {
     try WireCoder.decoder.decode(type, from: Data(json.utf8))
   }
@@ -11,37 +12,37 @@ final class RequestDTOTests: XCTestCase {
     let first = try decode(type, from: json)
     let reencoded = try WireCoder.encoder.encode(first)
     let second = try WireCoder.decoder.decode(type, from: reencoded)
-    XCTAssertEqual(first, second, "decode → encode → decode must be value-equal")
+    #expect(first == second, "decode → encode → decode must be value-equal")
     return first
   }
 
-  func test_syncRequest_emptyBodyDecodes() throws {
+  @Test func test_syncRequest_emptyBodyDecodes() throws {
     let request = try roundTrip(SyncRequest.self, from: "{}")
-    XCTAssertEqual(request.records, [])
-    XCTAssertEqual(request.workouts, [])
-    XCTAssertEqual(request.activitySummary, [])
-    XCTAssertNil(request.checkin)
-    XCTAssertNil(request.strengthTest)
+    #expect(request.records == [])
+    #expect(request.workouts == [])
+    #expect(request.activitySummary == [])
+    #expect(request.checkin == nil)
+    #expect(request.strengthTest == nil)
   }
 
-  func test_syncRequest_fullBodyRoundTrips() throws {
+  @Test func test_syncRequest_fullBodyRoundTrips() throws {
     let request = try roundTrip(SyncRequest.self, from: Self.fullSyncBody)
-    XCTAssertEqual(request.records.count, 2)
-    XCTAssertEqual(request.records[0].type, .known(.heartRate))
-    XCTAssertEqual(request.records[0].value, 142.0)
-    XCTAssertNil(request.records[1].value)
-    XCTAssertEqual(request.records[1].category, "asleepCore")
-    XCTAssertEqual(request.records[0].metadata, .object([
+    #expect(request.records.count == 2)
+    #expect(request.records[0].type == .known(.heartRate))
+    #expect(request.records[0].value == 142.0)
+    #expect(request.records[1].value == nil)
+    #expect(request.records[1].category == "asleepCore")
+    #expect(request.records[0].metadata == .object([
       "context": .string("workout"),
       "reps": .int(1),
       "rpe": .double(2.5),
     ]))
-    XCTAssertEqual(request.workouts.count, 1)
-    XCTAssertEqual(request.workouts[0].zoneMinutes?["z2"], 20.0)
-    XCTAssertEqual(request.workouts[0].statistics.count, 1)
-    XCTAssertEqual(request.activitySummary.count, 1)
-    XCTAssertEqual(request.checkin?.kneePain, 1)
-    XCTAssertEqual(request.strengthTest?.maxPushups, 42)
+    #expect(request.workouts.count == 1)
+    #expect(request.workouts[0].zoneMinutes?["z2"] == 20.0)
+    #expect(request.workouts[0].statistics.count == 1)
+    #expect(request.activitySummary.count == 1)
+    #expect(request.checkin?.kneePain == 1)
+    #expect(request.strengthTest?.maxPushups == 42)
   }
 
   private static let fullSyncBody = """
@@ -95,15 +96,15 @@ final class RequestDTOTests: XCTestCase {
   }
   """
 
-  func test_dailyBriefRequest_absentDate() throws {
+  @Test func test_dailyBriefRequest_absentDate() throws {
     let request = try roundTrip(DailyBriefRequest.self, from: "{}")
-    XCTAssertNil(request.date)
-    XCTAssertEqual(request, DailyBriefRequest(date: nil))
+    #expect(request.date == nil)
+    #expect(request == DailyBriefRequest(date: nil))
   }
 
-  func test_weeklyBriefRequest_absentIsoWeek() throws {
+  @Test func test_weeklyBriefRequest_absentIsoWeek() throws {
     let request = try roundTrip(WeeklyBriefRequest.self, from: "{}")
-    XCTAssertNil(request.isoWeek)
-    XCTAssertEqual(request, WeeklyBriefRequest(isoWeek: nil))
+    #expect(request.isoWeek == nil)
+    #expect(request == WeeklyBriefRequest(isoWeek: nil))
   }
 }

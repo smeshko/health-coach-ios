@@ -1,6 +1,6 @@
 import ComposableArchitecture
 import OnboardingFeature
-import XCTest
+import Testing
 
 @testable import AppFeature
 
@@ -8,12 +8,12 @@ import XCTest
 /// `.onboarding ↔ .main` switch and the per-tab `StackState` independence. The 401 routing effect is
 /// covered separately in `AppFeature401Tests` (TASK-002).
 @MainActor
-final class AppFeatureSwitchTests: XCTestCase {
-  func test_startsInOnboarding() {
-    XCTAssertEqual(AppFeature.State(), .onboarding(OnboardingFeature.State()))
+struct AppFeatureSwitchTests {
+  @Test func test_startsInOnboarding() {
+    #expect(AppFeature.State() == .onboarding(OnboardingFeature.State()))
   }
 
-  func test_connectedDelegate_swapsToMain() async {
+  @Test func test_connectedDelegate_swapsToMain() async {
     let store = TestStore(initialState: AppFeature.State.onboarding(OnboardingFeature.State())) {
       AppFeature()
     }
@@ -23,7 +23,7 @@ final class AppFeatureSwitchTests: XCTestCase {
     }
   }
 
-  func test_tabSelected_updatesSelectedTab() async {
+  @Test func test_tabSelected_updatesSelectedTab() async {
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
     }
@@ -35,7 +35,7 @@ final class AppFeatureSwitchTests: XCTestCase {
     }
   }
 
-  func test_perTabStacks_areIndependent() async {
+  @Test func test_perTabStacks_areIndependent() async {
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
     }
@@ -48,8 +48,8 @@ final class AppFeatureSwitchTests: XCTestCase {
     }
 
     let mainState = store.state.main
-    XCTAssertEqual(mainState?.today.count, 1)
-    XCTAssertEqual(mainState?.weekly.count, 0)
-    XCTAssertEqual(mainState?.settings.count, 0)
+    #expect(mainState?.today.count == 1)
+    #expect(mainState?.weekly.count == 0)
+    #expect(mainState?.settings.count == 0)
   }
 }

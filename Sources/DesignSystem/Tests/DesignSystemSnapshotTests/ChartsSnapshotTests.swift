@@ -4,17 +4,17 @@
 #if canImport(UIKit)
   import CoachTestSupport
   import SnapshotTesting
-  import XCTest
+  import Testing
 
   @testable import DesignSystem
 
   @MainActor
-  final class ChartsSnapshotTests: XCTestCase {
-    func test_barColumnsCatalog() {
+  struct ChartsSnapshotTests {
+    @Test func test_barColumnsCatalog() {
       assertCoachSnapshot(of: BarColumnsCatalogView())
     }
 
-    func test_trendChartCatalog() {
+    @Test func test_trendChartCatalog() {
       assertCoachSnapshot(of: ChartsCatalogView())
     }
   }

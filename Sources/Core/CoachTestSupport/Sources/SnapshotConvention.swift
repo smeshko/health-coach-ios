@@ -11,7 +11,6 @@
   import SnapshotTesting
   import SwiftUI
   import UIKit
-  import XCTest
 
   /// The single reference device for all view snapshots (D16). Centralised here so every test target
   /// renders against the same geometry.
@@ -23,13 +22,20 @@
   /// `record: .all` (or wrap the call in `withSnapshotTesting(record: .all) { … }`), run once on the
   /// iOS 26 simulator, then revert and commit the images. `nil` (the default) uses the ambient
   /// recording configuration (verify mode unless overridden).
+  ///
+  /// Failure routing follows `assertSnapshot`: `Issue.record` under Swift Testing, `XCTFail` under
+  /// XCTest — so the helper serves both runtimes. `fileID`/`column` are passed through so failures
+  /// attribute to the calling test, while `filePath` + `testName` keep deriving the reference-image
+  /// paths (which is why both must stay verbatim — see D3).
   public func assertCoachSnapshot(
     of view: @autoclosure () -> some View,
     named name: String? = nil,
     record recording: SnapshotTestingConfiguration.Record? = nil,
-    file: StaticString = #filePath,
+    fileID: StaticString = #fileID,
+    file filePath: StaticString = #filePath,
     testName: String = #function,
-    line: UInt = #line
+    line: UInt = #line,
+    column: UInt = #column
   ) {
     for style in [UIUserInterfaceStyle.light, .dark] {
       let suffix = style == .light ? "light" : "dark"
@@ -41,9 +47,11 @@
         ),
         named: name.map { "\($0)-\(suffix)" } ?? suffix,
         record: recording,
-        file: file,
+        fileID: fileID,
+        file: filePath,
         testName: testName,
-        line: line
+        line: line,
+        column: column
       )
     }
   }

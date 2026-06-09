@@ -1,11 +1,11 @@
 import DevSettings
 import Foundation
 import SampleData
-import XCTest
+import Testing
 
 @testable import DevSettingsLive
 
-final class DevSettingsLiveTests: XCTestCase {
+struct DevSettingsLiveTests {
   /// A throwaway, isolated UserDefaults suite (cleared up front) so tests never touch `.standard`.
   private func freshSuite(_ name: String = #function) -> (UserDefaults, String) {
     let suiteName = "DevSettingsLiveTests.\(name)"
@@ -14,7 +14,7 @@ final class DevSettingsLiveTests: XCTestCase {
     return (defaults, suiteName)
   }
 
-  func test_flag_persistsAcrossInstances() {
+  @Test func test_flag_persistsAcrossInstances() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
 
@@ -22,10 +22,10 @@ final class DevSettingsLiveTests: XCTestCase {
     writer.setUseMockData(true)
 
     let reader = DevSettings.live(store: DevSettingsStore(defaults: suite))
-    XCTAssertTrue(reader.useMockData())
+    #expect(reader.useMockData())
   }
 
-  func test_scenario_persistsAndRoundTrips() {
+  @Test func test_scenario_persistsAndRoundTrips() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
 
@@ -33,18 +33,18 @@ final class DevSettingsLiveTests: XCTestCase {
     writer.setScenario(.dailyBriefAmber, .dailyBrief)
 
     let reader = DevSettings.live(store: DevSettingsStore(defaults: suite))
-    XCTAssertEqual(reader.scenario(.dailyBrief), .dailyBriefAmber)
+    #expect(reader.scenario(.dailyBrief) == .dailyBriefAmber)
   }
 
-  func test_missingScenario_fallsBackToDefault() {
+  @Test func test_missingScenario_fallsBackToDefault() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
 
     let dev = DevSettings.live(store: DevSettingsStore(defaults: suite))
-    XCTAssertEqual(dev.scenario(.profile), DevEndpoint.profile.defaultScenario)
+    #expect(dev.scenario(.profile) == DevEndpoint.profile.defaultScenario)
   }
 
-  func test_garbageScenario_fallsBackToDefault() {
+  @Test func test_garbageScenario_fallsBackToDefault() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
 
@@ -53,10 +53,10 @@ final class DevSettingsLiveTests: XCTestCase {
       forKey: DevSettingsStore.scenariosKey
     )
     let dev = DevSettings.live(store: DevSettingsStore(defaults: suite))
-    XCTAssertEqual(dev.scenario(.dailyBrief), DevEndpoint.dailyBrief.defaultScenario)
+    #expect(dev.scenario(.dailyBrief) == DevEndpoint.dailyBrief.defaultScenario)
   }
 
-  func test_launchArg_beatsEnv_beatsPersisted() {
+  @Test func test_launchArg_beatsEnv_beatsPersisted() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
     let store = DevSettingsStore(defaults: suite)
@@ -68,7 +68,7 @@ final class DevSettingsLiveTests: XCTestCase {
       arguments: ["useMockData": "true"],
       defaults: suite
     )
-    XCTAssertTrue(store.readMock(), "launch arg should win")
+    #expect(store.readMock(), "launch arg should win")
 
     // env beats persisted when no arg.
     store.writeMock(false)
@@ -77,20 +77,20 @@ final class DevSettingsLiveTests: XCTestCase {
       arguments: [:],
       defaults: suite
     )
-    XCTAssertTrue(store.readMock(), "env should win over persisted")
+    #expect(store.readMock(), "env should win over persisted")
 
     // persisted is honoured when neither arg nor env is set.
     store.writeMock(false)
     DevSettings.applyLaunchOverrides(environment: [:], arguments: [:], defaults: suite)
-    XCTAssertFalse(store.readMock(), "persisted false should be honoured")
+    #expect(!store.readMock(), "persisted false should be honoured")
 
     // DEBUG default is true when nothing is set.
     suite.removePersistentDomain(forName: name)
     DevSettings.applyLaunchOverrides(environment: [:], arguments: [:], defaults: suite)
-    XCTAssertTrue(store.readMock(), "DEBUG default should be true")
+    #expect(store.readMock(), "DEBUG default should be true")
   }
 
-  func test_overrides_canForceMockOff() {
+  @Test func test_overrides_canForceMockOff() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
     let store = DevSettingsStore(defaults: suite)
@@ -102,7 +102,7 @@ final class DevSettingsLiveTests: XCTestCase {
       arguments: ["useMockData": "false"],
       defaults: suite
     )
-    XCTAssertFalse(store.readMock(), "launch arg=false should force mock off over env + persisted")
+    #expect(!store.readMock(), "launch arg=false should force mock off over env + persisted")
 
     // env=false beats persisted=true when there is no launch arg.
     store.writeMock(true)
@@ -111,10 +111,10 @@ final class DevSettingsLiveTests: XCTestCase {
       arguments: [:],
       defaults: suite
     )
-    XCTAssertFalse(store.readMock(), "env=false should force mock off over persisted")
+    #expect(!store.readMock(), "env=false should force mock off over persisted")
   }
 
-  func test_scenarioEnvVar_seedsSlot() {
+  @Test func test_scenarioEnvVar_seedsSlot() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
 
@@ -124,6 +124,6 @@ final class DevSettingsLiveTests: XCTestCase {
       defaults: suite
     )
     let dev = DevSettings.live(store: DevSettingsStore(defaults: suite))
-    XCTAssertEqual(dev.scenario(.dailyBrief), .dailyBriefRed)
+    #expect(dev.scenario(.dailyBrief) == .dailyBriefRed)
   }
 }

@@ -3,13 +3,13 @@
 #if canImport(UIKit)
   import CoachTestSupport
   import SnapshotTesting
-  import XCTest
+  import Testing
 
   @testable import DesignSystem
 
   @MainActor
-  final class BarsSnapshotTests: XCTestCase {
-    func test_barsCatalog() {
+  struct BarsSnapshotTests {
+    @Test func test_barsCatalog() {
       assertCoachSnapshot(of: BarsCatalogView())
     }
   }
