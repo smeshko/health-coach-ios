@@ -72,12 +72,13 @@ final class HealthKitPrimingTests: XCTestCase {
 
   // MARK: Pure state transitions (no effects in TASK-001)
 
-  func test_initialState_isPriming_andConnectTapped_entersAuthorizing() async {
+  /// The step opens in `.priming` (the `connectTapped` → `.authorizing` edge is asserted in every effect
+  /// scenario below, since `connectTapped` now also kicks off the authorize/probe effect).
+  func test_initialState_isPriming() {
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
     }
     XCTAssertEqual(store.state.phase, .priming)
-    await store.send(.connectTapped) { $0.phase = .authorizing }
   }
 
   func test_continueTapped_fromDegraded_emitsFinished() async {
@@ -88,4 +89,191 @@ final class HealthKitPrimingTests: XCTestCase {
     await store.send(.continueTapped)
     await store.receive(\.delegate, .finished)
   }
+
+  // MARK: Authorize + degraded-detection effects (TASK-002)
+
+  /// Grant: `requestAuthorization` succeeds and the probe returns samples for **every** row → granted →
+  /// `finished`.
+  func test_grant_allCategoriesPresent_landsGranted_andFinishes() async {
+    let store = TestStore(initialState: HealthKitPriming.State()) {
+      HealthKitPriming()
+    } withDependencies: {
+      $0.healthKitClient.isHealthDataAvailable = { true }
+      $0.healthKitClient.requestAuthorization = {}
+      $0.healthKitClient.authorizationStatus = { HKFixtures.allAuthorized }
+      $0.healthKitClient.deltaSamples = { _ in HKFixtures.allPresentSamples }
+    }
+
+    await store.send(.connectTapped) { $0.phase = .authorizing }
+    await store.receive(\.authorizationResponse) {
+      $0.statusHint = HKFixtures.allAuthorized
+      $0.phase = .checking
+    }
+    await store.receive(\.degradedProbeResponse) { $0.phase = .granted }
+    await store.receive(\.delegate, .finished)
+  }
+
+  /// Partial: the probe returns no `sleep`/`vo2Max` samples (others present) → only those rows are
+  /// missing and the banner names `sleep` — **derived from empty slices**, NOT the status map (the hint
+  /// is deliberately all-`.notDetermined` to prove inference ignores it).
+  func test_partial_inferenceFromEmptySlices_ignoresStatusMap() async {
+    let store = TestStore(initialState: HealthKitPriming.State()) {
+      HealthKitPriming()
+    } withDependencies: {
+      $0.healthKitClient.isHealthDataAvailable = { true }
+      $0.healthKitClient.requestAuthorization = {}
+      $0.healthKitClient.authorizationStatus = { HKFixtures.allNotDetermined }
+      $0.healthKitClient.deltaSamples = { _ in HKFixtures.sleepAndVo2MaxMissingSamples }
+    }
+
+    await store.send(.connectTapped) { $0.phase = .authorizing }
+    await store.receive(\.authorizationResponse) {
+      $0.statusHint = HKFixtures.allNotDetermined
+      $0.phase = .checking
+    }
+    await store.receive(\.degradedProbeResponse) {
+      $0.missingRows = [.sleep, .vo2Max]
+      $0.phase = .degraded(
+        HealthKitPriming.DegradedSummary(
+          missing: [.sleep, .vo2Max], bannerSignal: .sleep, statusHint: HKFixtures.allNotDetermined
+        )
+      )
+    }
+  }
+
+  /// Deny: `requestAuthorization` throws → straight to fully-degraded **without a probe** (the degraded
+  /// path never throws to the UI), and a non-blocking `continueTapped` → `finished`.
+  func test_deny_goesFullyDegraded_withoutProbe_andContinues() async {
+    let store = TestStore(initialState: HealthKitPriming.State()) {
+      HealthKitPriming()
+    } withDependencies: {
+      $0.healthKitClient.isHealthDataAvailable = { true }
+      $0.healthKitClient.requestAuthorization = { throw StubAuthError() }
+      $0.healthKitClient.deltaSamples = { _ in
+        XCTFail("deltaSamples must not run when authorization fails")
+        return .empty
+      }
+    }
+
+    await store.send(.connectTapped) { $0.phase = .authorizing }
+    await store.receive(\.authorizationResponse) {
+      $0.missingRows = Set(PrimingRow.allCases)
+      $0.phase = .degraded(
+        HealthKitPriming.DegradedSummary(missing: Set(PrimingRow.allCases), bannerSignal: .sleep)
+      )
+    }
+    await store.send(.continueTapped)
+    await store.receive(\.delegate, .finished)
+  }
+
+  /// Unavailable: `isHealthDataAvailable() == false` → fully degraded **without** requesting auth or
+  /// probing (DECISIONS #2 — `.healthDataUnavailable` is degraded, not an error).
+  func test_unavailable_goesFullyDegraded_withoutRequestingAuthOrProbe() async {
+    let store = TestStore(initialState: HealthKitPriming.State()) {
+      HealthKitPriming()
+    } withDependencies: {
+      $0.healthKitClient.isHealthDataAvailable = { false }
+      $0.healthKitClient.requestAuthorization = { XCTFail("requestAuthorization must not run when HK is unavailable") }
+      $0.healthKitClient.deltaSamples = { _ in
+        XCTFail("deltaSamples must not run when HK is unavailable")
+        return .empty
+      }
+    }
+
+    await store.send(.connectTapped) { $0.phase = .authorizing }
+    await store.receive(\.authorizationResponse) {
+      $0.missingRows = Set(PrimingRow.allCases)
+      $0.phase = .degraded(
+        HealthKitPriming.DegradedSummary(missing: Set(PrimingRow.allCases), bannerSignal: .sleep)
+      )
+    }
+  }
+
+  /// "Open Health settings" opens the `x-apple-health://` deep link via `openURL` (the Continue path
+  /// never depends on it succeeding).
+  func test_openHealthSettings_opensHealthDeepLink() async {
+    let opened = LockIsolated<[URL]>([])
+    let store = TestStore(initialState: HealthKitPriming.State()) {
+      HealthKitPriming()
+    } withDependencies: {
+      $0.openURL = OpenURLEffect { url in
+        opened.withValue { $0.append(url) }
+        return true
+      }
+    }
+
+    await store.send(.openHealthSettingsTapped)
+    await store.finish()
+    XCTAssertEqual(opened.value, [URL(string: "x-apple-health://")!])
+  }
+
+  // MARK: Pure helpers (unit-tested directly — independent of the reducer)
+
+  /// Per-category emptiness derivation, incl. `workouts`/`activity` (not `RecordType`-backed).
+  func test_missingRows_derivesPerCategoryEmptinessFromSlices() {
+    XCTAssertEqual(missingRows(from: .empty), Set(PrimingRow.allCases), "empty set → every row missing")
+    XCTAssertEqual(missingRows(from: HKFixtures.allPresentSamples), [], "every category present → no row missing")
+    // workouts is not a RecordType — presence comes from the workouts array.
+    let onlyWorkouts = missingRows(from: HealthSampleSet(workouts: [HKFixtures.sampleWorkout]))
+    XCTAssertFalse(onlyWorkouts.contains(.workoutsEffort))
+    // activity is not a RecordType — presence comes from the activity array (folds into Active & basal).
+    let onlyActivity = missingRows(from: HealthSampleSet(activity: [HKFixtures.sampleActivity]))
+    XCTAssertFalse(onlyActivity.contains(.activeBasalEnergy))
+  }
+
+  /// The banner priority is total and resolves a fully-missing set to `sleep`.
+  func test_topSignal_isTotal_andPrioritizesSleep() {
+    XCTAssertEqual(topSignal(Set(PrimingRow.allCases)), .sleep)
+    XCTAssertEqual(topSignal([.bodyWeight, .vo2Max]), .vo2Max)
+    XCTAssertEqual(topSignal([.dietary]), .dietary)
+    XCTAssertNil(topSignal([]))
+  }
+}
+
+private struct StubAuthError: Error {}
+
+/// Deterministic, `Sendable`, nonisolated fixtures (fixed timestamps — no wall clock; built via
+/// `RecordType` implicit members so the test never names `WireModels`). Kept at file scope so the
+/// `@Sendable` dependency stubs in the `@MainActor` test class can reference them.
+private enum HKFixtures {
+  static let fixedDate = Date(timeIntervalSinceReferenceDate: 1000)
+
+  static let allAuthorized: [HealthDataCategory: HealthAuthorizationStatus] =
+    Dictionary(uniqueKeysWithValues: HealthDataCategory.allCases.map { ($0, .sharingAuthorized) })
+
+  static let allNotDetermined: [HealthDataCategory: HealthAuthorizationStatus] =
+    Dictionary(uniqueKeysWithValues: HealthDataCategory.allCases.map { ($0, .notDetermined) })
+
+  static let sampleWorkout = WorkoutPayload(
+    uuid: "wk", type: "running", start: fixedDate, end: fixedDate, durationS: 100
+  )
+
+  static let sampleActivity = ActivitySummaryPayload(
+    date: fixedDate, activeEnergyKcal: 100, exerciseMinutes: 10, standHours: 5
+  )
+
+  /// One representative record per `RecordType`-backed row (workouts/activity carry the other two rows).
+  static let allPresentRecords: [HealthRecordPayload] = [
+    HealthRecordPayload(uuid: "hr", type: .heartRate, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "hrv", type: .heartRateVariabilitySdnn, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "rhr", type: .restingHeartRate, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "sleep", type: .sleepAnalysis, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "steps", type: .stepCount, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "active", type: .activeEnergyBurned, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "vo2", type: .vo2Max, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "run", type: .runningSpeed, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "mass", type: .bodyMass, start: fixedDate, end: fixedDate),
+    HealthRecordPayload(uuid: "diet", type: .dietaryEnergyConsumed, start: fixedDate, end: fixedDate),
+  ]
+
+  static let allPresentSamples = HealthSampleSet(
+    records: allPresentRecords, workouts: [sampleWorkout], activity: [sampleActivity]
+  )
+
+  /// Every row present **except** `sleep` and `vo2Max` (their records dropped) — drives the partial case.
+  static let sleepAndVo2MaxMissingSamples = HealthSampleSet(
+    records: allPresentRecords.filter { $0.uuid != "sleep" && $0.uuid != "vo2" },
+    workouts: [sampleWorkout],
+    activity: [sampleActivity]
+  )
 }

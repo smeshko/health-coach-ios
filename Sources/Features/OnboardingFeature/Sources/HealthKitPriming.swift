@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import Foundation
 import HealthKitClient
 
 /// The HealthKit priming + degraded step of `OnboardingFeature` (ARCHITECTURE §4.5 / §10, PRD §5
@@ -8,8 +9,10 @@ import HealthKitClient
 /// lands `.granted` → `delegate(.finished)`; partial/declined/unavailable lands `.degraded` with a
 /// non-blocking Continue (degraded is never a hard block — epic AC-2).
 ///
-/// **Phase 7.3 / TASK-001:** the state machine + pure transitions only. The authorize + degraded-probe
-/// effects (`connectTapped` → `requestAuthorization` → `deltaSamples` inference) land in TASK-002.
+/// The degraded probe reads `HealthKitClient.deltaSamples(since: .distantPast)` **directly** (the feature
+/// already imports the interface for auth — the §13/D12/§4.5 onboarding carve-out), **not** via
+/// `SyncRepository`: the call is watermark-neutral (a passed-in far-past `Date`), and `SyncRepository`'s
+/// `sync()` returns only counts, never the `HealthSampleSet` degraded inference needs (DECISIONS #2).
 @Reducer
 public struct HealthKitPriming {
   /// The step's exhaustive phase. `.checking` is the post-grant degraded-probe window; `.degraded`
@@ -82,24 +85,123 @@ public struct HealthKitPriming {
     case delegate(Delegate)
   }
 
+  @Dependency(\.healthKitClient) var healthKitClient
+  @Dependency(\.openURL) var openURL
+
   public init() {}
 
   public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
       case .connectTapped:
-        // Pure transition; the authorize/probe effect lands in TASK-002.
         state.phase = .authorizing
-        return .none
+        return .run { [healthKitClient] send in
+          // No HealthKit on this device (some iPads) → fully degraded, never touching the auth sheet or
+          // the probe (DECISIONS #2: `.healthDataUnavailable` is degraded, not an error).
+          guard healthKitClient.isHealthDataAvailable() else {
+            await send(.authorizationResponse(.failure(HealthKitPrimingError.healthDataUnavailable)))
+            return
+          }
+          do {
+            try await healthKitClient.requestAuthorization()
+            // The status map is captured only as a corroborating hint (HK masks read grants).
+            await send(.authorizationResponse(.success(healthKitClient.authorizationStatus())))
+          } catch {
+            await send(.authorizationResponse(.failure(error)))
+          }
+        }
+
+      case let .authorizationResponse(.success(hint)):
+        state.statusHint = hint
+        state.phase = .checking
+        // One-shot, watermark-neutral presence probe since the far past — "is there any sample at all",
+        // not a 30-day window, so an old-but-granted category still reads present (DECISIONS #2).
+        return .run { [healthKitClient] send in
+          do {
+            let samples = try await healthKitClient.deltaSamples(.distantPast)
+            await send(.degradedProbeResponse(.success(samples)))
+          } catch {
+            await send(.degradedProbeResponse(.failure(error)))
+          }
+        }
+
+      case .authorizationResponse(.failure):
+        // A thrown auth error (sheet dismissed/denied) or `.healthDataUnavailable` leaves HK
+        // indeterminate, so a follow-up probe is unreliable: go straight to fully degraded, no probe.
+        // The degraded path never throws to the UI (epic AC-2 — not a hard block).
+        return degrade(&state, missing: Set(PrimingRow.allCases))
+
+      case let .degradedProbeResponse(.success(samples)):
+        // "What's missing" is inferred from EMPTY delta slices, never the status map (DECISIONS #2).
+        let missing = missingRows(from: samples)
+        guard !missing.isEmpty else {
+          state.missingRows = []
+          state.phase = .granted
+          return .send(.delegate(.finished))
+        }
+        return degrade(&state, missing: missing)
+
+      case .degradedProbeResponse(.failure):
+        // A post-grant probe failure must not crash the UI — treat as fully degraded.
+        return degrade(&state, missing: Set(PrimingRow.allCases))
+
+      case .openHealthSettingsTapped:
+        return .run { [openURL] _ in
+          guard let url = URL(string: "x-apple-health://") else { return }
+          await openURL(url)
+        }
 
       case .continueTapped:
         // Degraded → proceed anyway (not a hard block — epic AC-2).
         return .send(.delegate(.finished))
 
-      case .authorizationResponse, .degradedProbeResponse, .openHealthSettingsTapped, .delegate:
-        // Effects land in TASK-002.
+      case .delegate:
         return .none
       }
     }
   }
+
+  /// Land the `.degraded` phase from an inferred missing-row set, naming the single banner signal.
+  private func degrade(_ state: inout State, missing: Set<PrimingRow>) -> Effect<Action> {
+    state.missingRows = missing
+    state.phase = .degraded(
+      DegradedSummary(missing: missing, bannerSignal: topSignal(missing), statusHint: state.statusHint)
+    )
+    return .none
+  }
+}
+
+/// HK has no read-permission failure of its own here; the only thrown signal we synthesize is
+/// "no HealthKit on this device", which the reducer routes to the same fully-degraded state.
+enum HealthKitPrimingError: Error, Equatable { case healthDataUnavailable }
+
+/// Reduce a delta `HealthSampleSet` to the rows that are **conspicuously absent** — a row is missing when
+/// **all** its categories returned zero samples (DECISIONS #2). Pure + feature-local (the grouping seam),
+/// unit-tested directly. No `HealthSampleSet.isEmpty(for:)` helper exists on the Phase 3.3 payload, so
+/// per-category emptiness is derived here.
+func missingRows(from samples: HealthSampleSet) -> Set<PrimingRow> {
+  Set(PrimingRow.allCases.filter { row in row.categories.allSatisfy { categoryIsEmpty($0, in: samples) } })
+}
+
+/// A category is empty when the delta set carries no sample for it: `workouts`/`activity` are not
+/// `RecordType`-backed (their own arrays), every other category is empty when no `records` element
+/// carries a `type` in that category's `RecordType` set (the Phase 3.3 category→`RecordType` mapping).
+private func categoryIsEmpty(_ category: HealthDataCategory, in samples: HealthSampleSet) -> Bool {
+  switch category {
+  case .workouts: samples.workouts.isEmpty
+  case .activity: samples.activity.isEmpty
+  default:
+    !samples.records.contains { category.recordTypes.contains($0.type) }
+  }
+}
+
+/// The single banner signal — the highest-priority missing row by a **total, fixed** order over every
+/// `PrimingRow` (so any missing set resolves deterministically, no undefined tail), matching the design's
+/// one-sentence banner (sleep is most impactful).
+func topSignal(_ rows: Set<PrimingRow>) -> PrimingRow? {
+  let priority: [PrimingRow] = [
+    .sleep, .vo2Max, .heartRate, .hrv, .restingHeartRate, .workoutsEffort,
+    .activeBasalEnergy, .steps, .runningForm, .bodyWeight, .dietary,
+  ]
+  return priority.first(where: rows.contains)
 }
