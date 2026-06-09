@@ -1,10 +1,11 @@
 import Database
-@testable import DatabaseLive
 import GRDB
 import PersistenceModels
-import XCTest
+import Testing
 
-final class MigrationTests: XCTestCase {
+@testable import DatabaseLive
+
+struct MigrationTests {
   private let tableNames = [
     DailyBriefRecord.databaseTableName,
     WeeklyPlanRecord.databaseTableName,
@@ -14,29 +15,30 @@ final class MigrationTests: XCTestCase {
     ProfileRecord.databaseTableName,
   ]
 
-  func test_migratorCreatesAllSixTables() throws {
+  @Test func test_migratorCreatesAllSixTables() throws {
     let queue = try DatabaseQueue()
     try DatabaseClient.migrator.migrate(queue)
     try queue.read { db in
       for table in tableNames {
-        XCTAssertTrue(try db.tableExists(table), "missing table: \(table)")
+        let exists = try db.tableExists(table)
+        #expect(exists, "missing table: \(table)")
       }
     }
   }
 
-  func test_migratorIsIdempotent() throws {
+  @Test func test_migratorIsIdempotent() throws {
     let queue = try DatabaseQueue()
     try DatabaseClient.migrator.migrate(queue)
     let firstApplied = try queue.read { db in try DatabaseClient.migrator.appliedMigrations(db) }
     // Second run must not throw / duplicate-table-fail.
-    XCTAssertNoThrow(try DatabaseClient.migrator.migrate(queue))
+    #expect(throws: Never.self) { try DatabaseClient.migrator.migrate(queue) }
     let secondApplied = try queue.read { db in try DatabaseClient.migrator.appliedMigrations(db) }
-    XCTAssertEqual(firstApplied, secondApplied)
+    #expect(firstApplied == secondApplied)
   }
 
-  func test_makeInMemory_isAlreadyMigrated() async throws {
+  @Test func test_makeInMemory_isAlreadyMigrated() async throws {
     let database = try DatabaseClient.makeInMemory()
     let exists = try await database.read { db in try db.tableExists(CheckInRecord.databaseTableName) }
-    XCTAssertTrue(exists)
+    #expect(exists)
   }
 }

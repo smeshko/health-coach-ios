@@ -1,4 +1,11 @@
 import Foundation
+import Testing
+
+/// Umbrella suite serializing every test that scripts the global `URLProtocolStub.box`.
+/// `.serialized` applies recursively, so nesting both transport suites here prevents
+/// cross-suite interleaving on the shared response queue (DECISIONS D2: genuinely shared
+/// mutable state gets targeted serialization).
+@Suite(.serialized) enum URLProtocolStubSerialized {}
 
 /// A test-scoped `URLProtocol` that returns scripted responses and records issued requests. Installed
 /// via a per-test `URLSessionConfiguration.protocolClasses` (DECISIONS Decision 1), so it never
