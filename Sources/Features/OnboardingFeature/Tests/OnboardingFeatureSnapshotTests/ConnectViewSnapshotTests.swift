@@ -15,13 +15,13 @@
   import CoachTestSupport
   import ComposableArchitecture
   import SnapshotTesting
-  import XCTest
+  import Testing
 
   @testable import OnboardingFeature
 
   @MainActor
-  final class ConnectViewSnapshotTests: XCTestCase {
-    func test_connect_idleState() {
+  struct ConnectViewSnapshotTests {
+    @Test func test_connect_idleState() {
       let view = ConnectView(
         store: Store(initialState: ConnectComponent.State(token: "ahc_live_a8f2c1d9")) {
           ConnectComponent()
@@ -30,7 +30,7 @@
       assertCoachSnapshot(of: view)
     }
 
-    func test_connect_errorState() {
+    @Test func test_connect_errorState() {
       let view = ConnectView(
         store: Store(initialState: ConnectComponent.State(token: "ahc_live_x93k7q", validation: .invalid)) {
           ConnectComponent()

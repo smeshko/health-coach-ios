@@ -10,11 +10,11 @@
   import ComposableArchitecture
   import OnboardingFeature
   import SnapshotTesting
-  import XCTest
+  import Testing
 
   @MainActor
-  final class AppViewSnapshotTests: XCTestCase {
-    func test_onboardingShell_neutral() {
+  struct AppViewSnapshotTests {
+    @Test func test_onboardingShell_neutral() {
       let view = AppView(
         store: Store(initialState: .onboarding(OnboardingFeature.State(step: .connect(reason: nil)))) {
           AppFeature()
@@ -23,7 +23,7 @@
       assertCoachSnapshot(of: view)
     }
 
-    func test_onboardingShell_tokenInvalid() {
+    @Test func test_onboardingShell_tokenInvalid() {
       let view = AppView(
         store: Store(
           initialState: .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
@@ -34,7 +34,7 @@
       assertCoachSnapshot(of: view)
     }
 
-    func test_mainTabBar() {
+    @Test func test_mainTabBar() {
       let view = AppView(
         store: Store(initialState: .main(MainTabs.State())) {
           AppFeature()
