@@ -2,6 +2,10 @@ import ComposableArchitecture
 import DesignSystem
 import SwiftUI
 
+#if canImport(UIKit)
+  import UIKit
+#endif
+
 /// The Connect screen (`Connect` / `Connect Error` designs): a centered token-entry form over
 /// `StoreOf<ConnectComponent>`. Renders the **connect** state and, when `validation == .invalid`, the
 /// **error** state (tinted field + an inline error row). All color/spacing/radius/typography come from
@@ -52,11 +56,18 @@ struct ConnectView: View {
             .foregroundStyle(.coachForeground)
             .autocorrectionDisabled()
 
-          PasteButton(payloadType: String.self) { strings in
-            if let value = strings.first { store.send(.tokenPasted(value)) }
+          Button("Paste") {
+            // Read the clipboard in the view and feed `.tokenPasted` — `UIPasteboard` stays confined to
+            // the view (DECISIONS 4), `#if`-guarded so the reducer + host build stay clipboard-free.
+            #if canImport(UIKit)
+              if let value = UIPasteboard.general.string {
+                store.send(.tokenPasted(value))
+              }
+            #endif
           }
-          .labelStyle(.titleOnly)
-          .tint(.coachAccent)
+          .font(.coachTextSm)
+          .foregroundStyle(.coachAccent)
+          .buttonStyle(.plain)
         }
         .padding(CoachSpacing.spaceMd)
         .background(

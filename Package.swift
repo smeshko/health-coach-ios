@@ -937,5 +937,21 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // ConnectView snapshots (connect + error states, light + dark) — iOS 26 simulator only, via
+    // `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host.
+    .testTarget(
+      name: "OnboardingFeatureSnapshotTests",
+      dependencies: [
+        "OnboardingFeature",
+        "CoachTestSupport",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureSnapshotTests",
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
   ]
 )

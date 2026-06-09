@@ -44,8 +44,8 @@ public struct ConnectComponent {
   public enum Action: BindableAction {
     case binding(BindingAction<State>)
     /// The view's Paste affordance. No clipboard `@Dependency` is pinned in the architecture yet
-    /// (DECISIONS 4), so the view reads the pasteboard (`PasteButton`) and feeds `.tokenPasted`; this
-    /// stays as an explicit no-op target for a future clipboard dependency.
+    /// (DECISIONS 4), so the view reads `UIPasteboard` directly and feeds `.tokenPasted`; this stays as
+    /// an explicit no-op target for a future clipboard dependency.
     case pasteTapped
     case tokenPasted(String)
     case connectTapped
