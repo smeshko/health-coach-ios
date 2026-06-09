@@ -1,7 +1,7 @@
 import APIClient
 import ComposableArchitecture
 import OnboardingFeature
-import XCTest
+import Testing
 
 @testable import AppFeature
 
@@ -10,12 +10,12 @@ import XCTest
 /// delivery is deterministic. The exhaustive store fails on any unexpected effect — so "no retry / no
 /// re-subscribe storm" is asserted simply by the absence of unexpected actions.
 @MainActor
-final class AppFeature401Tests: XCTestCase {
+struct AppFeature401Tests {
   private var tokenInvalid: AppFeature.State {
     .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
   }
 
-  func test_appWillAppear_unauthorized_swapsToConnectTokenInvalid() async {
+  @Test func test_appWillAppear_unauthorized_swapsToConnectTokenInvalid() async {
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
@@ -36,7 +36,7 @@ final class AppFeature401Tests: XCTestCase {
     await store.finish()
   }
 
-  func test_unauthorized_thenConnect_doesNotResubscribe() async {
+  @Test func test_unauthorized_thenConnect_doesNotResubscribe() async {
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
@@ -69,7 +69,7 @@ final class AppFeature401Tests: XCTestCase {
     await store.finish()
   }
 
-  func test_unauthorized_whenAlreadyOnboarding_isNoOp() async {
+  @Test func test_unauthorized_whenAlreadyOnboarding_isNoOp() async {
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
@@ -95,7 +95,7 @@ final class AppFeature401Tests: XCTestCase {
     await store.finish()
   }
 
-  func test_unauthorized_whileOnboarding_preservesTypedToken() async {
+  @Test func test_unauthorized_whileOnboarding_preservesTypedToken() async {
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     var onboarding = OnboardingFeature.State(step: .connect(reason: nil))
     onboarding.connect.token = "typed-token-123"
@@ -113,14 +113,14 @@ final class AppFeature401Tests: XCTestCase {
     continuation.yield(.unauthorized)
     await store.receive(\._sessionEvent, .unauthorized)
 
-    XCTAssertEqual(store.state.onboarding?.connect.token, "typed-token-123")
-    XCTAssertEqual(store.state.onboarding?.step, .connect(reason: nil))
+    #expect(store.state.onboarding?.connect.token == "typed-token-123")
+    #expect(store.state.onboarding?.step == .connect(reason: nil))
 
     continuation.finish()
     await store.finish()
   }
 
-  func test_validation_401SwapsToOnboarding() async {
+  @Test func test_validation_401SwapsToOnboarding() async {
     // The epic's literal validation case: a TestStore emits a 401 session event → state swaps to
     // onboarding.
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
@@ -136,7 +136,7 @@ final class AppFeature401Tests: XCTestCase {
       $0 = self.tokenInvalid
     }
 
-    XCTAssertNotNil(store.state.onboarding)
+    #expect(store.state.onboarding != nil)
 
     continuation.finish()
     await store.finish()
