@@ -39,15 +39,20 @@ public struct OnboardingFeature {
     /// The Connect step's child state. Always present (the connect field survives a step advance); the
     /// view renders it only while `step == .connect`.
     public var connect: ConnectComponent.State
+    /// The HealthKit-priming step's child state (Phase 7.3). Always present; the view renders it only
+    /// while `step == .healthKitPriming`. Reset to a fresh `.priming` on each advance into the step.
+    public var healthKitPriming: HealthKitPriming.State
 
     public init(step: Step = .connect(reason: nil)) {
       self.step = step
       connect = ConnectComponent.State()
+      healthKitPriming = HealthKitPriming.State()
     }
   }
 
   public enum Action {
     case connect(ConnectComponent.Action)
+    case healthKitPriming(HealthKitPriming.Action)
     case delegate(Delegate)
   }
 
@@ -57,14 +62,23 @@ public struct OnboardingFeature {
     Scope(state: \.connect, action: \.connect) {
       ConnectComponent()
     }
+    Scope(state: \.healthKitPriming, action: \.healthKitPriming) {
+      HealthKitPriming()
+    }
     Reduce { state, action in
       switch action {
       case .connect(.delegate(.connected)):
         // Token validated → advance to HealthKit priming (Phase 7.3). NOT a route to `.main` and NOT
         // the parent's own `.delegate(.connected)` (§10/§4.5 keep onboarding until connected + HK-auth).
+        // Reset the priming child so a re-entry starts at `.priming`, never a stale `.degraded`.
+        state.healthKitPriming = HealthKitPriming.State()
         state.step = .healthKitPriming
         return .none
-      case .connect, .delegate:
+      case .healthKitPriming(.delegate(.finished)):
+        // HK step done (granted, or degraded + Continue) → onboarding is fully complete: emit the
+        // parent's `connected` so `AppFeature` flips `.onboarding → .main` (§10 / D7).
+        return .send(.delegate(.connected))
+      case .connect, .healthKitPriming, .delegate:
         return .none
       }
     }

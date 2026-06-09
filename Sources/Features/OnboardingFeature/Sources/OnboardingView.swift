@@ -3,10 +3,10 @@ import DesignSystem
 import SwiftUI
 
 /// The onboarding branch's root view — renders the current `Step`. The `.connect` step renders
-/// `ConnectView` (Phase 7.2); the `.healthKitPriming` step is a placeholder until Phase 7.3. The
-/// 401-bounce `reason: .tokenInvalid` shows a reconnect banner pinned over the top of the connect
-/// content — a separate concern from `ConnectComponent`'s probe-failure error row (which keys off
-/// `validation == .invalid`).
+/// `ConnectView` (Phase 7.2); the `.healthKitPriming` step renders the priming or degraded screen
+/// (Phase 7.3), keyed off the child's `phase`. The 401-bounce `reason: .tokenInvalid` shows a reconnect
+/// banner pinned over the top of the connect content — a separate concern from `ConnectComponent`'s
+/// probe-failure error row (which keys off `validation == .invalid`).
 public struct OnboardingView: View {
   let store: StoreOf<OnboardingFeature>
 
@@ -32,11 +32,13 @@ public struct OnboardingView: View {
         }
 
     case .healthKitPriming:
-      Text("Setting up…")
-        .font(.coachTextLg)
-        .foregroundStyle(.coachForegroundMuted)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.coachBackground)
+      let hkStore = store.scope(state: \.healthKitPriming, action: \.healthKitPriming)
+      switch store.healthKitPriming.phase {
+      case let .degraded(summary):
+        DegradedPermissionsView(store: hkStore, summary: summary)
+      case .priming, .authorizing, .checking, .granted:
+        HealthKitPrimingView(store: hkStore)
+      }
     }
   }
 }
