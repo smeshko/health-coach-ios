@@ -1,9 +1,10 @@
 import CoachCore
 import Foundation
-@testable import WireModels
-import XCTest
+import Testing
 
-final class WireCoderTests: XCTestCase {
+@testable import WireModels
+
+struct WireCoderTests {
   // MARK: - Helpers
 
   private func decode<T: Decodable>(_ type: T.Type, from json: String) throws -> T {
@@ -12,7 +13,7 @@ final class WireCoderTests: XCTestCase {
 
   private func encodedString(_ value: some Encodable) throws -> String {
     let data = try WireCoder.encoder.encode(value)
-    return try XCTUnwrap(String(bytes: data, encoding: .utf8))
+    return try #require(String(bytes: data, encoding: .utf8))
   }
 
   /// An instant built host-independently from UTC components.
@@ -43,92 +44,97 @@ final class WireCoderTests: XCTestCase {
 
   // MARK: - Decoder: date strategy
 
-  func test_decoder_parsesDateOnly() throws {
+  @Test func test_decoder_parsesDateOnly() throws {
     let box = try decode(PlainDateBox.self, from: #"{"value":"2026-06-06"}"#)
     let components = Calendar.europeSofia.dateComponents([.year, .month, .day, .hour], from: box.value)
-    XCTAssertEqual(components.year, 2026)
-    XCTAssertEqual(components.month, 6)
-    XCTAssertEqual(components.day, 6)
-    XCTAssertEqual(components.hour, 0)
+    #expect(components.year == 2026)
+    #expect(components.month == 6)
+    #expect(components.day == 6)
+    #expect(components.hour == 0)
   }
 
-  func test_decoder_parsesDateTimeWithOffsetAndFractionalSeconds() throws {
+  @Test func test_decoder_parsesDateTimeWithOffsetAndFractionalSeconds() throws {
     // 07:30:00+03:00 == 04:30:00 UTC
     let whole = try decode(PlainDateBox.self, from: #"{"value":"2026-06-06T07:30:00+03:00"}"#)
-    XCTAssertEqual(
-      whole.value.timeIntervalSince1970,
-      utcInstant(year: 2026, month: 6, day: 6, hour: 4, minute: 30).timeIntervalSince1970,
-      accuracy: 0.001
+    #expect(
+      abs(
+        whole.value.timeIntervalSince1970
+          - utcInstant(year: 2026, month: 6, day: 6, hour: 4, minute: 30).timeIntervalSince1970
+      ) <= 0.001
     )
 
     // 07:30:00.123+03:00 == 04:30:00.123 UTC
     let fractional = try decode(PlainDateBox.self, from: #"{"value":"2026-06-06T07:30:00.123+03:00"}"#)
-    XCTAssertEqual(
-      fractional.value.timeIntervalSince1970,
-      utcInstant(year: 2026, month: 6, day: 6, hour: 4, minute: 30).timeIntervalSince1970 + 0.123,
-      accuracy: 0.001
+    #expect(
+      abs(
+        fractional.value.timeIntervalSince1970
+          - (utcInstant(year: 2026, month: 6, day: 6, hour: 4, minute: 30).timeIntervalSince1970 + 0.123)
+      ) <= 0.001
     )
 
     // 07:30:00+02:00 == 05:30:00 UTC (different instant from the +03:00 case)
     let otherOffset = try decode(PlainDateBox.self, from: #"{"value":"2026-06-06T07:30:00+02:00"}"#)
-    XCTAssertEqual(
-      otherOffset.value.timeIntervalSince1970,
-      utcInstant(year: 2026, month: 6, day: 6, hour: 5, minute: 30).timeIntervalSince1970,
-      accuracy: 0.001
+    #expect(
+      abs(
+        otherOffset.value.timeIntervalSince1970
+          - utcInstant(year: 2026, month: 6, day: 6, hour: 5, minute: 30).timeIntervalSince1970
+      ) <= 0.001
     )
   }
 
-  func test_decoder_rejectsGarbageDate() {
-    XCTAssertThrowsError(try decode(PlainDateBox.self, from: #"{"value":"not-a-date"}"#))
+  @Test func test_decoder_rejectsGarbageDate() {
+    #expect(throws: (any Error).self) {
+      try decode(PlainDateBox.self, from: #"{"value":"not-a-date"}"#)
+    }
   }
 
   // MARK: - WireCalendarDate
 
-  func test_calendarDate_encodesAsDateOnly() throws {
+  @Test func test_calendarDate_encodesAsDateOnly() throws {
     let box = try decode(CalendarDateBox.self, from: #"{"date":"2026-06-06"}"#)
     let json = try encodedString(box)
-    XCTAssertTrue(json.contains(#""date":"2026-06-06""#), "expected bare yyyy-MM-dd, got \(json)")
-    XCTAssertFalse(json.contains("T"), "must not emit an ISO-8601 instant, got \(json)")
+    #expect(json.contains(#""date":"2026-06-06""#), "expected bare yyyy-MM-dd, got \(json)")
+    #expect(!json.contains("T"), "must not emit an ISO-8601 instant, got \(json)")
 
     // decode → encode → decode is value-equal
     let roundTripped = try decode(CalendarDateBox.self, from: json)
-    XCTAssertEqual(roundTripped, box)
+    #expect(roundTripped == box)
   }
 
-  func test_calendarDate_optionalRoundTripsAbsentAndNull() throws {
+  @Test func test_calendarDate_optionalRoundTripsAbsentAndNull() throws {
     let absent = try decode(OptionalCalendarDateBox.self, from: "{}")
-    XCTAssertNil(absent.date)
+    #expect(absent.date == nil)
 
     let explicitNull = try decode(OptionalCalendarDateBox.self, from: #"{"date":null}"#)
-    XCTAssertNil(explicitNull.date)
-    XCTAssertEqual(absent, explicitNull)
+    #expect(explicitNull.date == nil)
+    #expect(absent == explicitNull)
 
     let present = try decode(OptionalCalendarDateBox.self, from: #"{"date":"2026-06-06"}"#)
-    XCTAssertNotNil(present.date)
+    #expect(present.date != nil)
     let roundTripped = try decode(OptionalCalendarDateBox.self, from: encodedString(present))
-    XCTAssertEqual(roundTripped, present)
+    #expect(roundTripped == present)
   }
 
   // MARK: - Wire enums (unknown-tolerant)
 
-  func test_enum_knownRawValuesRoundTrip() throws {
-    XCTAssertEqual(try decode(WireEnum<WorkoutCard>.self, from: #""easy_run""#), .known(.easyRun))
-    XCTAssertEqual(try decode(WireEnum<RecordType>.self, from: #""heart_rate""#), .known(.heartRate))
-    XCTAssertEqual(try decode(WireEnum<Zone>.self, from: #""z1""#), .known(.z1))
-    XCTAssertEqual(
-      try decode(WireEnum<ErrorCode>.self, from: #""validation_error""#),
-      .known(.validationError)
+  @Test func test_enum_knownRawValuesRoundTrip() throws {
+    #expect(try decode(WireEnum<WorkoutCard>.self, from: #""easy_run""#) == .known(.easyRun))
+    #expect(try decode(WireEnum<RecordType>.self, from: #""heart_rate""#) == .known(.heartRate))
+    #expect(try decode(WireEnum<Zone>.self, from: #""z1""#) == .known(.z1))
+    #expect(
+      try decode(WireEnum<ErrorCode>.self, from: #""validation_error""#)
+        == .known(.validationError)
     )
 
     let value = WireEnum<WorkoutCard>.known(.easyRun)
-    XCTAssertEqual(try encodedString(value), #""easy_run""#)
+    #expect(try encodedString(value) == #""easy_run""#)
   }
 
-  func test_enum_unknownRawValueDecodesToFallback() throws {
+  @Test func test_enum_unknownRawValueDecodesToFallback() throws {
     let decoded = try decode(WireEnum<WorkoutCard>.self, from: #""warp_drive""#)
-    XCTAssertEqual(decoded, .unknown("warp_drive"))
-    XCTAssertEqual(decoded.rawValue, "warp_drive")
-    XCTAssertNil(decoded.known)
-    XCTAssertEqual(try encodedString(decoded), #""warp_drive""#)
+    #expect(decoded == .unknown("warp_drive"))
+    #expect(decoded.rawValue == "warp_drive")
+    #expect(decoded.known == nil)
+    #expect(try encodedString(decoded) == #""warp_drive""#)
   }
 }
