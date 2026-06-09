@@ -6,13 +6,13 @@ import SwiftUI
   import UIKit
 #endif
 
-/// The Connect screen (`Connect` / `Connect Error` designs): a centered token-entry form over
+/// The Connect screen (`Connect` / `Connect Error` designs): a **left-aligned** token-entry form over
 /// `StoreOf<ConnectComponent>`. Renders the **connect** state and, when `validation == .invalid`, the
 /// **error** state (tinted field + an inline error row). All color/spacing/radius/typography come from
 /// `DesignSystem` tokens — no raw hex or magic numbers. The error row's copy is the fixed
-/// `ErrorDisplay.unauthorized` label from the `DesignSystem` boundary (DECISIONS 2); the feature authors
-/// no raw error string and there is no `APIError`→`ErrorDisplay` presenter here (every probe failure
-/// shows the one §8.4 generic message).
+/// `ErrorDisplay.tokenRejected` label from the `DesignSystem` boundary (DECISIONS 6) — distinct from the
+/// 401 reason banner's `.unauthorized`; the feature authors no raw error string and there is no
+/// `APIError`→`ErrorDisplay` presenter here (every probe failure shows the one token-rejected message).
 ///
 /// Pure SwiftUI value code that compiles on the macOS host (the Swift/SPM host-build hazard) — no
 /// iOS-only modifiers; the 401-bounce reason banner is the parent `OnboardingView`'s concern.
@@ -24,26 +24,28 @@ struct ConnectView: View {
   }
 
   var body: some View {
-    VStack(spacing: CoachSpacing.spaceLg) {
-      Spacer()
-
-      VStack(spacing: CoachSpacing.spaceMd) {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+      // Header: a small, top-left soft-tinted tile + left-aligned title/subtitle (not a centered block).
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
         Image(systemName: "heart.fill")
           .font(.system(size: Metrics.glyph))
-          .foregroundStyle(.coachOnAccent)
+          .foregroundStyle(.coachAccent)
           .frame(width: Metrics.tile, height: Metrics.tile)
-          .background(RoundedRectangle(cornerRadius: CoachRadius.md).fill(.coachAccent))
+          .background(RoundedRectangle(cornerRadius: CoachRadius.md).fill(.coachAccentSoft))
 
-        VStack(spacing: CoachSpacing.spaceSm) {
+        VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
           Text("Let's connect you")
             .font(.coachText2xl)
             .foregroundStyle(.coachForeground)
           Text("Enter the access token from your coach to start syncing your training and recovery.")
             .font(.coachTextMd)
             .foregroundStyle(.coachForegroundMuted)
-            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
+
+      Spacer()
 
       VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
         Text("Access token")
@@ -56,17 +58,29 @@ struct ConnectView: View {
             .foregroundStyle(.coachForeground)
             .autocorrectionDisabled()
 
-          Button("Paste") {
-            // Read the clipboard in the view and feed `.tokenPasted` — `UIPasteboard` stays confined to
-            // the view (DECISIONS 4), `#if`-guarded so the reducer + host build stay clipboard-free.
+          // Paste affordance: a bordered pill with a clipboard glyph (the design). Reads the clipboard
+          // in the view and feeds `.tokenPasted` — `UIPasteboard` stays confined to the view (DECISIONS
+          // 4), `#if`-guarded so the reducer + host build stay clipboard-free.
+          Button {
             #if canImport(UIKit)
               if let value = UIPasteboard.general.string {
                 store.send(.tokenPasted(value))
               }
             #endif
+          } label: {
+            HStack(spacing: CoachSpacing.space2xs) {
+              Image(systemName: "doc.on.clipboard")
+              Text("Paste")
+            }
+            .font(.coachTextSm)
+            .foregroundStyle(.coachAccent)
+            .padding(.horizontal, CoachSpacing.spaceSm)
+            .padding(.vertical, CoachSpacing.space2xs)
+            .overlay(
+              RoundedRectangle(cornerRadius: CoachRadius.pill)
+                .stroke(.coachBorder, lineWidth: 1)
+            )
           }
-          .font(.coachTextSm)
-          .foregroundStyle(.coachAccent)
           .buttonStyle(.plain)
         }
         .padding(CoachSpacing.spaceMd)
@@ -80,19 +94,24 @@ struct ConnectView: View {
         )
 
         if store.validation == .invalid {
-          HStack(spacing: CoachSpacing.space2xs) {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(ErrorDisplay.unauthorized.label)
+          HStack(alignment: .top, spacing: CoachSpacing.space2xs) {
+            Image(systemName: "exclamationmark.circle.fill")
+            Text(ErrorDisplay.tokenRejected.label)
+            Spacer(minLength: 0)
           }
           .font(.coachTextXs)
           .foregroundStyle(.coachNegative)
         }
-      }
 
-      Text("This app is personal — there's no sign-up or password. Your token is provisioned by your coach.")
+        HStack(alignment: .top, spacing: CoachSpacing.space2xs) {
+          Image(systemName: "info.circle")
+          Text("This app is personal — there's no sign-up or password. Your token is provisioned by your coach.")
+          Spacer(minLength: 0)
+        }
         .font(.coachTextXs)
         .foregroundStyle(.coachForegroundSubtle)
-        .multilineTextAlignment(.center)
+        .padding(.top, CoachSpacing.space2xs)
+      }
 
       Spacer()
 
@@ -105,16 +124,16 @@ struct ConnectView: View {
         }
     }
     .padding(CoachSpacing.spaceLg)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .background(.coachBackground)
   }
 }
 
 /// Glyph/tile geometry — named constants, not inline literals (mirrors the `DesignSystem` primitives'
-/// `private enum Metrics` convention).
+/// `private enum Metrics` convention). A small top-left tile (not the large centered block).
 private enum Metrics {
-  static let glyph: CGFloat = 28
-  static let tile: CGFloat = 64
+  static let glyph: CGFloat = 26
+  static let tile: CGFloat = 52
 }
 
 #Preview("Connect") {

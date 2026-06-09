@@ -24,6 +24,9 @@ public protocol DisplayIconed {
 /// error-presenter maps an `APIError` onto this at the boundary.
 public enum ErrorDisplay: Sendable, Hashable, CaseIterable {
   case unauthorized
+  /// A freshly-typed connect token was rejected — distinct from `.unauthorized` (a *prior* session
+  /// going invalid). Rendered in the Connect field error; the 401 reason banner keeps `.unauthorized`.
+  case tokenRejected
   case validationError
   case notFound
   case briefGenerationFailed
@@ -36,6 +39,7 @@ extension ErrorDisplay: DisplayLabel {
   public var label: String {
     switch self {
     case .unauthorized: "Session expired — reconnect to continue."
+    case .tokenRejected: "That token doesn't look right. Check it and paste again."
     case .validationError: "Something didn't look right — please try again."
     case .notFound: "We couldn't find that."
     case .briefGenerationFailed: "Couldn't build your brief — try again in a moment."
