@@ -115,13 +115,8 @@ struct ConnectView: View {
 
       Spacer()
 
-      PrimaryButton("Connect") { store.send(.connectTapped) }
+      PrimaryButton("Connect", isLoading: store.validation == .validating) { store.send(.connectTapped) }
         .disabled(!store.canSubmit)
-        .overlay {
-          if store.validation == .validating {
-            ProgressView().tint(.coachOnAccent)
-          }
-        }
     }
     .padding(CoachSpacing.spaceLg)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

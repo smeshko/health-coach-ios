@@ -2,11 +2,12 @@ import ComposableArchitecture
 import DesignSystem
 import SwiftUI
 
-/// The HealthKit priming screen (`Wrap HealthKit*` designs): a left-aligned explainer that lists each
-/// Apple-Health signal group **before** the unskippable system sheet, the MyFitnessPal "read, not
-/// entered" callout, and the "Connect Apple Health" CTA → `connectTapped`. All copy comes through the
-/// `DesignSystem` label boundary (`PrimingRow.groupLabel`) — no raw machine key. Pure SwiftUI on
-/// `DesignSystem` tokens; compiles on the macOS host (no UIKit-only / HealthKit API).
+/// The HealthKit priming screen (`Wrap HealthKit*` designs): a `NavigationStack` with the standard
+/// large title, a left-aligned explainer that lists each Apple-Health signal group **before** the
+/// unskippable system sheet, and the "Connect Apple Health" CTA → `connectTapped` (which spins in place
+/// while the sheet / degraded probe is in flight). All copy comes through the `DesignSystem` label
+/// boundary (`PrimingRow.groupLabel`) — no raw machine key. Pure SwiftUI on `DesignSystem` tokens;
+/// compiles on the macOS host (the one UIKit-only nav modifier is `#if os(iOS)`-guarded).
 struct HealthKitPrimingView: View {
   let store: StoreOf<HealthKitPriming>
 
@@ -23,13 +24,10 @@ struct HealthKitPrimingView: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      ScrollView {
-        VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
-          VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
-            Text("Connect Apple Health")
-              .font(.coachText2xl)
-              .foregroundStyle(.coachForeground)
+    NavigationStack {
+      VStack(alignment: .leading, spacing: 0) {
+        ScrollView {
+          VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
             Text(
               "Here's what each signal does before the system sheet appears — "
                 + "nothing leaves your phone without your say."
@@ -37,40 +35,33 @@ struct HealthKitPrimingView: View {
             .font(.coachTextMd)
             .foregroundStyle(.coachForegroundMuted)
             .fixedSize(horizontal: false, vertical: true)
-          }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-          VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
-            ForEach(PrimingRow.primingGroups, id: \.self) { group in
-              PrimingSignalRow(label: group.groupLabel)
+            VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+              ForEach(PrimingRow.primingGroups, id: \.self) { group in
+                PrimingSignalRow(label: group.groupLabel)
+              }
             }
+            .padding(CoachSpacing.spaceLg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: CoachRadius.card).fill(.coachSurface))
           }
           .padding(CoachSpacing.spaceLg)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background(RoundedRectangle(cornerRadius: CoachRadius.card).fill(.coachSurface))
-
-          Banner(
-            icon: "info.circle",
-            tone: .warning,
-            title: nil,
-            message: "Food is logged in MyFitnessPal, which writes to Apple Health. "
-              + "This app only reads it — there's no food, weight or workout entry here."
-          )
         }
-        .padding(CoachSpacing.spaceLg)
-      }
 
-      PrimaryButton("Connect Apple Health", icon: "heart.fill") { store.send(.connectTapped) }
-        .disabled(isWorking)
-        .overlay {
-          if isWorking {
-            ProgressView().tint(.coachOnAccent)
-          }
+        PrimaryButton("Connect Apple Health", icon: "heart.fill", isLoading: isWorking) {
+          store.send(.connectTapped)
         }
         .padding(.horizontal, CoachSpacing.spaceLg)
         .padding(.bottom, CoachSpacing.spaceLg)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      .background(.coachBackground)
+      .navigationTitle("Connect Apple Health")
+      #if os(iOS)
+        .navigationBarTitleDisplayMode(.large)
+      #endif
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    .background(.coachBackground)
   }
 }
 
