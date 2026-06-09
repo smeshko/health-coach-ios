@@ -1,6 +1,6 @@
 import Foundation
 import SampleData
-import XCTest
+import Testing
 
 @testable import DevSettings
 
@@ -69,21 +69,21 @@ private struct DemoRepo: Sendable {
   }
 }
 
-final class DevSettingsRoutingTests: XCTestCase {
-  func test_routed_servesLive_whenFlagOff() async {
+struct DevSettingsRoutingTests {
+  @Test func test_routed_servesLive_whenFlagOff() async {
     let dev = DevSettings.fake(FakeDevBox(mock: false))
     let result = await DemoRepo.routed(dev).value()
-    XCTAssertEqual(result, "live")
+    #expect(result == "live")
   }
 
-  func test_routed_servesMock_whenFlagOn() async {
+  @Test func test_routed_servesMock_whenFlagOn() async {
     let box = FakeDevBox(mock: true, scenarios: [.dailyBrief: .dailyBriefAmber])
     let dev = DevSettings.fake(box)
     let result = await DemoRepo.routed(dev).value()
-    XCTAssertEqual(result, "mock:\(SampleScenario.dailyBriefAmber.rawValue)")
+    #expect(result == "mock:\(SampleScenario.dailyBriefAmber.rawValue)")
   }
 
-  func test_routed_switchesPerCall_noReconstruction() async {
+  @Test func test_routed_switchesPerCall_noReconstruction() async {
     let box = FakeDevBox(mock: false, scenarios: [.dailyBrief: .dailyBriefGreen])
     let dev = DevSettings.fake(box)
 
@@ -91,25 +91,25 @@ final class DevSettingsRoutingTests: XCTestCase {
     let repo = DemoRepo.routed(dev)
 
     let first = await repo.value()
-    XCTAssertEqual(first, "live")
+    #expect(first == "live")
 
     // Flip the flag after construction — the SAME repo must now serve mock.
     box.useMock = true
     let second = await repo.value()
-    XCTAssertEqual(second, "mock:\(SampleScenario.dailyBriefGreen.rawValue)")
+    #expect(second == "mock:\(SampleScenario.dailyBriefGreen.rawValue)")
   }
 
-  func test_routed_followsScenarioChange() async {
+  @Test func test_routed_followsScenarioChange() async {
     let box = FakeDevBox(mock: true, scenarios: [.dailyBrief: .dailyBriefGreen])
     let dev = DevSettings.fake(box)
     let repo = DemoRepo.routed(dev)
 
     let first = await repo.value()
-    XCTAssertEqual(first, "mock:\(SampleScenario.dailyBriefGreen.rawValue)")
+    #expect(first == "mock:\(SampleScenario.dailyBriefGreen.rawValue)")
 
     // Change only the selected scenario; the mock arm must follow on the next call.
     box.setScenario(.dailyBriefRed, .dailyBrief)
     let second = await repo.value()
-    XCTAssertEqual(second, "mock:\(SampleScenario.dailyBriefRed.rawValue)")
+    #expect(second == "mock:\(SampleScenario.dailyBriefRed.rawValue)")
   }
 }
