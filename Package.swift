@@ -271,6 +271,9 @@ let package = Package(
         "TokenClient",
         "WireModels",
         "CoachCore",
+        // The transport logs every request/response/error under `.http` via the LogClient INTERFACE
+        // (no LogClientLive — the composition root installs the live value).
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/APIClient/Live",
@@ -625,6 +628,9 @@ let package = Package(
         "APIClientLive",
         "TokenClient",
         "WireModels",
+        // The transport-logging test builds a recorder `LogClient`; SwiftPM doesn't re-export the
+        // transitive import, so the test target lists it directly.
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "Clocks", package: "swift-clocks"),
       ],
