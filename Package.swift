@@ -19,6 +19,7 @@ let package = Package(
     .library(name: "PersistenceModels", targets: ["PersistenceModels"]),
     .library(name: "TokenClient", targets: ["TokenClient"]),
     .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
+    .library(name: "LogClient", targets: ["LogClient"]),
     .library(name: "APIClient", targets: ["APIClient"]),
     .library(name: "APIClientLive", targets: ["APIClientLive"]),
     .library(name: "Database", targets: ["Database"]),
@@ -61,6 +62,10 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
     // Test-only: SwiftUI image snapshots. Used only by CoachTestSupport + the snapshot test target.
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
+    // swift-log — the app-wide logging mechanism (DECISIONS 1). `LogClient` (interface) depends only
+    // on its `Logging` product; `LogClientLive` adds a custom `LogHandler` (console + rotating file +
+    // category gating).
+    .package(url: "https://github.com/apple/swift-log", from: "1.5.0"),
   ],
   targets: [
     .target(
@@ -203,6 +208,20 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/TokenClient/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // App-wide logging interface — `@Dependency(\.log)`: a Sendable closure-struct + `LogLevel` /
+    // `LogCategory` (`.http` always-on) + a host-assertable `LogRecorder`. Depends ONLY on swift-log
+    // (`Logging`) + Dependencies — no app types, no DevSettings (the gate lives in LogClientLive).
+    .target(
+      name: "LogClient",
+      dependencies: [
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -604,6 +623,21 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/TokenClient/Tests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // LogClient interface tests — recorder capture + level-helper routing + always-on rule. Host, no
+    // simulator. LogClient has TWO test targets (this + LogClientLiveTests, TASK-002), so each sits in
+    // its own subfolder under `Tests/` — the repository-style nested layout (e.g. BriefRepository),
+    // not the flat single-`Tests/` layout the single-test-target clients use.
+    .testTarget(
+      name: "LogClientTests",
+      dependencies: [
+        "LogClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/LogClient/Tests/LogClientTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
