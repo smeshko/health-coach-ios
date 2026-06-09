@@ -6,29 +6,29 @@
   import CoachTestSupport
   import SnapshotTesting
   import SwiftUI
-  import XCTest
+  import Testing
 
   @testable import DesignSystemGallery
 
   @MainActor
-  final class GallerySnapshotTests: XCTestCase {
-    func test_galleryShell() {
+  struct GallerySnapshotTests {
+    @Test func test_galleryShell() {
       assertCoachSnapshot(of: DesignSystemGalleryView())
     }
 
-    func test_colorsPage() {
+    @Test func test_colorsPage() {
       assertCoachSnapshot(of: NavigationStack { ColorsGalleryPage() })
     }
 
-    func test_typographyPage() {
+    @Test func test_typographyPage() {
       assertCoachSnapshot(of: NavigationStack { TypographyGalleryPage() })
     }
 
-    func test_spacingPage() {
+    @Test func test_spacingPage() {
       assertCoachSnapshot(of: NavigationStack { SpacingGalleryPage() })
     }
 
-    func test_iconsPage() {
+    @Test func test_iconsPage() {
       assertCoachSnapshot(of: NavigationStack { IconsGalleryPage() })
     }
   }

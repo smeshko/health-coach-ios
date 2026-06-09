@@ -2,11 +2,13 @@ import Dependencies
 import DevSettings
 import Foundation
 import LogClient
-import XCTest
+import Testing
 
 @testable import LogClientLive
 
-final class LogClientLiveTests: XCTestCase {
+// Parallel-safe: every test writes into its own UUID-suffixed temp directory (see
+// `tempDirectory`), so no `.serialized` is needed despite the on-disk state.
+struct LogClientLiveTests {
   /// A throwaway temp directory cleaned up after each test.
   private func tempDirectory(_ name: String = #function) -> URL {
     let url = FileManager.default.temporaryDirectory
@@ -18,7 +20,7 @@ final class LogClientLiveTests: XCTestCase {
     (try? String(contentsOf: url, encoding: .utf8)) ?? ""
   }
 
-  func test_http_alwaysWritesReadableLine() async throws {
+  @Test func test_http_alwaysWritesReadableLine() async throws {
     let dir = tempDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
     let writer = LogFileWriter(directory: dir)
@@ -33,13 +35,13 @@ final class LogClientLiveTests: XCTestCase {
 
     let url = await writer.currentFileURL
     let line = contents(of: url)
-    XCTAssertTrue(line.contains("[http]"), "category segment missing: \(line)")
-    XCTAssertTrue(line.contains("ERROR"), "level missing: \(line)")
-    XCTAssertTrue(line.contains("boom"), "message missing: \(line)")
-    XCTAssertTrue(line.contains("status=401"), "metadata missing: \(line)")
+    #expect(line.contains("[http]"), "category segment missing: \(line)")
+    #expect(line.contains("ERROR"), "level missing: \(line)")
+    #expect(line.contains("boom"), "message missing: \(line)")
+    #expect(line.contains("status=401"), "metadata missing: \(line)")
   }
 
-  func test_gatedCategory_droppedWhenOff_emittedWhenOn() async throws {
+  @Test func test_gatedCategory_droppedWhenOff_emittedWhenOn() async throws {
     // OFF: testValue resolves every category to off → the .tca line is dropped.
     let offDir = tempDirectory("off")
     defer { try? FileManager.default.removeItem(at: offDir) }
@@ -52,7 +54,7 @@ final class LogClientLiveTests: XCTestCase {
     }
     await offWriter.flush()
     let offURL = await offWriter.currentFileURL
-    XCTAssertFalse(contents(of: offURL).contains("hidden"))
+    #expect(!contents(of: offURL).contains("hidden"))
 
     // ON: flip the .tca toggle on → the line is emitted.
     let onDir = tempDirectory("on")
@@ -67,10 +69,10 @@ final class LogClientLiveTests: XCTestCase {
     }
     await onWriter.flush()
     let onURL = await onWriter.currentFileURL
-    XCTAssertTrue(contents(of: onURL).contains("shown"))
+    #expect(contents(of: onURL).contains("shown"))
   }
 
-  func test_rotation_capsFileCount() async throws {
+  @Test func test_rotation_capsFileCount() async throws {
     let dir = tempDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
     // Small cap so a few lines force several rotations; keep at most 3 files.
@@ -89,7 +91,7 @@ final class LogClientLiveTests: XCTestCase {
     let logFiles = try FileManager.default
       .contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
       .filter { $0.pathExtension == "log" }
-    XCTAssertLessThanOrEqual(logFiles.count, 3, "rotation must cap the file count, found \(logFiles.count)")
-    XCTAssertGreaterThan(logFiles.count, 1, "expected several rotations from 40 lines at a 64-byte cap")
+    #expect(logFiles.count <= 3, "rotation must cap the file count, found \(logFiles.count)")
+    #expect(logFiles.count > 1, "expected several rotations from 40 lines at a 64-byte cap")
   }
 }

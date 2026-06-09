@@ -4,8 +4,8 @@ import CoachCore
 import Database
 import Dependencies
 import Foundation
+import Testing
 import WireModels
-import XCTest
 
 /// Run `work` with Europe/Sofia + a fixed `now`, the stub API client, and a migrated in-memory DB.
 /// Shared by the daily + weekly cache-policy tests.
@@ -34,15 +34,14 @@ func envelopeError(_ code: WireEnum<ErrorCode>, _ status: Int) -> APIError {
 func expectBriefError(
   _ expected: BriefError,
   _ work: () async throws -> some Any,
-  file: StaticString = #filePath,
-  line: UInt = #line
+  sourceLocation: SourceLocation = #_sourceLocation
 ) async {
   do {
     _ = try await work()
-    XCTFail("expected BriefError.\(expected)", file: file, line: line)
+    Issue.record("expected BriefError.\(expected)", sourceLocation: sourceLocation)
   } catch let error as BriefError {
-    XCTAssertEqual(error, expected, file: file, line: line)
+    #expect(error == expected, sourceLocation: sourceLocation)
   } catch {
-    XCTFail("expected BriefError, got \(error)", file: file, line: line)
+    Issue.record("expected BriefError, got \(error)", sourceLocation: sourceLocation)
   }
 }

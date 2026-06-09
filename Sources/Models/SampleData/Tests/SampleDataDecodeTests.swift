@@ -1,27 +1,30 @@
 import DomainModels
 import Foundation
-@testable import SampleData
+import Testing
 import WireModels
-import XCTest
 
-final class SampleDataDecodeTests: XCTestCase {
-  func test_everyScenario_decodesViaWireModels() {
+@testable import SampleData
+
+struct SampleDataDecodeTests {
+  @Test func test_everyScenario_decodesViaWireModels() {
     for scenario in SampleScenario.allCases {
-      XCTAssertNoThrow(try SampleData.jsonData(for: scenario), "missing resource: \(scenario)")
+      #expect(throws: Never.self, "missing resource: \(scenario)") {
+        try SampleData.jsonData(for: scenario)
+      }
       switch scenario {
       case .weeklyPlanDeload:
-        XCTAssertNoThrow(try SampleData.weeklyPlan(scenario), "\(scenario)")
+        #expect(throws: Never.self, "\(scenario)") { try SampleData.weeklyPlan(scenario) }
       case .profile:
-        XCTAssertNoThrow(try SampleData.profile(), "\(scenario)")
+        #expect(throws: Never.self, "\(scenario)") { try SampleData.profile() }
       case .syncResponse:
-        XCTAssertNoThrow(try SampleData.syncResponse(), "\(scenario)")
+        #expect(throws: Never.self, "\(scenario)") { try SampleData.syncResponse() }
       default:
-        XCTAssertNoThrow(try SampleData.dailyBrief(scenario), "\(scenario)")
+        #expect(throws: Never.self, "\(scenario)") { try SampleData.dailyBrief(scenario) }
       }
     }
   }
 
-  func test_everyDailyBrief_mapsToDomain() throws {
+  @Test func test_everyDailyBrief_mapsToDomain() throws {
     let expectedBands: [SampleScenario: DomainModels.ReadinessBand] = [
       .dailyBriefGreen: .green,
       .dailyBriefAmber: .amber,
@@ -33,36 +36,36 @@ final class SampleDataDecodeTests: XCTestCase {
     ]
     for (scenario, band) in expectedBands {
       let brief = try SampleData.dailyBrief(scenario).domain
-      XCTAssertEqual(brief.readiness.band, band, "\(scenario)")
+      #expect(brief.readiness.band == band, "\(scenario)")
     }
 
     // The three forced-REST scenarios carry a tripped gate with the expected reason.
-    XCTAssertEqual(
-      try SampleData.dailyBrief(.dailyBriefRestGIFlare).domain.safetyGate.reasons, [.giFlare]
+    #expect(
+      try SampleData.dailyBrief(.dailyBriefRestGIFlare).domain.safetyGate.reasons == [.giFlare]
     )
-    XCTAssertEqual(
-      try SampleData.dailyBrief(.dailyBriefRestIllness).domain.safetyGate.reasons, [.illness]
+    #expect(
+      try SampleData.dailyBrief(.dailyBriefRestIllness).domain.safetyGate.reasons == [.illness]
     )
-    XCTAssertEqual(
-      try SampleData.dailyBrief(.dailyBriefRestKnee).domain.safetyGate.reasons, [.kneePainHigh]
+    #expect(
+      try SampleData.dailyBrief(.dailyBriefRestKnee).domain.safetyGate.reasons == [.kneePainHigh]
     )
   }
 
-  func test_noFood_hasNilIntake() throws {
-    XCTAssertNil(try SampleData.dailyBrief(.dailyBriefNoFood).domain.intakeYesterday)
+  @Test func test_noFood_hasNilIntake() throws {
+    #expect(try SampleData.dailyBrief(.dailyBriefNoFood).domain.intakeYesterday == nil)
   }
 
-  func test_unknownFlag_survivesMapping() throws {
+  @Test func test_unknownFlag_survivesMapping() throws {
     let brief = try SampleData.dailyBrief(.dailyBriefNoFood).domain
-    XCTAssertTrue(
+    #expect(
       brief.session.flags.contains(.unknown("moon_phase")),
       "unknown flag must survive the map with its raw string: \(brief.session.flags)"
     )
   }
 
-  func test_deload_isFlagged() throws {
+  @Test func test_deload_isFlagged() throws {
     let plan = try SampleData.weeklyPlan(.weeklyPlanDeload).domain
-    XCTAssertTrue(plan.budgets.deload)
-    XCTAssertNil(plan.budgets.longRunKm, "deload fixture has a null longRunKm")
+    #expect(plan.budgets.deload)
+    #expect(plan.budgets.longRunKm == nil, "deload fixture has a null longRunKm")
   }
 }

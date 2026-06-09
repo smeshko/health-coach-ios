@@ -8,12 +8,12 @@ import GRDB
 import PersistenceModels
 import ProfileRepository
 import SampleData
+import Testing
 import WireModels
-import XCTest
 
 @testable import ProfileRepositoryLive
 
-final class ProfileCacheTests: XCTestCase {
+struct ProfileCacheTests {
   private func run<T>(
     api: StubProfileAPI,
     database: DatabaseClient,
@@ -37,7 +37,7 @@ final class ProfileCacheTests: XCTestCase {
     .live(recompute: RecomputeStream())
   }
 
-  func test_cacheMiss_fetchesAndCaches() async throws {
+  @Test func test_cacheMiss_fetchesAndCaches() async throws {
     let db = try DatabaseClient.makeInMemory()
     let fixture = try SampleData.profile()
     let api = StubProfileAPI(result: .success(fixture.dto))
@@ -46,13 +46,13 @@ final class ProfileCacheTests: XCTestCase {
       try await Self.makeRepo().profile()
     }
 
-    XCTAssertEqual(result, fixture.domain)
-    XCTAssertEqual(api.callCount, 1)
+    #expect(result == fixture.domain)
+    #expect(api.callCount == 1)
     let count = try await db.read { dbx in try ProfileRecord.fetchCount(dbx) }
-    XCTAssertEqual(count, 1, "the fetched profile must be cached")
+    #expect(count == 1, "the fetched profile must be cached")
   }
 
-  func test_cacheHit_noNetwork() async throws {
+  @Test func test_cacheHit_noNetwork() async throws {
     let db = try DatabaseClient.makeInMemory()
     let fixture = try SampleData.profile()
     try await seedProfile(db, fixture.domain)
@@ -62,11 +62,11 @@ final class ProfileCacheTests: XCTestCase {
       try await Self.makeRepo().profile()
     }
 
-    XCTAssertEqual(result, fixture.domain)
-    XCTAssertEqual(api.callCount, 0, "a cached profile serves without a network call")
+    #expect(result == fixture.domain)
+    #expect(api.callCount == 0, "a cached profile serves without a network call")
   }
 
-  func test_refresh_overwrites() async throws {
+  @Test func test_refresh_overwrites() async throws {
     let db = try DatabaseClient.makeInMemory()
     var stale = try SampleData.profile().domain
     stale.athlete.age = 99 // a distinguishable stale cached value
@@ -78,25 +78,28 @@ final class ProfileCacheTests: XCTestCase {
       try await Self.makeRepo().refresh()
     }
 
-    XCTAssertEqual(result, fixture.domain, "refresh returns the fresh fetched profile")
-    XCTAssertEqual(api.callCount, 1)
+    #expect(result == fixture.domain, "refresh returns the fresh fetched profile")
+    #expect(api.callCount == 1)
     let stored = try await db.read { dbx in try ProfileRecord.fetchOne(dbx, key: 1)?.toDomain() }
-    XCTAssertEqual(stored, fixture.domain, "the cached record is overwritten")
+    #expect(stored == fixture.domain, "the cached record is overwritten")
   }
 
-  func test_apiError_mapsToProfileError() async throws {
+  @Test func test_apiError_mapsToProfileError() async throws {
     let db = try DatabaseClient.makeInMemory() // empty → a miss forces the (failing) fetch
     let api = StubProfileAPI(result: .failure(.transport("offline")))
 
     do {
       _ = try await run(api: api, database: db) { try await Self.makeRepo().profile() }
-      XCTFail("expected ProfileRepositoryError")
+      Issue.record("expected ProfileRepositoryError")
     } catch let error as ProfileRepositoryError {
-      guard case .fetchFailed = error else { return XCTFail("expected .fetchFailed, got \(error)") }
+      guard case .fetchFailed = error else {
+        Issue.record("expected .fetchFailed, got \(error)")
+        return
+      }
     }
   }
 
-  func test_apiError_cachedProfileStillServes() async throws {
+  @Test func test_apiError_cachedProfileStillServes() async throws {
     let db = try DatabaseClient.makeInMemory()
     let fixture = try SampleData.profile()
     try await seedProfile(db, fixture.domain)
@@ -106,7 +109,7 @@ final class ProfileCacheTests: XCTestCase {
     let result = try await run(api: api, database: db) {
       try await Self.makeRepo().profile()
     }
-    XCTAssertEqual(result, fixture.domain)
-    XCTAssertEqual(api.callCount, 0)
+    #expect(result == fixture.domain)
+    #expect(api.callCount == 0)
   }
 }

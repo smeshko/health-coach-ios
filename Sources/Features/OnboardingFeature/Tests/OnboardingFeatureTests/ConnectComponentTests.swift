@@ -1,7 +1,7 @@
 import APIClient
 import ComposableArchitecture
+import Testing
 import TokenClient
-import XCTest
 
 @testable import OnboardingFeature
 
@@ -10,14 +10,14 @@ import XCTest
 /// path, paste, and the `canSubmit` gate. A `CallRecorder` actor records the `TokenClient`/`APIClient`
 /// call order so we can assert `write` precedes `probe` and that `clear` runs on failure only.
 @MainActor
-final class ConnectComponentTests: XCTestCase {
+struct ConnectComponentTests {
   /// Records the order of `write` / `probe` / `clear` across the stubbed dependencies.
   private actor CallRecorder {
     private(set) var calls: [String] = []
     func record(_ name: String) { calls.append(name) }
   }
 
-  func test_connect_validToken_writes_thenProbes_thenEmitsConnected_keepsToken() async {
+  @Test func test_connect_validToken_writes_thenProbes_thenEmitsConnected_keepsToken() async {
     let recorder = CallRecorder()
     let store = TestStore(initialState: ConnectComponent.State(token: "  ahc_live_ok\n")) {
       ConnectComponent()
@@ -36,10 +36,10 @@ final class ConnectComponentTests: XCTestCase {
     await store.finish()
 
     let calls = await recorder.calls
-    XCTAssertEqual(calls, ["write", "probe"], "write must precede probe; clear must NOT run on success")
+    #expect(calls == ["write", "probe"], "write must precede probe; clear must NOT run on success")
   }
 
-  func test_connect_invalidToken_401_clearsToken_showsError_noConnected() async {
+  @Test func test_connect_invalidToken_401_clearsToken_showsError_noConnected() async {
     let recorder = CallRecorder()
     let store = TestStore(initialState: ConnectComponent.State(token: "ahc_live_bad")) {
       ConnectComponent()
@@ -57,12 +57,12 @@ final class ConnectComponentTests: XCTestCase {
     await store.finish()
 
     let calls = await recorder.calls
-    XCTAssertEqual(calls, ["write", "probe", "clear"], "a 401 must clear the just-written candidate")
+    #expect(calls == ["write", "probe", "clear"], "a 401 must clear the just-written candidate")
     // The absence of a received `.delegate(.connected)` is asserted by the exhaustive store (it would
     // fail on any unexpected action).
   }
 
-  func test_connect_transportFailure_clearsToken_showsError_noConnected() async {
+  @Test func test_connect_transportFailure_clearsToken_showsError_noConnected() async {
     let recorder = CallRecorder()
     let store = TestStore(initialState: ConnectComponent.State(token: "ahc_live_x")) {
       ConnectComponent()
@@ -80,10 +80,10 @@ final class ConnectComponentTests: XCTestCase {
     await store.finish()
 
     let calls = await recorder.calls
-    XCTAssertEqual(calls, ["write", "probe", "clear"], "a transport failure clears the candidate too")
+    #expect(calls == ["write", "probe", "clear"], "a transport failure clears the candidate too")
   }
 
-  func test_editingToken_afterError_resetsValidationToIdle() async {
+  @Test func test_editingToken_afterError_resetsValidationToIdle() async {
     let store = TestStore(initialState: ConnectComponent.State(token: "ahc_live_x93k7q", validation: .invalid)) {
       ConnectComponent()
     }
@@ -94,7 +94,7 @@ final class ConnectComponentTests: XCTestCase {
     }
   }
 
-  func test_paste_fillsTokenField() async {
+  @Test func test_paste_fillsTokenField() async {
     let store = TestStore(initialState: ConnectComponent.State()) {
       ConnectComponent()
     }
@@ -102,7 +102,7 @@ final class ConnectComponentTests: XCTestCase {
     await store.send(.tokenPasted("ahc_live_pasted")) { $0.token = "ahc_live_pasted" }
   }
 
-  func test_connectTapped_emptyOrValidating_doesNothing() async {
+  @Test func test_connectTapped_emptyOrValidating_doesNothing() async {
     // Empty token → `canSubmit` is false → no state change, no probe.
     let emptyStore = TestStore(initialState: ConnectComponent.State(token: "   ")) {
       ConnectComponent()

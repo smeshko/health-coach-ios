@@ -1,13 +1,14 @@
 import Database
 import DatabaseLive
+import Foundation
 import GRDB
 import PersistenceModels
-import XCTest
+import Testing
 
-final class ObservationTests: XCTestCase {
+struct ObservationTests {
   private static let day = Date(timeIntervalSince1970: 1_780_000_000)
 
-  func test_observe_emitsInitialThenOnChange() async throws {
+  @Test func test_observe_emitsInitialThenOnChange() async throws {
     let day = Self.day
     let database = try DatabaseClient.makeInMemory()
     let stream = database.observe { db in try CheckInRecord.fetchCount(db) }
@@ -15,17 +16,17 @@ final class ObservationTests: XCTestCase {
 
     // Initial value reflects the (empty) DB.
     let initial = await iterator.next()
-    XCTAssertEqual(initial, 0)
+    #expect(initial == 0)
 
     // A write that changes the result re-emits (awaited, not slept).
     try await database.write { db in
       try CheckInRecord(date: day, giSymptoms: false, kneePain: 0, illness: false).save(db)
     }
     let afterWrite = await iterator.next()
-    XCTAssertEqual(afterWrite, 1)
+    #expect(afterWrite == 1)
   }
 
-  func test_observe_finishesOnCancellation() async throws {
+  @Test func test_observe_finishesOnCancellation() async throws {
     let database = try DatabaseClient.makeInMemory()
     let stream = database.observe { db in try CheckInRecord.fetchCount(db) }
 

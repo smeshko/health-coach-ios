@@ -8,12 +8,12 @@ import Foundation
 import GRDB
 import PersistenceModels
 import SampleData
+import Testing
 import WireModels
-import XCTest
 
 @testable import BriefRepositoryLive
 
-final class WeeklyCachePolicyTests: XCTestCase {
+struct WeeklyCachePolicyTests {
   /// The deload fixture DTO + its mapped domain. `domain.isoWeek == "2026-W24"` and
   /// `domain.weekStart` is that week's Monday (Europe/Sofia), so running with `now == weekStart`
   /// makes `isoWeekKey(ISOWeek.current)` equal the record PK.
@@ -21,12 +21,12 @@ final class WeeklyCachePolicyTests: XCTestCase {
     try SampleData.weeklyPlan(.weeklyPlanDeload)
   }
 
-  func test_isoWeekKey_formatsYYYYWww() {
-    XCTAssertEqual(isoWeekKey(ISOWeek(year: 2026, week: 7)), "2026-W07")
-    XCTAssertEqual(isoWeekKey(ISOWeek(year: 2026, week: 24)), "2026-W24")
+  @Test func test_isoWeekKey_formatsYYYYWww() {
+    #expect(isoWeekKey(ISOWeek(year: 2026, week: 7)) == "2026-W07")
+    #expect(isoWeekKey(ISOWeek(year: 2026, week: 24)) == "2026-W24")
   }
 
-  func test_weeklyBrief_cacheHit_noNetwork() async throws {
+  @Test func test_weeklyBrief_cacheHit_noNetwork() async throws {
     let (_, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWeekly(db, domain)
@@ -36,11 +36,11 @@ final class WeeklyCachePolicyTests: XCTestCase {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
 
-    XCTAssertEqual(result, domain)
-    XCTAssertEqual(stub.weeklyCallCount, 0, "a same-week cache hit must not hit the network")
+    #expect(result == domain)
+    #expect(stub.weeklyCallCount == 0, "a same-week cache hit must not hit the network")
   }
 
-  func test_weeklyBrief_missNoSync_throwsSyncRequired() async throws {
+  @Test func test_weeklyBrief_missNoSync_throwsSyncRequired() async throws {
     let (_, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory() // empty, no watermark
     let stub = StubAPIClient()
@@ -50,10 +50,10 @@ final class WeeklyCachePolicyTests: XCTestCase {
         try await BriefRepository.live.weeklyBrief(nil, false)
       }
     }
-    XCTAssertEqual(stub.weeklyCallCount, 0)
+    #expect(stub.weeklyCallCount == 0)
   }
 
-  func test_weeklyBrief_refreshUnsynced_throwsSyncRequired() async throws {
+  @Test func test_weeklyBrief_refreshUnsynced_throwsSyncRequired() async throws {
     let (_, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory() // no watermark
     let stub = StubAPIClient()
@@ -63,10 +63,10 @@ final class WeeklyCachePolicyTests: XCTestCase {
         try await BriefRepository.live.weeklyBrief(nil, true)
       }
     }
-    XCTAssertEqual(stub.weeklyCallCount, 0, "an un-synced refresh must not hit the network")
+    #expect(stub.weeklyCallCount == 0, "an un-synced refresh must not hit the network")
   }
 
-  func test_weeklyBrief_specificWeek_passesKeyAndRoundTrips() async throws {
+  @Test func test_weeklyBrief_specificWeek_passesKeyAndRoundTrips() async throws {
     let (dto, domain) = try deloadFixture()
     let week = ISOWeek(year: 2026, week: 24) // matches the deload fixture's isoWeek "2026-W24"
     let db = try TestDatabase.makeInMemory()
@@ -80,13 +80,13 @@ final class WeeklyCachePolicyTests: XCTestCase {
       try await BriefRepository.live.weeklyBrief(week, false)
     }
 
-    XCTAssertEqual(first, domain)
-    XCTAssertEqual(second, domain)
-    XCTAssertEqual(stub.weeklyCallCount, 1, "a specific-week generate then re-read is a cache hit (key↔PK agree)")
-    XCTAssertEqual(stub.lastWeeklyArg, .some("2026-W24"), "a specific week passes the formatted key as the API arg")
+    #expect(first == domain)
+    #expect(second == domain)
+    #expect(stub.weeklyCallCount == 1, "a specific-week generate then re-read is a cache hit (key↔PK agree)")
+    #expect(stub.lastWeeklyArg == .some("2026-W24"), "a specific week passes the formatted key as the API arg")
   }
 
-  func test_weeklyBrief_missSynced_generatesAndPersists() async throws {
+  @Test func test_weeklyBrief_missSynced_generatesAndPersists() async throws {
     let (dto, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
@@ -96,14 +96,14 @@ final class WeeklyCachePolicyTests: XCTestCase {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
 
-    XCTAssertEqual(result, domain)
-    XCTAssertEqual(stub.weeklyCallCount, 1)
-    XCTAssertEqual(stub.lastWeeklyArg, .some(nil), "current week passes nil so the server resolves it")
+    #expect(result == domain)
+    #expect(stub.weeklyCallCount == 1)
+    #expect(stub.lastWeeklyArg == .some(nil), "current week passes nil so the server resolves it")
     let count = try await TestDatabase.weeklyCount(db)
-    XCTAssertEqual(count, 1)
+    #expect(count == 1)
   }
 
-  func test_weeklyBrief_generateThenReread_isCacheHit() async throws {
+  @Test func test_weeklyBrief_generateThenReread_isCacheHit() async throws {
     let (dto, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
@@ -116,12 +116,12 @@ final class WeeklyCachePolicyTests: XCTestCase {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
 
-    XCTAssertEqual(first, domain)
-    XCTAssertEqual(second, domain)
-    XCTAssertEqual(stub.weeklyCallCount, 1, "the second same-week call must be a cache hit (key↔PK agree)")
+    #expect(first == domain)
+    #expect(second == domain)
+    #expect(stub.weeklyCallCount == 1, "the second same-week call must be a cache hit (key↔PK agree)")
   }
 
-  func test_weeklyBrief_refresh_overwrites() async throws {
+  @Test func test_weeklyBrief_refresh_overwrites() async throws {
     let (dto, domain) = try deloadFixture()
     var newDTO = dto
     newDTO.data.constantsRecomputed.toggle() // distinguishable fresh result, same isoWeek PK
@@ -134,15 +134,15 @@ final class WeeklyCachePolicyTests: XCTestCase {
       try await BriefRepository.live.weeklyBrief(nil, true)
     }
 
-    XCTAssertEqual(result.constantsRecomputed, !domain.constantsRecomputed)
-    XCTAssertEqual(result.isoWeek, domain.isoWeek)
-    XCTAssertEqual(stub.weeklyCallCount, 1)
-    XCTAssertEqual(stub.lastWeeklyRefresh, true)
+    #expect(result.constantsRecomputed == !domain.constantsRecomputed)
+    #expect(result.isoWeek == domain.isoWeek)
+    #expect(stub.weeklyCallCount == 1)
+    #expect(stub.lastWeeklyRefresh == true)
     let count = try await TestDatabase.weeklyCount(db)
-    XCTAssertEqual(count, 1, "refresh overwrites the same-week record")
+    #expect(count == 1, "refresh overwrites the same-week record")
   }
 
-  func test_weeklyBrief_newIsoWeek_regenerates() async throws {
+  @Test func test_weeklyBrief_newIsoWeek_regenerates() async throws {
     let (dto, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
@@ -155,7 +155,7 @@ final class WeeklyCachePolicyTests: XCTestCase {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
 
-    XCTAssertEqual(stub.weeklyCallCount, 1, "the first open of a new ISO week regenerates")
+    #expect(stub.weeklyCallCount == 1, "the first open of a new ISO week regenerates")
   }
 
   // NOTE: `domainWeeklyPlan` is a TOTAL mapping — it has no required *singular* closed enum, so unlike
@@ -163,9 +163,11 @@ final class WeeklyCachePolicyTests: XCTestCase {
   // are DROPPED when out-of-set). The `.mappingFailed` wrapper is still present in `weeklyPlanPolicy`
   // (defensive, and proven by the daily mapping-error test); here we document the real behavior: an
   // out-of-set core session is dropped, not surfaced as an error.
+  @Test(.enabled("fixture needs a core session to exercise the drop path") {
+    try !SampleData.weeklyPlan(.weeklyPlanDeload).dto.data.core.isEmpty
+  })
   func test_weeklyBrief_outOfSetCoreSession_isDropped() async throws {
     let (dto, domain) = try deloadFixture()
-    try XCTSkipIf(dto.data.core.isEmpty, "fixture needs a core session to exercise the drop path")
     var badDTO = dto
     badDTO.data.core[0].card = WireEnum(rawValue: "bogus_card") // out-of-set collection element
     let db = try TestDatabase.makeInMemory()
@@ -176,6 +178,6 @@ final class WeeklyCachePolicyTests: XCTestCase {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
 
-    XCTAssertEqual(result.core.count, domain.core.count - 1, "the out-of-set core session is dropped")
+    #expect(result.core.count == domain.core.count - 1, "the out-of-set core session is dropped")
   }
 }

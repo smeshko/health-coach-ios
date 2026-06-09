@@ -1,20 +1,20 @@
 import Dependencies
 import DomainModels
 import Foundation
-import XCTest
+import Testing
 
 @testable import SyncRepository
 
-final class SyncRepositoryTests: XCTestCase {
-  func test_testValue_returnsCannedResult() async throws {
+struct SyncRepositoryTests {
+  @Test func test_testValue_returnsCannedResult() async throws {
     let result = try await SyncRepository.testValue.sync()
-    XCTAssertEqual(result.recordsUpserted, 0)
-    XCTAssertEqual(result.recordsDuplicate, 0)
-    XCTAssertFalse(result.checkinSaved)
-    XCTAssertEqual(result.serverTime, Date(timeIntervalSince1970: 0))
+    #expect(result.recordsUpserted == 0)
+    #expect(result.recordsDuplicate == 0)
+    #expect(!result.checkinSaved)
+    #expect(result.serverTime == Date(timeIntervalSince1970: 0))
   }
 
-  func test_syncResult_isEquatable() {
+  @Test func test_syncResult_isEquatable() {
     let time = Date(timeIntervalSince1970: 100)
     let first = SyncResult(
       recordsUpserted: 1, recordsDuplicate: 2, workoutsUpserted: 3,
@@ -24,11 +24,11 @@ final class SyncRepositoryTests: XCTestCase {
       recordsUpserted: 1, recordsDuplicate: 2, workoutsUpserted: 3,
       activityDaysUpserted: 4, checkinSaved: true, strengthTestSaved: false, serverTime: time
     )
-    XCTAssertEqual(first, second)
+    #expect(first == second)
   }
 
-  func test_syncError_isEquatable() {
-    XCTAssertEqual(SyncError.transient, SyncError.transient)
-    XCTAssertNotEqual(SyncError.transient, SyncError.serverError)
+  @Test func test_syncError_isEquatable() {
+    #expect(SyncError.transient == SyncError.transient)
+    #expect(SyncError.transient != SyncError.serverError)
   }
 }

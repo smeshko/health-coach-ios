@@ -6,13 +6,13 @@
 #if canImport(UIKit)
   import CoachTestSupport
   import SnapshotTesting
-  import XCTest
+  import Testing
 
   @testable import DesignSystem
 
   @MainActor
-  final class TokenCatalogSnapshotTests: XCTestCase {
-    func test_tokenCatalog() {
+  struct TokenCatalogSnapshotTests {
+    @Test func test_tokenCatalog() {
       assertCoachSnapshot(of: TokenCatalogView())
     }
   }
