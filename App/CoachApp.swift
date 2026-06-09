@@ -8,6 +8,8 @@ import DatabaseLive
 import DevSettings
 import DevSettingsLive
 import HealthKitClientLive
+import LogClient
+import LogClientLive
 import ProfileRepositoryLive
 import StrengthTestRepositoryLive
 import SwiftUI
@@ -19,6 +21,11 @@ import TokenClientLive
 @main
 struct CoachApp: App {
   init() {
+    // Route any stray third-party swift-log `Logger` to the console+file sink (process-global,
+    // one-shot). The `LogClient.live` path builds its own `Logger`, so this is not load-bearing for
+    // our logging — it only redirects loggers we don't own. Must precede everything else.
+    LogClient.bootstrapStandardLogging()
+
     // DEBUG dev overrides (launch-arg > env > persisted > default); no-op in RELEASE. Must run BEFORE
     // dependencies resolve `devSettings`, so the routed repos below read the resolved flag.
     DevSettings.applyLaunchOverrides()
@@ -27,6 +34,10 @@ struct CoachApp: App {
       $0.context = .live
       // Pin calendar + timeZone to the coaching server's frame (Europe/Sofia) via the canonical helper.
       $0.useEuropeSofia()
+
+      // App-wide logging: console + rotating file, with verbose categories gated by the persisted
+      // DevSettings toggles (.http always on). The switch UI lands in Phase 7.4.
+      $0.log = .liveValue
 
       // Repos with a remote fork install via `routed(dev)` so the DEBUG `-useMockData` toggle works at
       // runtime; CheckIn/StrengthTest are local-only (no `DevEndpoint`) → installed `.live`. The

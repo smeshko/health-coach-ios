@@ -14,6 +14,16 @@ extension LogClient: DependencyKey {
     live(writer: .shared)
   }
 
+  /// One-shot, process-global swift-log bootstrap so any **stray** third-party `Logger(label:)` also
+  /// lands in the same console+file sink. Call exactly once at app start (the composition root). The
+  /// `LogClient.live` path builds its own `Logger` and does **not** depend on this — bootstrap only
+  /// redirects loggers we don't own. Re-bootstrapping is the process-global double-bootstrap hazard.
+  public static func bootstrapStandardLogging() {
+    LoggingSystem.bootstrap { _ in
+      CoachLogHandler(writer: .shared, console: { print($0) })
+    }
+  }
+
   /// Builds a live `LogClient` over `writer` (+ console sink). Factored out so tests can point it at a
   /// temp directory and assert on the file. Not for app use — the app uses `liveValue`.
   static func live(
