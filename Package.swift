@@ -77,6 +77,10 @@ let package = Package(
         // The app spine subscribes to the session-event stream (401 routing) via the APIClient
         // INTERFACE — the one app-spine exception to the feature dependency rule (§13). Never *Live.
         "APIClient",
+        // App-open session restore reads the stored bearer token via the TokenClient INTERFACE (same
+        // §13/D12 app-spine carve-out) to fall back from the default `.main` to onboarding when absent.
+        // Never *Live.
+        "TokenClient",
         // The onboarding branch is its own feature module (ARCHITECTURE §4.5/§10); AppFeature composes
         // it and renders its root view.
         "OnboardingFeature",

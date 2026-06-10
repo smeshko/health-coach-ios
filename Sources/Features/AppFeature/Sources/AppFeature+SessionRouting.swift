@@ -33,7 +33,8 @@ extension AppFeature {
       state = .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
       return .cancel(id: CancelID.appWork)
 
-    case .onboarding, .main:
+    case ._restoreSession, ._tokenChecked, .onboarding, .main:
+      // Handled in `AppFeature.body` (launch restore) / the child reducers — never routed here.
       return .none
     }
   }
