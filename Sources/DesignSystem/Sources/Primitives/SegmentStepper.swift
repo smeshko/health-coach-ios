@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// A 0–10 dot stepper for the knee-pain input (`1 · Daily Check-in.png`): round `−`/`+` buttons flank a
-/// row of dots filled up to `value` in the warning accent. `−`/`+` clamp within `range` — this clamp is
-/// UI convenience only; the authoritative 0–10 clamp lives in `CheckInComponent` (DECISIONS #2), which
-/// remains the single writer of stored `kneePain`.
-public struct DotStepper: View {
+/// A 0–10 segment stepper for the knee-pain input (`1 · Daily Check-in.png`): round `−`/`+` buttons
+/// flank a row of short rounded dashes filled up to `value` in the warning accent. `−`/`+` clamp within
+/// `range` — this clamp is UI convenience only; the authoritative 0–10 clamp lives in `CheckInComponent`
+/// (DECISIONS #2), which remains the single writer of stored `kneePain`.
+public struct SegmentStepper: View {
   @Binding var value: Int
   let range: ClosedRange<Int>
 
@@ -14,16 +14,17 @@ public struct DotStepper: View {
   }
 
   public var body: some View {
-    let dots = Array(stride(from: range.lowerBound + 1, through: range.upperBound, by: 1))
+    let segments = Array(stride(from: range.lowerBound + 1, through: range.upperBound, by: 1))
     HStack(spacing: CoachSpacing.spaceSm) {
       StepButton(symbol: "minus", isEnabled: value > range.lowerBound) {
         value = max(range.lowerBound, value - 1)
       }
       HStack(spacing: CoachSpacing.space2xs) {
-        ForEach(dots, id: \.self) { dot in
-          Circle()
-            .fill(dot <= value ? Color.coachWarning : Color.coachBorder)
-            .frame(width: Metrics.dotSize, height: Metrics.dotSize)
+        ForEach(segments, id: \.self) { segment in
+          Capsule()
+            .fill(segment <= value ? Color.coachWarning : Color.coachBorder)
+            .frame(height: Metrics.segmentHeight)
+            .frame(maxWidth: .infinity)
         }
       }
       .frame(maxWidth: .infinity)
@@ -53,8 +54,8 @@ public struct DotStepper: View {
   }
 }
 
-/// Dot/button sizing — named constants, not inline literals.
+/// Segment/button sizing — named constants, not inline literals.
 private enum Metrics {
-  static let dotSize: CGFloat = 12
+  static let segmentHeight: CGFloat = 6
   static let buttonSize: CGFloat = 40
 }

@@ -1088,8 +1088,9 @@ let package = Package(
         // The main-tab-bar snapshot seeds the Today tab root to a deterministic `.syncing` state (so the
         // app-open orchestration's async churn can't make the capture flaky) — needs `TodayFeature.State`.
         "TodayFeature",
-        // The same snapshot parks the app-open `sync()` (over its interface) so Today holds on `.syncing`.
-        "SyncRepository",
+        // The same snapshot parks the chain's first await — the check-in gate's `current()` read (over
+        // its interface) — so Today holds on `.syncing`.
+        "CheckInRepository",
         // Pins `\.calendar`/`\.date` to Europe/Sofia for the Today header's date subtitle.
         "CoachCore",
         "CoachTestSupport",

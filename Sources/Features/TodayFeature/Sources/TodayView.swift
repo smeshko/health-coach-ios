@@ -7,9 +7,11 @@ import SwiftUI
 import SyncRepository
 
 /// The Today tab's root view (the 2026-06-10 shell — `Today · Exercise.png` / `Today · Nutrition.png`):
-/// the "Today" title + Europe/Sofia date subtitle + the "● Synced …" pill, the Exercise | Nutrition
-/// segmented toggle, then an **exhaustive** switch over `store.briefState` (no `default:`) — so the
-/// 8.2/8.3/8.4 phases add *content* to the `ready` branch without ever missing a lifecycle render path.
+/// the "Today" title + Europe/Sofia date subtitle + the "● Synced …" pill, then an **exhaustive** switch
+/// over `store.briefState` (no `default:`) — so the 8.2/8.3/8.4 phases add *content* to the `ready`
+/// branch without ever missing a lifecycle render path. The Exercise | Nutrition segmented toggle (the
+/// `SegTabs` primitive) is **not rendered yet** — it belongs above the brief content, and no brief
+/// content exists until 8.2/8.4 fill the `ready` seams; Phase 8.2 mounts it (in `ready` only).
 ///
 /// All chrome is `DesignSystem` tokens/primitives; the brief-error copy comes from the `DesignSystem`
 /// `ErrorDisplay` boundary (the feature maps the typed `BriefError` onto it). The sync-failed state shows
@@ -32,6 +34,12 @@ public struct TodayView: View {
       case .idle:
         ProgressView()
           .frame(maxWidth: .infinity, maxHeight: .infinity)
+      case .checkInRequired:
+        // The check-in gate (`1 · Daily Check-in.png`) — no brief yet, so no section toggle; saving
+        // re-enters the sync→brief chain.
+        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
+          CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
+        }
       case .syncing:
         SyncProgressView(
           progress: LoadingCopy.syncingProgress,
@@ -49,15 +57,15 @@ public struct TodayView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       case .syncFailed:
-        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel, store: store) {
+        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
           TodaySyncFailedContent { store.send(.retryTapped) }
         }
       case let .error(error):
-        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel, store: store) {
+        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
           TodayBriefErrorContent(display: errorDisplay(for: error)) { store.send(.retryTapped) }
         }
       case let .ready(brief, freshness):
-        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel, store: store) {
+        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
           TodayReadyContent(
             store: store,
             cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
@@ -136,36 +144,21 @@ private struct TodayHeader: View {
   }
 }
 
-/// The Exercise | Nutrition segmented toggle, bound to `selectedSection` (sends `.sectionSelected`).
-private struct TodaySectionToggle: View {
-  @Bindable var store: StoreOf<TodayFeature>
-
-  var body: some View {
-    SegTabs(
-      selection: Binding(
-        get: { store.selectedSection == .exercise ? .exercise : .nutrition },
-        set: { store.send(.sectionSelected($0 == .exercise ? .exercise : .nutrition)) }
-      )
-    )
-  }
-}
-
 // MARK: - Loaded-content frame
 
-/// The loaded-content frame: the screen header + Exercise|Nutrition toggle above the state's content,
-/// in a scroll view. The idle/loading states render chrome-free + centered instead (the `2 ·`/`3 ·
-/// Loading` mockups have no header/toggle), so the header/toggle live here rather than unconditionally.
+/// The loaded-content frame: the screen header above the state's content, in a scroll view. The
+/// idle/loading states render chrome-free + centered instead (the `2 ·`/`3 · Loading` mockups have no
+/// header), so the header lives here rather than unconditionally. The Exercise|Nutrition toggle is NOT
+/// part of this frame — only the `ready` content carries it (no brief → no sections).
 private struct TodayContentScroll<Content: View>: View {
   let dateSubtitle: String
   let syncedLabel: String?
-  @Bindable var store: StoreOf<TodayFeature>
   @ViewBuilder let content: Content
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
         TodayHeader(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel)
-        TodaySectionToggle(store: store)
         content
       }
       .padding(CoachSpacing.spaceLg)
@@ -237,8 +230,11 @@ private struct TodayBriefErrorContent: View {
 }
 
 /// The `ready` content area: the cached-freshness label, the check-in section, and the 8.2/8.3/8.4 seam
-/// placeholders. The readiness gauge (8.2), session card (8.3), and nutrition (8.4) fill the seams later;
-/// the check-in's final placement is an open design note (kept here as planned).
+/// placeholders. The readiness gauge (8.2), session card (8.3), and nutrition (8.4) fill the seams
+/// later — 8.2 also mounts the Exercise|Nutrition `SegTabs` toggle here (hidden until actual brief
+/// content exists to switch between; `selectedSection`/`sectionSelected` already carry it). The
+/// check-in's final placement is an open design note (kept here as planned — re-saving rebuilds the
+/// brief).
 private struct TodayReadyContent: View {
   @Bindable var store: StoreOf<TodayFeature>
   let cachedLabel: String?
@@ -258,10 +254,6 @@ private struct TodayReadyContent: View {
         // MARK: - Phase 8.3 session
 
         CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
-
-        if store.offerRefresh {
-          SecondaryButton("Refresh brief", icon: "arrow.clockwise") { store.send(.refreshTapped) }
-        }
       case .nutrition:
         // MARK: - Phase 8.4 nutrition
 
@@ -273,29 +265,22 @@ private struct TodayReadyContent: View {
   }
 }
 
-/// The morning check-in (PRD §7.2) restyled to `1 · Daily Check-in.png`: a "DAILY CHECK-IN" eyebrow,
-/// "How are you today?" title + subtitle, a card with two Yes/No rows (helper copy) + the knee-pain
-/// dot-stepper & severity badge, a "Save & build today's brief" button, and a "Last saved <time>"
-/// footer. `kneePain` edits route through `kneePainChanged` (clamped) — out-of-range is impossible
-/// (DECISIONS #2). The footer time is formatted in the Europe/Sofia frame so snapshots stay deterministic.
+/// The morning check-in (PRD §7.2) restyled to `1 · Daily Check-in.png`: a "DAILY CHECK-IN" eyebrow (the
+/// mockup's "How are you today?" title + subtitle are dropped — they doubled up under the screen's
+/// "Today" header), a card with two Yes/No rows (helper copy) + the knee-pain segment stepper & severity
+/// badge, a "Save & build today's brief" button, and a "Last saved <time>" footer. `kneePain` edits route
+/// through `kneePainChanged` (clamped) — out-of-range is impossible (DECISIONS #2). The footer time is
+/// formatted in the Europe/Sofia frame so snapshots stay deterministic.
 private struct CheckInSection: View {
   @Bindable var store: StoreOf<CheckInComponent>
   @Dependency(\.calendar) var calendar
 
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
-      VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-        Text("DAILY CHECK-IN")
-          .font(.coachText2xs)
-          .tracking(0.4)
-          .foregroundStyle(.coachForegroundMuted)
-        Text("How are you today?")
-          .font(.coachText2xl)
-          .foregroundStyle(.coachForeground)
-        Text("Three quick taps. Edit and resubmit anytime.")
-          .font(.coachTextMd)
-          .foregroundStyle(.coachForegroundMuted)
-      }
+      Text("DAILY CHECK-IN")
+        .font(.coachText2xs)
+        .tracking(0.4)
+        .foregroundStyle(.coachForegroundMuted)
 
       VStack(spacing: CoachSpacing.spaceMd) {
         CheckInQuestionRow(
@@ -323,7 +308,7 @@ private struct CheckInSection: View {
             Spacer(minLength: CoachSpacing.spaceSm)
             Pill(PainSeverity.badge(for: store.kneePain), tone: .warning)
           }
-          DotStepper(
+          SegmentStepper(
             value: Binding(get: { store.kneePain }, set: { store.send(.kneePainChanged($0)) })
           )
         }

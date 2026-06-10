@@ -6,13 +6,13 @@
 
 #if canImport(UIKit)
   import AppFeature
+  import CheckInRepository
   import CoachCore
   import CoachTestSupport
   import ComposableArchitecture
   import Foundation
   import OnboardingFeature
   import SnapshotTesting
-  import SyncRepository
   import Testing
   import TodayFeature
 
@@ -41,8 +41,9 @@
     @Test func test_mainTabBar() {
       // The Today tab is the default selection and now renders the real `TodayView`. The shell fires
       // `onAppOpen` when the tab bar appears, so make the capture deterministic instead of racing the
-      // async sync→brief chain: seed the Today root to `.syncing` AND park the app-open `sync()` so it
-      // never advances past `.syncing` (the store is torn down at test end, cancelling the parked task).
+      // async chain: seed the Today root to `.syncing` AND park the chain's **first await** — the
+      // check-in gate's `current()` read (it precedes `sync()` since the 2026-06-10 gate) — so it never
+      // advances past `.syncing` (the store is torn down at test end, cancelling the parked task).
       // `tokenClient.read` returns a token so the launch check keeps `.main` (the sim's empty Keychain
       // would otherwise fall back to onboarding mid-capture). The whole capture runs inside
       // `withDependencies` so the Today header's `@Dependency(\.date)`/`(\.calendar)` (read at *render*
@@ -62,9 +63,9 @@
         $0.calendar = .europeSofia
         $0.date = .constant(fixedInstant)
         $0.tokenClient.read = { "snapshot-token" }
-        $0.syncRepository.sync = {
+        $0.checkInRepository.current = { _ in
           try await Task.sleep(for: .seconds(3600))
-          throw CancellationError() // unreachable; keeps Today parked on `.syncing` for the capture
+          return nil // unreachable; keeps Today parked on `.syncing` for the capture
         }
       } operation: {
         let view = AppView(store: Store(initialState: .main(mainState)) { AppFeature() })

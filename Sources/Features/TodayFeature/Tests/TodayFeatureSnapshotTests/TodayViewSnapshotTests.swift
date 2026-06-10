@@ -1,9 +1,10 @@
 // TodayView snapshots (ARCHITECTURE D16): the lifecycle chrome states — the redesigned **loading
 // (`.syncing`)** and **generating** states (`2 ·`/`3 · Loading` mockups), **sync-failed**, and the
-// redesigned **check-in card** (`1 · Daily Check-in.png`, rendered in `.ready`) — in light + dark on the
-// single reference device, via the shared `CoachTestSupport` harness. The whole body is `#if
-// canImport(UIKit)`-guarded so this target compiles to an empty module on the macOS host (so `swift
-// test` stays green); it runs on the pinned iOS 26 simulator via `make test-snapshots`.
+// redesigned **check-in screen** (`1 · Daily Check-in.png`, the `.checkInRequired` gate — no section
+// toggle until a brief is available) — in light + dark on the single reference device, via the shared
+// `CoachTestSupport` harness. The whole body is `#if canImport(UIKit)`-guarded so this target compiles
+// to an empty module on the macOS host (so `swift test` stays green); it runs on the pinned iOS 26
+// simulator via `make test-snapshots`.
 //
 // The shell header reads `@Dependency(\.date)`/`(\.calendar)` for the date subtitle, so each snapshot is
 // wrapped in `withDependencies` to pin a fixed Europe/Sofia instant (deterministic references). The full
@@ -15,7 +16,6 @@
   import CoachTestSupport
   import ComposableArchitecture
   import Foundation
-  import SampleData
   import SnapshotTesting
   import Testing
 
@@ -75,12 +75,12 @@
       }
     }
 
-    /// The redesigned check-in card (`1 · Daily Check-in.png`) — rendered in `.ready`, seeded to the
-    /// mockup's "2 · Mild" knee pain and a 7:02 AM "Last saved" footer. `current` is pinned so the
-    /// card's `.task` load is a no-op and the seeded state is what's captured.
+    /// The redesigned check-in screen (`1 · Daily Check-in.png`) — the `.checkInRequired` gate (no
+    /// section toggle), seeded to the mockup's "2 · Mild" knee pain and a 7:02 AM "Last saved" footer.
+    /// `current` is pinned so the card's `.task` load is a no-op and the seeded state is what's captured.
     @Test func test_checkIn() {
       let state = TodayFeature.State(
-        briefState: .ready(SampleData.dailyBriefGreen, .fresh),
+        briefState: .checkInRequired,
         checkIn: CheckInComponent.State(kneePain: 2, lastSavedAt: savedAtInstant())
       )
       withDependencies {

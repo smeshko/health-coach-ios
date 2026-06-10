@@ -1,4 +1,4 @@
-// Check-in input controls catalog snapshots — `YesNoToggle` + `DotStepper`/severity badge, light + dark
+// Check-in input controls catalog snapshots — `YesNoToggle` + `SegmentStepper`/severity badge, light + dark
 // on the reference device. Mirrors the inputs in `1 · Daily Check-in.png`.
 
 #if canImport(UIKit)

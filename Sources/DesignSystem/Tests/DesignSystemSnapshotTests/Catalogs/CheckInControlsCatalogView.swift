@@ -2,8 +2,9 @@ import DesignSystem
 import SwiftUI
 
 /// Snapshot fixture for the check-in input controls (`1 · Daily Check-in.png`): the `YesNoToggle` in
-/// both states and the `DotStepper` + `PainSeverity` badge across representative values. Its own catalog
-/// (not the atoms grid) so both controls render fully on the reference device rather than below the fold.
+/// both states and the `SegmentStepper` + `PainSeverity` badge across representative values. Its own
+/// catalog (not the atoms grid) so both controls render fully on the reference device rather than below
+/// the fold.
 struct CheckInControlsCatalogView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
@@ -15,11 +16,11 @@ struct CheckInControlsCatalogView: View {
         }
       }
       VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
-        Text("DotStepper + severity badge").font(.coachText2xs).foregroundStyle(.coachForegroundSubtle)
+        Text("SegmentStepper + severity badge").font(.coachText2xs).foregroundStyle(.coachForegroundSubtle)
         ForEach([0, 2, 7], id: \.self) { value in
           HStack(spacing: CoachSpacing.spaceSm) {
             Pill(PainSeverity.badge(for: value), tone: .warning)
-            DotStepper(value: .constant(value))
+            SegmentStepper(value: .constant(value))
           }
         }
       }

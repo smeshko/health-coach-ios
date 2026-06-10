@@ -1,5 +1,6 @@
 import BriefRepository
 import CheckInRepository
+import Clocks
 import CoachCore
 import ComposableArchitecture
 import LogClient
@@ -22,7 +23,8 @@ struct TodayFeatureLogTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(instant)
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in brief }
       $0.log = .recording(into: recorder)

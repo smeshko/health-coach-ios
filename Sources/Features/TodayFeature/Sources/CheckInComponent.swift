@@ -10,8 +10,8 @@ import Foundation
 /// repo owns the Europe/Sofia date key, 4.4).
 ///
 /// An **internal** component of `TodayFeature` (ARCHITECTURE §4.5 / D5 "internal unless promoted") —
-/// never its own target. A failed save is **non-fatal** (reverts to `.idle`, no error UI): a missing or
-/// failed check-in must never block the brief (PRD §7.2).
+/// never its own target. A failed save is **non-fatal** (reverts to `.idle`, no error UI, no delegate —
+/// the parent's chain is only re-entered by a *successful* save).
 @Reducer
 public struct CheckInComponent {
   /// The save lifecycle — `.saved` flips to `.idle` again on the next edit (a binding/toggle). 1-level
@@ -52,7 +52,8 @@ public struct CheckInComponent {
   }
 
   /// The only thing the child tells its parent (`TodayFeature`): "the check-in was saved", so the parent
-  /// can offer Refresh (PRD §8.6 — editing the check-in after the brief regenerates it). 1-level nested.
+  /// re-enters the sync→brief chain ("Save & build today's brief" — a saved/edited check-in builds or
+  /// regenerates the brief). 1-level nested.
   public enum Delegate: Equatable { case checkInSaved }
 
   public enum Action {
@@ -140,7 +141,7 @@ public struct CheckInComponent {
         return .send(.delegate(.checkInSaved))
 
       case .saveResponse(.failure):
-        // Non-fatal: a failed check-in must never block the brief (PRD §7.2). Surface quietly.
+        // Non-fatal: revert quietly so the user can retry — no delegate, so the parent chain stays put.
         state.saveStatus = .idle
         return .none
 
