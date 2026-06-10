@@ -16,16 +16,6 @@ struct DegradedPermissionsView: View {
     self.summary = summary
   }
 
-  /// "We're missing <signal> data — …", naming the single banner signal (the design's one-sentence
-  /// banner). The signal name comes from the `DesignSystem` boundary, never a raw key.
-  private var bannerMessage: String {
-    guard let signal = summary.bannerSignal else {
-      return "Some signals haven't shared yet — your brief still works and sharpens as more data flows in."
-    }
-    return "We're missing \(signal.rowLabel.title.lowercased()) data"
-      + " — readiness may read a little off until it's shared."
-  }
-
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       ScrollView {
@@ -39,13 +29,6 @@ struct DegradedPermissionsView: View {
               .foregroundStyle(.coachForegroundMuted)
               .fixedSize(horizontal: false, vertical: true)
           }
-
-          Banner(
-            icon: summary.bannerSignal?.rowLabel.iconName ?? "exclamationmark.triangle.fill",
-            tone: .warning,
-            title: nil,
-            message: bannerMessage
-          )
 
           VStack(spacing: CoachSpacing.spaceMd) {
             ForEach(PrimingRow.allCases, id: \.self) { row in
