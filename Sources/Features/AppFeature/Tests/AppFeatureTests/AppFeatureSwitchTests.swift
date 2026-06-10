@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import OnboardingFeature
+import SettingsFeature
 import Testing
 
 @testable import AppFeature
@@ -60,6 +61,31 @@ struct AppFeatureSwitchTests {
 
     await store.send(.onboarding(.delegate(.connected))) {
       $0 = .main(MainTabs.State())
+    }
+  }
+
+  @Test func test_mainTokenResetDelegate_swapsToOnboarding() async {
+    // The AppFeature seam (AC3): a `tokenReset` delegate bubbled up from the You tab swaps `.main →
+    // .onboarding` so the connect flow can be re-run without relaunch.
+    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+      AppFeature()
+    }
+
+    await store.send(.main(.delegate(.tokenReset))) {
+      $0 = .onboarding(OnboardingFeature.State())
+    }
+  }
+
+  @Test func test_settingsTokenReset_bubblesThroughMainTabs_toOnboarding() async {
+    // Full route: the You-tab root's `tokenReset` delegate bubbles through `MainTabs` (which re-emits
+    // its own `.delegate(.tokenReset)`) up to `AppFeature`, which swaps to onboarding.
+    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+      AppFeature()
+    }
+
+    await store.send(.main(.settingsRoot(.delegate(.tokenReset))))
+    await store.receive(\.main.delegate, .tokenReset) {
+      $0 = .onboarding(OnboardingFeature.State())
     }
   }
 

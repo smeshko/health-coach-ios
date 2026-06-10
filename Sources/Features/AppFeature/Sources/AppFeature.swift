@@ -61,6 +61,11 @@ public struct AppFeature {
         // Onboarding finished → swap in the tab bar.
         state = .main(MainTabs.State())
         return .none
+      case .main(.delegate(.tokenReset)):
+        // The You tab cleared the session (the DEBUG dev menu's "reset token", or Phase 10.2's
+        // Disconnect row) → swap back to onboarding so the connect flow can be re-run without relaunch.
+        state = .onboarding(OnboardingFeature.State())
+        return .none
       case ._appWillAppear, ._sessionEvent:
         return reduceSessionRouting(into: &state, action: action)
       case ._restoreSession:

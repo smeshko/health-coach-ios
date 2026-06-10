@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import DesignSystem
+import SettingsFeature
 import SwiftUI
 
 /// The main tab bar (the `.main` branch). Three tabs — **Today / Week / You** — each its own
@@ -36,7 +37,7 @@ struct MainTabsView: View {
       .tag(MainTabs.Tab.weekly)
 
       NavigationStack(path: $store.scope(state: \.settings, action: \.settings)) {
-        TabRootPlaceholder(title: "Settings", icon: Icon.you.systemName)
+        SettingsFeatureView(store: store.scope(state: \.settingsRoot, action: \.settingsRoot))
       } destination: { store in
         switch store.case {
         case .placeholder: PlaceholderDestinationView()

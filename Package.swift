@@ -85,6 +85,9 @@ let package = Package(
         // The onboarding branch is its own feature module (ARCHITECTURE §4.5/§10); AppFeature composes
         // it and renders its root view.
         "OnboardingFeature",
+        // The You-tab root feature (Phase 7.4): `MainTabs` composes it and renders `SettingsFeatureView`
+        // — a feature→feature edge the tab root implies. Phase 10.2 expands the same target.
+        "SettingsFeature",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
       ],
@@ -981,6 +984,9 @@ let package = Package(
         "AppFeature",
         // The switch/401 tests construct `OnboardingFeature.State` (the onboarding branch payload).
         "OnboardingFeature",
+        // The token-reset route test constructs `SettingsFeature.Action.delegate(.tokenReset)` to drive
+        // the You-tab → MainTabs → AppFeature bubble.
+        "SettingsFeature",
         // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
         "APIClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -1062,6 +1068,24 @@ let package = Package(
       path: "Sources/Features/AppFeature/Tests/AppFeatureSnapshotTests",
       // Reference images are read from disk by swift-snapshot-testing (not bundled), so exclude them
       // from the target to avoid SwiftPM's "unhandled files" warning.
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // DevMenuView snapshot (the DEBUG dev menu) — iOS 26 simulator only, via `xcodebuild test`. Guarded
+    // on `#if canImport(UIKit)` (empty module on the host) AND `#if DEBUG` (compiles out of RELEASE).
+    .testTarget(
+      name: "SettingsFeatureSnapshotTests",
+      dependencies: [
+        "SettingsFeature",
+        "DevSettings",
+        "SampleData",
+        "CoachTestSupport",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/SettingsFeature/Tests/SettingsFeatureSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
