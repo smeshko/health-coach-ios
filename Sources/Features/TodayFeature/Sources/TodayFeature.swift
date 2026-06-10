@@ -18,6 +18,8 @@ public struct TodayFeature {
     /// The screen lifecycle — the one source of truth (DECISIONS #1). No sibling `isLoading`/`error`
     /// bools; the enum is exhaustive.
     public var briefState: BriefViewState
+    /// The morning check-in child (PRD §7.2). Always present; rendered in the `ready` branch.
+    public var checkIn: CheckInComponent.State
     /// The 2026-06-10 shell's Exercise | Nutrition segmented toggle (local UI state). 8.2/8.3 render
     /// under `.exercise`, 8.4 under `.nutrition`.
     public var selectedSection: TodaySection
@@ -27,10 +29,12 @@ public struct TodayFeature {
 
     public init(
       briefState: BriefViewState = .idle,
+      checkIn: CheckInComponent.State = CheckInComponent.State(),
       selectedSection: TodaySection = .exercise,
       lastSyncedAt: Date? = nil
     ) {
       self.briefState = briefState
+      self.checkIn = checkIn
       self.selectedSection = selectedSection
       self.lastSyncedAt = lastSyncedAt
     }
@@ -45,6 +49,8 @@ public struct TodayFeature {
     case retryTapped
     /// The segmented toggle — pure UI, flips `selectedSection`.
     case sectionSelected(TodaySection)
+    /// The morning check-in child's actions.
+    case checkIn(CheckInComponent.Action)
   }
 
   /// Cancellation namespace. `.orchestration` owns the chained sync→brief `.run` (TASK-003); a new
@@ -55,6 +61,9 @@ public struct TodayFeature {
   public init() {}
 
   public var body: some ReducerOf<Self> {
+    Scope(state: \.checkIn, action: \.checkIn) {
+      CheckInComponent()
+    }
     Reduce { state, action in
       switch action {
       case let .sectionSelected(section):
@@ -62,6 +71,9 @@ public struct TodayFeature {
         return .none
       case .onAppOpen, .refreshTapped, .retryTapped:
         // The orchestration + debounce land in TASK-003 / TASK-004.
+        return .none
+      case .checkIn:
+        // The bubbled `.checkIn(.delegate(.checkInSaved))` → offer-Refresh handling lands in TASK-003.
         return .none
       }
     }
