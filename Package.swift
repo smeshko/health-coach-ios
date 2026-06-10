@@ -91,6 +91,10 @@ let package = Package(
         "SettingsFeature",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
+        // App-spine observability: emits `.app`/`.lifecycle` log lines (state swaps, session restore,
+        // app-will-appear) via the LogClient INTERFACE — same §13 app-spine carve-out as APIClient/
+        // TokenClient. Never *Live.
+        "LogClient",
       ],
       path: "Sources/Features/AppFeature/Sources",
       swiftSettings: [
@@ -1003,6 +1007,8 @@ let package = Package(
         "SettingsFeature",
         // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
         "APIClient",
+        // The logging tests inject `LogClient.recording(into:)` and assert `.app`/`.lifecycle` entries.
+        "LogClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/AppFeature/Tests/AppFeatureTests",
@@ -1138,6 +1144,9 @@ let package = Package(
         "DesignSystem",
         "DomainModels",
         "CoachCore",
+        // `.lifecycle` observability: emits a log line when the morning orchestration is triggered, via
+        // the LogClient INTERFACE (the feature dependency rule allows interface clients). Never *Live.
+        "LogClient",
       ],
       path: "Sources/Features/TodayFeature/Sources",
       swiftSettings: [
@@ -1161,6 +1170,9 @@ let package = Package(
         // `BriefRepository` (the `cached` flag is flipped per test to exercise the Freshness branch).
         "SampleData",
         "CoachCore",
+        // The logging test injects `LogClient.recording(into:)` and asserts the `.lifecycle` `onAppOpen`
+        // entry.
+        "LogClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "Clocks", package: "swift-clocks"),
       ],

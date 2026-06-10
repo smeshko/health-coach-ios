@@ -3,6 +3,7 @@ import CheckInRepository
 import ComposableArchitecture
 import DomainModels
 import Foundation
+import LogClient
 import SyncRepository
 
 /// The Today tab's root reducer (ARCHITECTURE §4.5, PRD §6/§8.1) — the hero "daily brief" screen. It owns
@@ -89,6 +90,7 @@ public struct TodayFeature {
   @Dependency(\.continuousClock) var clock
   @Dependency(\.calendar) var calendar
   @Dependency(\.date) var date
+  @Dependency(\.log) var log
 
   public init() {}
 
@@ -106,8 +108,13 @@ public struct TodayFeature {
         state.selectedSection = section
         return .none
 
-      case .onAppOpen, .retryTapped:
+      case .onAppOpen:
         // The morning orchestration (sync strictly before the brief) — the open path, `refresh: false`.
+        log.info("App-open — starting morning orchestration", category: .lifecycle)
+        return orchestrationEffect(refresh: false)
+
+      case .retryTapped:
+        // Retry from a terminal — re-runs the same sync-first chain (open path, `refresh: false`).
         return orchestrationEffect(refresh: false)
 
       case .refreshTapped:
