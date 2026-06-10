@@ -72,6 +72,34 @@ struct LogClientLiveTests {
     #expect(contents(of: onURL).contains("shown"))
   }
 
+  @Test func test_readRecent_returnsWrittenLinesInOrder() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let writer = LogFileWriter(directory: dir)
+    let log = LogClient.live(writer: writer, console: { _ in })
+
+    // `.http` is always-on, so both lines persist regardless of the (off) DevSettings toggles.
+    await withDependencies {
+      $0.devSettings = .testValue
+    } operation: {
+      log.error("first", category: .http)
+      log.error("second", category: .http)
+    }
+    await writer.flush()
+
+    let lines = await log.readRecent()
+    #expect(lines.count == 2, "both written lines should be read back")
+    #expect(lines.first?.contains("first") == true, "chronological order: oldest first")
+    #expect(lines.last?.contains("second") == true)
+  }
+
+  @Test func test_readRecent_emptyWhenNothingLogged() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let log = LogClient.live(writer: LogFileWriter(directory: dir), console: { _ in })
+    #expect(await log.readRecent().isEmpty)
+  }
+
   @Test func test_rotation_capsFileCount() async throws {
     let dir = tempDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }

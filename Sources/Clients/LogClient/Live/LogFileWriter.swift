@@ -57,7 +57,7 @@ public actor LogFileWriter {
     Task { [weak self] in
       for await command in stream {
         guard let self else { break }
-        await self.handle(command)
+        await handle(command)
       }
     }
   }
@@ -65,6 +65,29 @@ public actor LogFileWriter {
   /// The file currently being appended to. Rotated siblings sit alongside it in `directory`.
   public var currentFileURL: URL {
     directory.appendingPathComponent("coach-\(fileIndex).log")
+  }
+
+  /// Recent log lines across the current file + rotated siblings, in chronological order
+  /// (oldest→newest), capped to the **last** `maxLines`. Actor-isolated, so it never interleaves with
+  /// an in-flight append (the writes funnel through the same actor). Best-effort: an unreadable or
+  /// missing file is skipped. Backs the Phase 7.4 DEBUG log viewer via `LogClient.readRecent`.
+  public func recentLines(maxLines: Int = 2000) -> [String] {
+    let urls = ((try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [])
+      .filter { $0.pathExtension == "log" && $0.lastPathComponent.hasPrefix("coach-") }
+      .sorted { Self.rotationIndex($0) < Self.rotationIndex($1) }
+
+    var lines: [String] = []
+    for url in urls {
+      guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+      lines.append(contentsOf: text.split(separator: "\n").map(String.init))
+    }
+    return Array(lines.suffix(maxLines))
+  }
+
+  /// The rotation index parsed out of a `coach-<n>.log` URL (so the files concatenate in write order).
+  /// Unparseable names sort first.
+  private static func rotationIndex(_ url: URL) -> Int {
+    Int(url.deletingPathExtension().lastPathComponent.dropFirst("coach-".count)) ?? -1
   }
 
   /// Enqueue a line for appending — synchronous and non-blocking (off the caller's thread).
@@ -123,7 +146,7 @@ public actor LogFileWriter {
   private func pruneOldFiles() {
     let oldestToKeep = fileIndex - maxFiles + 1
     guard oldestToKeep > 0 else { return }
-    for index in 0..<oldestToKeep {
+    for index in 0 ..< oldestToKeep {
       let url = directory.appendingPathComponent("coach-\(index).log")
       try? fileManager.removeItem(at: url)
     }

@@ -33,16 +33,20 @@ extension LogClient: DependencyKey {
     let logger = Logger(label: "com.coach.app") { _ in
       CoachLogHandler(writer: writer, console: console)
     }
-    return LogClient(log: { level, category, message, metadata in
-      @Dependency(\.devSettings) var devSettings
-      guard category.isAlwaysOn || devSettings.isLogCategoryEnabled(category.rawValue) else { return }
+    return LogClient(
+      log: { level, category, message, metadata in
+        @Dependency(\.devSettings) var devSettings
+        guard category.isAlwaysOn || devSettings.isLogCategoryEnabled(category.rawValue) else { return }
 
-      var entryMetadata: Logger.Metadata = [CoachLogHandler.categoryKey: .string(category.rawValue)]
-      for (key, value) in metadata {
-        entryMetadata[key] = .string(value)
-      }
-      logger.log(level: level.loggerLevel, "\(message)", metadata: entryMetadata)
-    })
+        var entryMetadata: Logger.Metadata = [CoachLogHandler.categoryKey: .string(category.rawValue)]
+        for (key, value) in metadata {
+          entryMetadata[key] = .string(value)
+        }
+        logger.log(level: level.loggerLevel, "\(message)", metadata: entryMetadata)
+      },
+      // The DEBUG log viewer (Phase 7.4) reads the rotating files back through the same writer.
+      readRecent: { await writer.recentLines() }
+    )
   }
 }
 
@@ -50,10 +54,10 @@ private extension LogLevel {
   /// Map the app-facing level onto swift-log's.
   var loggerLevel: Logger.Level {
     switch self {
-    case .debug: return .debug
-    case .info: return .info
-    case .notice: return .notice
-    case .error: return .error
+    case .debug: .debug
+    case .info: .info
+    case .notice: .notice
+    case .error: .error
     }
   }
 }
