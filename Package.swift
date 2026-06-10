@@ -77,6 +77,10 @@ let package = Package(
         // The app spine subscribes to the session-event stream (401 routing) via the APIClient
         // INTERFACE — the one app-spine exception to the feature dependency rule (§13). Never *Live.
         "APIClient",
+        // App-open session restore reads the stored bearer token via the TokenClient INTERFACE (same
+        // §13/D12 app-spine carve-out) to fall back from the default `.main` to onboarding when absent.
+        // Never *Live.
+        "TokenClient",
         // The onboarding branch is its own feature module (ARCHITECTURE §4.5/§10); AppFeature composes
         // it and renders its root view.
         "OnboardingFeature",
@@ -101,6 +105,10 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         "APIClient",
         "TokenClient",
+        // The HealthKit-priming step (Phase 7.3) drives auth + the degraded-detection delta probe via
+        // the `HealthKitClient` INTERFACE only (the §13/D12/§4.5 onboarding carve-out) — never HealthKit
+        // / `*Live`.
+        "HealthKitClient",
         "DesignSystem",
         "DomainModels",
         "CoachCore",
@@ -558,6 +566,10 @@ let package = Package(
       dependencies: [
         "DomainModels",
         "CoachCore",
+        // The `HealthDataCategory` → label mapping (Phase 7.3 / DECISIONS #1) — a recorded §4.4 widening:
+        // DesignSystem imports the `HealthKitClient` INTERFACE (a pure value enum, never `*Live`/HealthKit)
+        // so the priming/degraded category labels live at the single enum→label boundary (principle #2 / D19).
+        "HealthKitClient",
       ],
       path: "Sources/DesignSystem/Sources",
       swiftSettings: [
@@ -966,6 +978,10 @@ let package = Package(
         "OnboardingFeature",
         "APIClient",
         "TokenClient",
+        // The HealthKit-priming TestStore stubs `HealthKitClient` + constructs `HealthDataCategory`/
+        // `HealthSampleSet` fixtures; the label tests reach the `DesignSystem` category labels.
+        "HealthKitClient",
+        "DesignSystem",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureTests",

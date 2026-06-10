@@ -35,11 +35,17 @@
     }
 
     @Test func test_mainTabBar() {
-      let view = AppView(
-        store: Store(initialState: .main(MainTabs.State())) {
-          AppFeature()
-        }
-      )
+      // A stored token is the happy path: pin `tokenClient.read` so the launch check keeps `.main`
+      // (otherwise the sim's empty Keychain would fall back to onboarding mid-capture).
+      let view = withDependencies {
+        $0.tokenClient.read = { "snapshot-token" }
+      } operation: {
+        AppView(
+          store: Store(initialState: .main(MainTabs.State())) {
+            AppFeature()
+          }
+        )
+      }
       assertCoachSnapshot(of: view)
     }
   }

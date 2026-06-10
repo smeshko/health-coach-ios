@@ -1,4 +1,5 @@
 #if canImport(HealthKit)
+  import Dependencies
   import Foundation
   import HealthKit
   import HealthKitClient
@@ -72,20 +73,30 @@
   }
 
   private func readActivity(box: HealthStoreBox, since: Date) async -> [ActivitySummaryPayload] {
-    let calendar: Calendar = {
-      var calendar = Calendar(identifier: .gregorian)
-      calendar.timeZone = .current
-      return calendar
-    }()
-    let units: Set<Calendar.Component> = [.year, .month, .day]
-    let start = calendar.dateComponents(units, from: since)
-    let end = calendar.dateComponents(units, from: Date())
+    // Resolve the app's pinned frame (Europe/Sofia, installed at the composition root via
+    // `useEuropeSofia()`) so activity-summary day buckets line up with the rest of the app's date math
+    // rather than the device locale — and the injected clock for the `end` boundary.
+    @Dependency(\.calendar) var calendar
+    @Dependency(\.date.now) var now
+
+    // Activity-summary predicates require each `DateComponents` to carry its own calendar — the
+    // components returned by `dateComponents(_:from:)` do **not** (HealthKit raises
+    // `NSInvalidArgumentException: Date components require a calendar` otherwise). `.era` is included
+    // per Apple's guidance so the day boundaries are unambiguous.
+    let units: Set<Calendar.Component> = [.era, .year, .month, .day]
+    var start = calendar.dateComponents(units, from: since)
+    start.calendar = calendar
+    var end = calendar.dateComponents(units, from: now)
+    end.calendar = calendar
     let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: start, end: end)
 
+    // Snapshot the resolved calendar into a plain value so the `@Sendable` query callback captures a
+    // Sendable `Calendar`, not the `@Dependency` storage.
+    let payloadCalendar = calendar
     return await withCheckedContinuation { continuation in
       let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, _ in
         let payloads = (summaries ?? [])
-          .map { HKSampleMapping.activityPayload(from: $0, calendar: calendar) }
+          .map { HKSampleMapping.activityPayload(from: $0, calendar: payloadCalendar) }
         continuation.resume(returning: payloads)
       }
       box.store.execute(query)

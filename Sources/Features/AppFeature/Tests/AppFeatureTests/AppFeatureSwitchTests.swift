@@ -9,8 +9,48 @@ import Testing
 /// covered separately in `AppFeature401Tests` (TASK-002).
 @MainActor
 struct AppFeatureSwitchTests {
-  @Test func test_startsInOnboarding() {
-    #expect(AppFeature.State() == .onboarding(OnboardingFeature.State()))
+  @Test func test_startsInMain() {
+    // Happy-path-first (personal app): the app defaults to `.main`; the launch token check swaps to
+    // onboarding only when no token is stored (covered in `test_restoreSession_*`).
+    #expect(AppFeature.State() == .main(MainTabs.State()))
+  }
+
+  @Test func test_restoreSession_noStoredToken_swapsToOnboarding() async {
+    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+      AppFeature()
+    } withDependencies: {
+      $0.tokenClient.read = { nil }
+    }
+
+    await store.send(._restoreSession)
+    await store.receive(\._tokenChecked, false) {
+      $0 = .onboarding(OnboardingFeature.State())
+    }
+  }
+
+  @Test func test_restoreSession_emptyToken_swapsToOnboarding() async {
+    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+      AppFeature()
+    } withDependencies: {
+      $0.tokenClient.read = { "" }
+    }
+
+    await store.send(._restoreSession)
+    await store.receive(\._tokenChecked, false) {
+      $0 = .onboarding(OnboardingFeature.State())
+    }
+  }
+
+  @Test func test_restoreSession_storedToken_staysInMain() async {
+    // The happy path: a token exists → the default `.main` is kept, no state change.
+    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+      AppFeature()
+    } withDependencies: {
+      $0.tokenClient.read = { "stored-bearer-token" }
+    }
+
+    await store.send(._restoreSession)
+    await store.receive(\._tokenChecked, true)
   }
 
   @Test func test_connectedDelegate_swapsToMain() async {
