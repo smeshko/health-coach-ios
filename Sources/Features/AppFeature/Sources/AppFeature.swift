@@ -103,5 +103,8 @@ public struct AppFeature {
     .ifCaseLet(\.main, action: \.main) {
       MainTabs()
     }
+    // App-root `.tca` action trace (DECISIONS #4) — label-only, gated by the per-category DevSettings
+    // toggle in `LogClientLive`. Outermost so it observes every action entering the root exactly once.
+    .logActions()
   }
 }
