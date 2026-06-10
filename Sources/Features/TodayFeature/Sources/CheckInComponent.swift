@@ -82,7 +82,7 @@ public struct CheckInComponent {
       case .task:
         let day = today
         return .run { [checkInRepository] send in
-          let existing = (try? await checkInRepository.current(day)) ?? nil
+          let existing = await (try? checkInRepository.current(day)) ?? nil
           await send(._currentLoaded(existing))
         }
 
