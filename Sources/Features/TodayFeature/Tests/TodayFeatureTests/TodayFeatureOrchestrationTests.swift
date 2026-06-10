@@ -1,50 +1,10 @@
 import BriefRepository
 import CoachCore
 import ComposableArchitecture
-import DomainModels
-import Foundation
-import SampleData
 import SyncRepository
 import Testing
 
 @testable import TodayFeature
-
-/// Counts `BriefRepository.dailyBrief` invocations so a test can assert exactly 0 (blocked) / 1 (ran).
-/// File-scoped (not nested) so the `@Sendable` stub closures capture only the actor, never the test
-/// struct (`self`), under Swift 6 strict concurrency.
-private actor CallCounter {
-  private(set) var count = 0
-  func increment() { count += 1 }
-}
-
-/// A wall-clock instant in Europe/Sofia (the pinned frame). Free function so closures don't capture self.
-private func sofiaInstant() -> Date {
-  var components = DateComponents()
-  components.year = 2026
-  components.month = 6
-  components.day = 10
-  components.hour = 9
-  return Calendar.europeSofia.date(from: components)!
-}
-
-/// The default green sample brief with `cached` forced to a known value.
-private func brief(cached: Bool) -> DomainModels.DailyBrief {
-  var brief = SampleData.dailyBriefGreen
-  brief.cached = cached
-  return brief
-}
-
-private func syncResult() -> SyncResult {
-  SyncResult(
-    recordsUpserted: 0,
-    recordsDuplicate: 0,
-    workoutsUpserted: 0,
-    activityDaysUpserted: 0,
-    checkinSaved: false,
-    strengthTestSaved: false,
-    serverTime: Date(timeIntervalSince1970: 0)
-  )
-}
 
 /// Exhaustive `TestStore` coverage (ARCHITECTURE D18) for the morning orchestration: **sync strictly
 /// before the brief** (D15/§11), a sync failure **blocking** the brief (the brief stub is invoked 0
@@ -55,14 +15,14 @@ private func syncResult() -> SyncResult {
 struct TodayFeatureOrchestrationTests {
   @Test func test_onAppOpen_success_syncThenBrief_readyFresh() async {
     let now = sofiaInstant()
-    let fresh = brief(cached: false)
+    let fresh = sampleBrief(cached: false)
     let store = TestStore(initialState: TodayFeature.State()) {
       TodayFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
       $0.checkInRepository.current = { _ in nil }
-      $0.syncRepository.sync = { syncResult() }
+      $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
     }
 
@@ -76,8 +36,8 @@ struct TodayFeatureOrchestrationTests {
   }
 
   @Test func test_syncFailure_blocksBrief_setsSyncFailed_briefNeverCalled() async {
-    let counter = CallCounter()
-    let fresh = brief(cached: false)
+    let counter = BriefCallCounter()
+    let fresh = sampleBrief(cached: false)
     let store = TestStore(initialState: TodayFeature.State()) {
       TodayFeature()
     } withDependencies: {
@@ -101,14 +61,14 @@ struct TodayFeatureOrchestrationTests {
 
   @Test func test_cacheHit_resolvesReadyCached() async {
     let now = sofiaInstant()
-    let cached = brief(cached: true)
+    let cached = sampleBrief(cached: true)
     let store = TestStore(initialState: TodayFeature.State()) {
       TodayFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
       $0.checkInRepository.current = { _ in nil }
-      $0.syncRepository.sync = { syncResult() }
+      $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in cached }
     }
 
@@ -129,7 +89,7 @@ struct TodayFeatureOrchestrationTests {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
       $0.checkInRepository.current = { _ in nil }
-      $0.syncRepository.sync = { syncResult() }
+      $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in throw BriefError.serverError }
     }
 
@@ -144,8 +104,8 @@ struct TodayFeatureOrchestrationTests {
 
   @Test func test_nonTypedSyncThrow_landsSyncFailedFallback_briefNeverCalled() async {
     struct WeirdError: Error {}
-    let counter = CallCounter()
-    let fresh = brief(cached: false)
+    let counter = BriefCallCounter()
+    let fresh = sampleBrief(cached: false)
     let store = TestStore(initialState: TodayFeature.State()) {
       TodayFeature()
     } withDependencies: {
@@ -176,7 +136,7 @@ struct TodayFeatureOrchestrationTests {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
       $0.checkInRepository.current = { _ in nil }
-      $0.syncRepository.sync = { syncResult() }
+      $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in throw WeirdError() }
     }
 
@@ -191,14 +151,14 @@ struct TodayFeatureOrchestrationTests {
 
   @Test func test_skipCheckIn_nilCurrent_stillReachesReady() async {
     let now = sofiaInstant()
-    let fresh = brief(cached: false)
+    let fresh = sampleBrief(cached: false)
     let store = TestStore(initialState: TodayFeature.State()) {
       TodayFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
       $0.checkInRepository.current = { _ in nil } // no check-in logged — must not hard-block
-      $0.syncRepository.sync = { syncResult() }
+      $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
     }
 
@@ -213,14 +173,14 @@ struct TodayFeatureOrchestrationTests {
 
   @Test func test_retryFromSyncFailed_rerunsChain_reachesReady() async {
     let now = sofiaInstant()
-    let fresh = brief(cached: false)
+    let fresh = sampleBrief(cached: false)
     let store = TestStore(initialState: TodayFeature.State(briefState: .syncFailed(.network))) {
       TodayFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
       $0.checkInRepository.current = { _ in nil }
-      $0.syncRepository.sync = { syncResult() }
+      $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
     }
 

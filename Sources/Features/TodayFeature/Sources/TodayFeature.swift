@@ -63,6 +63,8 @@ public struct TodayFeature {
     // Internal transition actions drive the orchestration's `BriefViewState` mutations through the
     // reducer. The leading underscore (TCA convention) trips `identifier_name`, so scope a disable.
     // swiftlint:disable identifier_name
+    /// Fired once the Refresh debounce window elapses — runs the shared chain with `refresh: true`.
+    case _runOrchestration(refresh: Bool)
     case _syncStarted
     case _syncFailed(SyncError)
     case _generating
@@ -71,14 +73,20 @@ public struct TodayFeature {
     // swiftlint:enable identifier_name
   }
 
-  /// Cancellation namespace. `.orchestration` owns the chained sync→brief `.run` (TASK-003); a new
-  /// trigger (`onAppOpen`/`refreshTapped`/`retryTapped`) cancels it in-flight so a stale brief can't land
-  /// after a newer request. `.refreshDebounce` owns the Refresh debounce window (TASK-004).
+  /// Cancellation namespace. `.orchestration` owns the chained sync→brief `.run`; a new trigger
+  /// (`onAppOpen`/`retryTapped`, or a fired Refresh) cancels it in-flight so a stale brief can't land
+  /// after a newer request. `.refreshDebounce` owns the Refresh debounce window (so rapid `refreshTapped`
+  /// collapse the pending window) — kept distinct so an `onAppOpen`-started run is still cancellable.
   public enum CancelID: Hashable, Sendable { case orchestration, refreshDebounce }
+
+  /// The Refresh debounce window (PRD §8.6 — collapse refresh-spam re-rolls). A named constant so the
+  /// `TestClock` test advances exactly past it (no magic number duplicated between source and test).
+  static let refreshDebounceWindow: Duration = .milliseconds(300)
 
   @Dependency(\.checkInRepository) var checkInRepository
   @Dependency(\.syncRepository) var syncRepository
   @Dependency(\.briefRepository) var briefRepository
+  @Dependency(\.continuousClock) var clock
   @Dependency(\.calendar) var calendar
   @Dependency(\.date) var date
 
@@ -99,13 +107,22 @@ public struct TodayFeature {
         return .none
 
       case .onAppOpen, .retryTapped:
-        // The morning orchestration (sync strictly before the brief). TASK-004 adds the debounced
-        // Refresh that reuses the same chain with `refresh: true`.
+        // The morning orchestration (sync strictly before the brief) — the open path, `refresh: false`.
         return orchestrationEffect(refresh: false)
 
       case .refreshTapped:
-        // The debounced Refresh lands in TASK-004.
-        return .none
+        // Debounce over the clock to collapse refresh-spam (PRD §8.6), then run the shared chain with
+        // `refresh: true`. The debounce sleep is on `.refreshDebounce` (so rapid taps collapse the
+        // pending window); the orchestration `.run` it fires is on `.orchestration` (so a new trigger
+        // cancels the in-flight *run*).
+        return .run { [clock] send in
+          try await clock.sleep(for: Self.refreshDebounceWindow)
+          await send(._runOrchestration(refresh: true))
+        }
+        .cancellable(id: CancelID.refreshDebounce, cancelInFlight: true)
+
+      case let ._runOrchestration(refresh):
+        return orchestrationEffect(refresh: refresh)
 
       case ._syncStarted:
         state.briefState = .syncing
