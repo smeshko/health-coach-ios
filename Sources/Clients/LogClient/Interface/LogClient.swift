@@ -19,8 +19,26 @@ public struct LogClient: Sendable {
 
   public var log: Log
 
-  public init(log: @escaping Log) {
+  /// Reads recent persisted log lines (the current rotating file + its siblings, oldest→newest, capped)
+  /// for the DEBUG on-device log viewer (Phase 7.4). Defaults to **empty** so the test / preview /
+  /// recording values — and any cross-module fake — need not provide it; only `LogClientLive` reads the
+  /// on-disk `Caches/Logs/` files. `async` because the live read hops onto the file-writer actor.
+  public var readRecent: @Sendable () async -> [String]
+
+  /// Deletes every persisted log file (the DEBUG log viewer's "Clear" action). Defaults to a **no-op**
+  /// so the test / preview / recording values need not provide it; only `LogClientLive` wipes the
+  /// on-disk `Caches/Logs/` files. `async` because the live clear is ordered after in-flight appends on
+  /// the file-writer actor.
+  public var clear: @Sendable () async -> Void
+
+  public init(
+    log: @escaping Log,
+    readRecent: @escaping @Sendable () async -> [String] = { [] },
+    clear: @escaping @Sendable () async -> Void = {}
+  ) {
     self.log = log
+    self.readRecent = readRecent
+    self.clear = clear
   }
 }
 

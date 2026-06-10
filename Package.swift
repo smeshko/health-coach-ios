@@ -11,6 +11,7 @@ let package = Package(
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
     .library(name: "OnboardingFeature", targets: ["OnboardingFeature"]),
+    .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
     .library(name: "WireModels", targets: ["WireModels"]),
     .library(name: "DomainModels", targets: ["DomainModels"]),
@@ -84,6 +85,9 @@ let package = Package(
         // The onboarding branch is its own feature module (ARCHITECTURE §4.5/§10); AppFeature composes
         // it and renders its root view.
         "OnboardingFeature",
+        // The You-tab root feature (Phase 7.4): `MainTabs` composes it and renders `SettingsFeatureView`
+        // — a feature→feature edge the tab root implies. Phase 10.2 expands the same target.
+        "SettingsFeature",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
       ],
@@ -114,6 +118,35 @@ let package = Package(
         "CoachCore",
       ],
       path: "Sources/Features/OnboardingFeature/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The You-tab root feature (ARCHITECTURE §4.5). **Minimal in Phase 7.4** — only a `tokenReset`
+    // delegate seam + a `#if DEBUG` DEV section hosting the dev menu; Phase 10.2 expands this SAME target
+    // (CONNECTION / APPLE HEALTH / PROFILE / REMINDERS, adding DesignSystem/DomainModels/CoachCore + repo
+    // interfaces). The DEBUG dev menu writes the mock/live + scenario knobs through the `DevSettings`
+    // INTERFACE and clears the bearer token through the `TokenClient` INTERFACE (the §13/D12 app-spine
+    // carve-out) — never a `*Live`, GRDB, HealthKit, or WireModels. `SampleData` arrives transitively
+    // via `DevSettings`.
+    .target(
+      name: "SettingsFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "DevSettings",
+        "TokenClient",
+        // The DEBUG dev menu surfaces the per-category log toggles. It uses the `LogClient` INTERFACE only
+        // for the `LogCategory` vocabulary; the toggles are written through the `DevSettings` log seam
+        // (keyed by rawValue), so this adds no client→client coupling beyond reading the enum.
+        "LogClient",
+        // The You-tab root + DEBUG dev menu are styled against the shared design tokens (the Settings
+        // design reference): neutral background, accent tint, card surfaces, type + spacing scale.
+        "DesignSystem",
+        // The log viewer parses log timestamps back into `Date`s using the app's canonical Europe/Sofia
+        // frame (`Calendar.europeSofia`) — the same frame the live `CoachLogHandler` wrote them in.
+        "CoachCore",
+      ],
+      path: "Sources/Features/SettingsFeature/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -245,6 +278,9 @@ let package = Package(
       dependencies: [
         "LogClient",
         "DevSettings",
+        // Timestamps render in the app's canonical Europe/Sofia frame (`Calendar.europeSofia`) — the
+        // same value `useEuropeSofia()` pins `\.calendar` to — so console + viewer agree on wall-clock.
+        "CoachCore",
         .product(name: "Logging", package: "swift-log"),
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
@@ -961,6 +997,9 @@ let package = Package(
         "AppFeature",
         // The switch/401 tests construct `OnboardingFeature.State` (the onboarding branch payload).
         "OnboardingFeature",
+        // The token-reset route test constructs `SettingsFeature.Action.delegate(.tokenReset)` to drive
+        // the You-tab → MainTabs → AppFeature bubble.
+        "SettingsFeature",
         // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
         "APIClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -985,6 +1024,27 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // DevMenuFeature + SettingsFeature exhaustive TestStore (host) — the DEBUG dev-menu write-through
+    // contract (toggle/scenario ⇒ DevSettings writers), the reset-token clear + delegate, and the DEV
+    // section presentation. The test files are `#if DEBUG`-guarded (they reference DEBUG-only types).
+    .testTarget(
+      name: "SettingsFeatureTests",
+      dependencies: [
+        "SettingsFeature",
+        // The dev-menu tests reference DevEndpoint / SampleScenario / DevSettings / LogCategory by symbol
+        // and override TokenClient.clear directly; depend on those interfaces explicitly (the transitive
+        // visibility through SettingsFeature is the fallback).
+        "DevSettings",
+        "SampleData",
+        "TokenClient",
+        "LogClient",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      path: "Sources/Features/SettingsFeature/Tests/SettingsFeatureTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -1022,6 +1082,25 @@ let package = Package(
       path: "Sources/Features/AppFeature/Tests/AppFeatureSnapshotTests",
       // Reference images are read from disk by swift-snapshot-testing (not bundled), so exclude them
       // from the target to avoid SwiftPM's "unhandled files" warning.
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // DevMenuView snapshot (the DEBUG dev menu) — iOS 26 simulator only, via `xcodebuild test`. Guarded
+    // on `#if canImport(UIKit)` (empty module on the host) AND `#if DEBUG` (compiles out of RELEASE).
+    .testTarget(
+      name: "SettingsFeatureSnapshotTests",
+      dependencies: [
+        "SettingsFeature",
+        "DevSettings",
+        "SampleData",
+        "LogClient",
+        "CoachTestSupport",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/SettingsFeature/Tests/SettingsFeatureSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),

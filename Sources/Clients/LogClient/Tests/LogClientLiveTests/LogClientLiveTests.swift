@@ -72,6 +72,75 @@ struct LogClientLiveTests {
     #expect(contents(of: onURL).contains("shown"))
   }
 
+  @Test func test_readRecent_returnsWrittenLinesInOrder() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let writer = LogFileWriter(directory: dir)
+    let log = LogClient.live(writer: writer, console: { _ in })
+
+    // `.http` is always-on, so both lines persist regardless of the (off) DevSettings toggles.
+    await withDependencies {
+      $0.devSettings = .testValue
+    } operation: {
+      log.error("first", category: .http)
+      log.error("second", category: .http)
+    }
+    await writer.flush()
+
+    let lines = await log.readRecent()
+    #expect(lines.count == 2, "both written lines should be read back")
+    #expect(lines.first?.contains("first") == true, "chronological order: oldest first")
+    #expect(lines.last?.contains("second") == true)
+  }
+
+  @Test func test_readRecent_emptyWhenNothingLogged() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let log = LogClient.live(writer: LogFileWriter(directory: dir), console: { _ in })
+    #expect(await log.readRecent().isEmpty)
+  }
+
+  @Test func test_clear_removesAllPersistedLines() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let writer = LogFileWriter(directory: dir)
+    let log = LogClient.live(writer: writer, console: { _ in })
+
+    await withDependencies {
+      $0.devSettings = .testValue
+    } operation: {
+      log.error("first", category: .http)
+      log.error("second", category: .http)
+    }
+    await writer.flush()
+    #expect(!(await log.readRecent().isEmpty), "precondition: lines were written")
+
+    // `clear()` is FIFO-ordered after the writes, so it removes them; the next read is empty.
+    await log.clear()
+    #expect(await log.readRecent().isEmpty, "clear must delete every persisted log line")
+  }
+
+  @Test func test_writtenLine_carriesLocalDateAndCategory() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let writer = LogFileWriter(directory: dir)
+
+    await withDependencies {
+      $0.devSettings = .testValue
+    } operation: {
+      LogClient.live(writer: writer, console: { _ in }).error("boom", category: .http)
+    }
+    await writer.flush()
+
+    let line = contents(of: await writer.currentFileURL)
+    // The line now begins with a full `yyyy-MM-dd HH:mm:ss.SSS` local timestamp (was time-only UTC).
+    let datedPrefix = #"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ERROR \[http\] boom"#
+    #expect(
+      line.range(of: datedPrefix, options: .regularExpression) != nil,
+      "expected a dated, parseable line, got: \(line)"
+    )
+  }
+
   @Test func test_rotation_capsFileCount() async throws {
     let dir = tempDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }

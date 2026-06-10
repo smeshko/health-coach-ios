@@ -1,16 +1,21 @@
+import CoachCore
 import Foundation
 import Logging
 
 /// A `swift-log` `LogHandler` that renders one human-readable line per entry and fans it out to both
 /// the console (stdout) and the rotating `LogFileWriter`. Format:
 ///
-///     HH:mm:ss.SSS LEVEL [category] message — key=value key=value …
+///     yyyy-MM-dd HH:mm:ss.SSS LEVEL [category] message — key=value key=value …
 ///
 /// The category is carried in metadata under `categoryKey` (the live `LogClient` injects
-/// `LogCategory.rawValue` there) and stripped from the rendered `key=value` tail. Timestamps are UTC
-/// and formatted with pure arithmetic so the handler stays `Sendable`/thread-safe (no shared
-/// `DateFormatter`). This handler also backs the process-global `LoggingSystem.bootstrap` (TASK-004),
-/// so stray third-party swift-log loggers land in the same console+file sink.
+/// `LogCategory.rawValue` there) and stripped from the rendered `key=value` tail. Timestamps are the
+/// full local date+time in the app's canonical Europe/Sofia frame (`Calendar.europeSofia` — the same
+/// value `useEuropeSofia()` pins `\.calendar` to), so both the Xcode console and the DEBUG log viewer
+/// read in wall-clock time and the viewer parses them back in the identical frame. A `Calendar` is a
+/// `Sendable` value type, so this stays thread-safe with no shared mutable `DateFormatter`, and it makes
+/// DST correct (unlike a fixed UTC offset). The fixed-width prefix keeps the line machine-parseable for
+/// the viewer's filters. This handler also backs the process-global `LoggingSystem.bootstrap`
+/// (TASK-004), so stray third-party swift-log loggers land in the same console+file sink.
 struct CoachLogHandler: LogHandler {
   /// The metadata key the live `LogClient` uses to carry `LogCategory.rawValue` to the formatter.
   static let categoryKey = "coach.category"
@@ -48,15 +53,19 @@ struct CoachLogHandler: LogHandler {
     return line
   }
 
-  /// `HH:mm:ss.SSS` (UTC) from pure arithmetic — no `DateFormatter`, so it is thread-safe to call from
-  /// the arbitrary thread `log(…)` runs on.
+  /// `yyyy-MM-dd HH:mm:ss.SSS` in the canonical `Calendar.europeSofia` frame. A `Calendar` is a
+  /// `Sendable` value type that knows the zone's DST rules, so this stays thread-safe to call from the
+  /// arbitrary thread `log(…)` runs on (no shared `DateFormatter`). The fixed-width layout keeps the
+  /// line parseable by the viewer's filters.
   static func timestamp(_ date: Date) -> String {
-    let totalMillis = Int((date.timeIntervalSince1970 * 1000).rounded(.down))
-    let millis = totalMillis % 1000
-    let totalSeconds = totalMillis / 1000
-    let seconds = totalSeconds % 60
-    let minutes = (totalSeconds / 60) % 60
-    let hours = (totalSeconds / 3600) % 24
-    return String(format: "%02d:%02d:%02d.%03d", hours, minutes, seconds, millis)
+    let parts = Calendar.europeSofia.dateComponents(
+      [.year, .month, .day, .hour, .minute, .second, .nanosecond], from: date
+    )
+    let millis = (parts.nanosecond ?? 0) / 1_000_000
+    return String(
+      format: "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+      parts.year ?? 0, parts.month ?? 0, parts.day ?? 0,
+      parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0, millis
+    )
   }
 }
