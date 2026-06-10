@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import SettingsFeature
+import TodayFeature
 
 /// The tab-root reducer (the `.main` branch of `AppFeature`). Holds the selected tab plus three
 /// **independent** `StackState` drill-downs — one per tab — driven by `.forEach`, plus the You-tab
@@ -25,6 +26,9 @@ public struct MainTabs {
     public var today = StackState<TodayPath.State>()
     public var weekly = StackState<WeeklyPath.State>()
     public var settings = StackState<SettingsPath.State>()
+    /// The Today-tab root feature (rendered above the `today` drill-down stack). The hero daily-brief
+    /// screen (Epic 8); replaces 6.1's `TabRootPlaceholder` so each Today phase is testable as it lands.
+    public var todayRoot = TodayFeature.State()
     /// The You-tab root feature (rendered above the `settings` drill-down stack). Minimal in Phase 7.4.
     public var settingsRoot = SettingsFeature.State()
     public init() {}
@@ -33,6 +37,7 @@ public struct MainTabs {
   public enum Action {
     case tabSelected(Tab)
     case today(StackAction<TodayPath.State, TodayPath.Action>)
+    case todayRoot(TodayFeature.Action)
     case weekly(StackAction<WeeklyPath.State, WeeklyPath.Action>)
     case settings(StackAction<SettingsPath.State, SettingsPath.Action>)
     case settingsRoot(SettingsFeature.Action)
@@ -42,6 +47,9 @@ public struct MainTabs {
   public init() {}
 
   public var body: some ReducerOf<Self> {
+    Scope(state: \.todayRoot, action: \.todayRoot) {
+      TodayFeature()
+    }
     Scope(state: \.settingsRoot, action: \.settingsRoot) {
       SettingsFeature()
     }
@@ -55,8 +63,9 @@ public struct MainTabs {
         // Disconnect row) → bubble up to `AppFeature`, which swaps `.main → .onboarding` (navigation
         // lives at the root — D7).
         return .send(.delegate(.tokenReset))
-      case .today, .weekly, .settings, .settingsRoot, .delegate:
-        // Destinations land in Epics 8/9/10; the `.forEach`s below own the stack plumbing.
+      case .today, .todayRoot, .weekly, .settings, .settingsRoot, .delegate:
+        // Destinations land in Epics 8/9/10; the `.forEach`s below own the stack plumbing. `todayRoot`
+        // (the Today screen, Epic 8) owns its own orchestration — `MainTabs` just composes its reducer.
         return .none
       }
     }

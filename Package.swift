@@ -89,6 +89,9 @@ let package = Package(
         // The You-tab root feature (Phase 7.4): `MainTabs` composes it and renders `SettingsFeatureView`
         // — a feature→feature edge the tab root implies. Phase 10.2 expands the same target.
         "SettingsFeature",
+        // The Today-tab root feature (Epic 8): `MainTabs` composes it and renders `TodayView` in place of
+        // the 6.1 placeholder so each Today phase (8.1–8.4) is testable in the running app as it lands.
+        "TodayFeature",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
         // App-spine observability: emits `.app`/`.lifecycle` log lines (state swaps, session restore,
@@ -1082,6 +1085,13 @@ let package = Package(
         "AppFeature",
         // The shell snapshots construct `OnboardingFeature.State` for the onboarding branch.
         "OnboardingFeature",
+        // The main-tab-bar snapshot seeds the Today tab root to a deterministic `.syncing` state (so the
+        // app-open orchestration's async churn can't make the capture flaky) — needs `TodayFeature.State`.
+        "TodayFeature",
+        // The same snapshot parks the app-open `sync()` (over its interface) so Today holds on `.syncing`.
+        "SyncRepository",
+        // Pins `\.calendar`/`\.date` to Europe/Sofia for the Today header's date subtitle.
+        "CoachCore",
         "CoachTestSupport",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
