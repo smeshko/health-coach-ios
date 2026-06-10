@@ -23,4 +23,21 @@ public enum DevEndpoint: String, CaseIterable, Sendable, Hashable {
     case .sync: .syncResponse
     }
   }
+
+  /// Every `SampleScenario` that belongs to this endpoint. Lets the dev menu list **only** an endpoint's
+  /// own fixtures when picking a scenario for it (instead of all `SampleScenario.allCases`). Invariant:
+  /// the per-endpoint lists **partition** `SampleScenario.allCases` (each scenario belongs to exactly one
+  /// endpoint) and each always contains `defaultScenario` — guarded by `DevEndpointTests`.
+  public var scenarios: [SampleScenario] {
+    switch self {
+    case .dailyBrief:
+      [
+        .dailyBriefGreen, .dailyBriefAmber, .dailyBriefRed, .dailyBriefRestGIFlare,
+        .dailyBriefRestIllness, .dailyBriefRestKnee, .dailyBriefNoFood,
+      ]
+    case .weeklyPlan: [.weeklyPlanDeload]
+    case .profile: [.profile]
+    case .sync: [.syncResponse]
+    }
+  }
 }
