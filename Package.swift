@@ -135,6 +135,10 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         "DevSettings",
         "TokenClient",
+        // The DEBUG dev menu surfaces the per-category log toggles. It uses the `LogClient` INTERFACE only
+        // for the `LogCategory` vocabulary; the toggles are written through the `DevSettings` log seam
+        // (keyed by rawValue), so this adds no client→client coupling beyond reading the enum.
+        "LogClient",
       ],
       path: "Sources/Features/SettingsFeature/Sources",
       swiftSettings: [
@@ -1022,12 +1026,13 @@ let package = Package(
       name: "SettingsFeatureTests",
       dependencies: [
         "SettingsFeature",
-        // The dev-menu tests reference DevEndpoint / SampleScenario / DevSettings by symbol and override
-        // TokenClient.clear directly; depend on those interfaces explicitly (the transitive visibility
-        // through SettingsFeature is the fallback).
+        // The dev-menu tests reference DevEndpoint / SampleScenario / DevSettings / LogCategory by symbol
+        // and override TokenClient.clear directly; depend on those interfaces explicitly (the transitive
+        // visibility through SettingsFeature is the fallback).
         "DevSettings",
         "SampleData",
         "TokenClient",
+        "LogClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/SettingsFeature/Tests/SettingsFeatureTests",
@@ -1081,6 +1086,7 @@ let package = Package(
         "SettingsFeature",
         "DevSettings",
         "SampleData",
+        "LogClient",
         "CoachTestSupport",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),

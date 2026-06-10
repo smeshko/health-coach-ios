@@ -1,19 +1,23 @@
 #if DEBUG
   import ComposableArchitecture
   import DevSettings
+  import LogClient
   import SampleData
   import TokenClient
 
-  /// The DEBUG dev menu (ARCHITECTURE §7.1 / D25). It mirrors the `useMockData` flag + the
-  /// per-`DevEndpoint` `SampleScenario` map from `@Dependency(\.devSettings)` and writes every change
-  /// straight back through the `DevSettings` writers, so the next `*.routed(dev:)` repository call
-  /// reflects it with **no relaunch** (the per-call read is Phase 4.1's contract, not this menu's).
-  /// `resetTokenTapped` clears the bearer token via `@Dependency(\.tokenClient)` and bubbles a
-  /// `tokenReset` delegate so the shell restarts onboarding — re-testing the connect flow on demand.
+  /// The DEBUG dev menu (ARCHITECTURE §7.1 / D25). It mirrors the `useMockData` flag, the
+  /// per-`DevEndpoint` `SampleScenario` map, and the per-`LogCategory` enabled flags from
+  /// `@Dependency(\.devSettings)` and writes every change straight back through the `DevSettings`
+  /// writers, so the next `*.routed(dev:)` repository call (or the next log) reflects it with **no
+  /// relaunch** (the per-call read is Phase 4.1's contract, not this menu's). `resetTokenTapped` clears
+  /// the bearer token via `@Dependency(\.tokenClient)` and bubbles a `tokenReset` delegate so the shell
+  /// restarts onboarding — re-testing the connect flow on demand.
   ///
   /// The whole surface is `#if DEBUG`, so it compiles out of RELEASE (D25: routing collapses to `.live`).
-  /// It touches only the `DevSettings` + `TokenClient` **interfaces** (the app-spine carve-out, §3) — no
-  /// repository call, no `*Live`, no DTO/GRDB/HealthKit.
+  /// It touches only the `DevSettings` + `TokenClient` + `LogClient` **interfaces** (the app-spine
+  /// carve-out, §3) — no repository call, no `*Live`, no DTO/GRDB/HealthKit. The `LogClient` import is
+  /// only for the `LogCategory` vocabulary; the toggles are written through the `DevSettings` log seam
+  /// (keyed by `rawValue`, so `DevSettings` itself never imports `LogClient` — app-logging DECISIONS 3).
   @Reducer
   public struct DevMenuFeature {
     /// Delegate actions the parent (`SettingsFeature`) listens for.
@@ -28,6 +32,9 @@
       public var useMockData = false
       /// The selected scenario per endpoint. Mirrors `dev.scenario(_:)` over `DevEndpoint.allCases`.
       public var scenarios: [DevEndpoint: SampleScenario] = [:]
+      /// Whether each verbose log category is enabled. Mirrors `dev.isLogCategoryEnabled(_:)` over
+      /// `LogCategory.allCases`; always-on categories (`.http`) are seeded `true` and never written.
+      public var logEnabled: [LogCategory: Bool] = [:]
       public init() {}
     }
 
@@ -35,6 +42,7 @@
       case onAppear
       case useMockDataToggled(Bool)
       case scenarioSelected(SampleScenario, DevEndpoint)
+      case logCategoryToggled(LogCategory, Bool)
       case resetTokenTapped
       case delegate(Delegate)
     }
@@ -54,6 +62,11 @@
           state.scenarios = Dictionary(
             uniqueKeysWithValues: DevEndpoint.allCases.map { ($0, dev.scenario($0)) }
           )
+          state.logEnabled = Dictionary(
+            uniqueKeysWithValues: LogCategory.allCases.map { category in
+              (category, category.isAlwaysOn ? true : dev.isLogCategoryEnabled(category.rawValue))
+            }
+          )
           return .none
         case let .useMockDataToggled(enabled):
           state.useMockData = enabled
@@ -65,6 +78,12 @@
           // DevEndpoint)` parameter order.
           state.scenarios[endpoint] = scenario
           dev.setScenario(scenario, endpoint)
+          return .none
+        case let .logCategoryToggled(category, enabled):
+          // `.http` is always-on (never gated) — ignore any attempt to flip it.
+          guard !category.isAlwaysOn else { return .none }
+          state.logEnabled[category] = enabled
+          dev.setLogCategoryEnabled(enabled, category.rawValue)
           return .none
         case .resetTokenTapped:
           // Clear the stored bearer token, then bubble `tokenReset` so the shell swaps to onboarding —

@@ -1,6 +1,7 @@
 #if DEBUG
   import ComposableArchitecture
   import DevSettings
+  import LogClient
   import SampleData
   import Testing
   import TokenClient
@@ -19,19 +20,34 @@
       let endpoint: DevEndpoint
     }
 
+    /// One recorded `setLogCategoryEnabled(_:_:)` write (kept flat for the nesting lint).
+    private struct LogWrite: Equatable {
+      let enabled: Bool
+      let rawValue: String
+    }
+
     /// A `DevSettings` fake whose getters serve a fixed seed and whose writers record their arguments.
     /// The closures are synchronous (`@Sendable () -> …`), so recording uses a `LockIsolated` box.
     private struct DevSettingsRecorder {
       let setMockCalls = LockIsolated<[Bool]>([])
       let setScenarioCalls = LockIsolated<[ScenarioWrite]>([])
+      let setLogCalls = LockIsolated<[LogWrite]>([])
 
-      func make(useMockData: Bool, seed: [DevEndpoint: SampleScenario]) -> DevSettings {
+      func make(
+        useMockData: Bool,
+        seed: [DevEndpoint: SampleScenario],
+        enabledLogCategories: Set<String> = []
+      ) -> DevSettings {
         DevSettings(
           useMockData: { useMockData },
           scenario: { seed[$0] ?? $0.defaultScenario },
           setUseMockData: { enabled in setMockCalls.withValue { $0.append(enabled) } },
           setScenario: { scenario, endpoint in
             setScenarioCalls.withValue { $0.append(ScenarioWrite(scenario: scenario, endpoint: endpoint)) }
+          },
+          isLogCategoryEnabled: { enabledLogCategories.contains($0) },
+          setLogCategoryEnabled: { enabled, rawValue in
+            setLogCalls.withValue { $0.append(LogWrite(enabled: enabled, rawValue: rawValue)) }
           }
         )
       }
@@ -48,12 +64,14 @@
       let store = TestStore(initialState: DevMenuFeature.State()) {
         DevMenuFeature()
       } withDependencies: {
-        $0.devSettings = recorder.make(useMockData: true, seed: seed)
+        $0.devSettings = recorder.make(useMockData: true, seed: seed, enabledLogCategories: ["tca"])
       }
 
       await store.send(.onAppear) {
         $0.useMockData = true
         $0.scenarios = seed
+        // Always-on `.http` seeds `true`; the rest reflect `isLogCategoryEnabled` (only `tca` enabled).
+        $0.logEnabled = [.http: true, .tca: true, .lifecycle: false, .app: false]
       }
     }
 
@@ -86,6 +104,33 @@
         recorder.setScenarioCalls.value == [.init(scenario: .dailyBriefRestKnee, endpoint: .dailyBrief)],
         "the writer must be called positionally as setScenario(scenario, endpoint)"
       )
+    }
+
+    @Test func test_logCategoryToggled_updatesStateAndWritesThrough() async {
+      let recorder = DevSettingsRecorder()
+      let store = TestStore(initialState: DevMenuFeature.State()) {
+        DevMenuFeature()
+      } withDependencies: {
+        $0.devSettings = recorder.make(useMockData: false, seed: [:])
+      }
+
+      await store.send(.logCategoryToggled(.app, true)) { $0.logEnabled[.app] = true }
+
+      #expect(recorder.setLogCalls.value == [.init(enabled: true, rawValue: "app")])
+    }
+
+    @Test func test_logCategoryToggled_alwaysOnCategory_isNoOp() async {
+      let recorder = DevSettingsRecorder()
+      let store = TestStore(initialState: DevMenuFeature.State()) {
+        DevMenuFeature()
+      } withDependencies: {
+        $0.devSettings = recorder.make(useMockData: false, seed: [:])
+      }
+
+      // `.http` is always-on — toggling it mutates nothing and writes nothing.
+      await store.send(.logCategoryToggled(.http, false))
+
+      #expect(recorder.setLogCalls.value.isEmpty)
     }
 
     @Test func test_resetTokenTapped_clearsTokenAndEmitsDelegate() async {
