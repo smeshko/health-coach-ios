@@ -11,6 +11,7 @@ let package = Package(
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
     .library(name: "OnboardingFeature", targets: ["OnboardingFeature"]),
+    .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
     .library(name: "WireModels", targets: ["WireModels"]),
     .library(name: "DomainModels", targets: ["DomainModels"]),
@@ -114,6 +115,25 @@ let package = Package(
         "CoachCore",
       ],
       path: "Sources/Features/OnboardingFeature/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The You-tab root feature (ARCHITECTURE §4.5). **Minimal in Phase 7.4** — only a `tokenReset`
+    // delegate seam + a `#if DEBUG` DEV section hosting the dev menu; Phase 10.2 expands this SAME target
+    // (CONNECTION / APPLE HEALTH / PROFILE / REMINDERS, adding DesignSystem/DomainModels/CoachCore + repo
+    // interfaces). The DEBUG dev menu writes the mock/live + scenario knobs through the `DevSettings`
+    // INTERFACE and clears the bearer token through the `TokenClient` INTERFACE (the §13/D12 app-spine
+    // carve-out) — never a `*Live`, GRDB, HealthKit, or WireModels. `SampleData` arrives transitively
+    // via `DevSettings`.
+    .target(
+      name: "SettingsFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "DevSettings",
+        "TokenClient",
+      ],
+      path: "Sources/Features/SettingsFeature/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -985,6 +1005,26 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // DevMenuFeature + SettingsFeature exhaustive TestStore (host) — the DEBUG dev-menu write-through
+    // contract (toggle/scenario ⇒ DevSettings writers), the reset-token clear + delegate, and the DEV
+    // section presentation. The test files are `#if DEBUG`-guarded (they reference DEBUG-only types).
+    .testTarget(
+      name: "SettingsFeatureTests",
+      dependencies: [
+        "SettingsFeature",
+        // The dev-menu tests reference DevEndpoint / SampleScenario / DevSettings by symbol and override
+        // TokenClient.clear directly; depend on those interfaces explicitly (the transitive visibility
+        // through SettingsFeature is the fallback).
+        "DevSettings",
+        "SampleData",
+        "TokenClient",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      path: "Sources/Features/SettingsFeature/Tests/SettingsFeatureTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
