@@ -114,7 +114,10 @@ struct TodayFeatureRefreshTests {
 
     // Save the check-in → the child emits `.checkInSaved` → the parent offers Refresh.
     await store.send(.checkIn(.saveTapped)) { $0.checkIn.saveStatus = .saving }
-    await store.receive(\.checkIn.saveResponse) { $0.checkIn.saveStatus = .saved }
+    await store.receive(\.checkIn.saveResponse) {
+      $0.checkIn.saveStatus = .saved
+      $0.checkIn.lastSavedAt = now
+    }
     await store.receive(\.checkIn.delegate) { $0.offerRefresh = true }
 
     // Refresh → re-runs sync then dailyBrief(refresh: true) → a fresh brief, clearing the affordance.

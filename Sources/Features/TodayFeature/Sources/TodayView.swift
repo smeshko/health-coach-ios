@@ -25,35 +25,45 @@ public struct TodayView: View {
   }
 
   public var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
-        if !store.briefState.isIdle {
-          TodayHeader(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel)
-          TodaySectionToggle(store: store)
-        }
-
-        switch store.briefState {
-        case .idle:
-          ProgressView()
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, CoachSpacing.spaceLg)
-        case .syncing:
-          TodayLoadingContent(message: "Syncing your health data…")
-        case .generating:
-          TodayLoadingContent(message: "Building today's brief…")
-        case .syncFailed:
+    Group {
+      switch store.briefState {
+      // Idle + the two loading states render chrome-free and centered — the `2 ·`/`3 · Loading` mockups
+      // have no header/toggle. Content states (below) carry them via `TodayContentScroll`.
+      case .idle:
+        ProgressView()
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      case .syncing:
+        SyncProgressView(
+          progress: LoadingCopy.syncingProgress,
+          title: LoadingCopy.syncingTitle,
+          subtitle: LoadingCopy.syncingSubtitle,
+          steps: LoadingCopy.syncingSteps
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      case .generating:
+        SyncProgressView(
+          progress: LoadingCopy.generatingProgress,
+          title: LoadingCopy.generatingTitle,
+          subtitle: LoadingCopy.generatingSubtitle,
+          steps: LoadingCopy.generatingSteps
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      case .syncFailed:
+        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel, store: store) {
           TodaySyncFailedContent { store.send(.retryTapped) }
-        case let .error(error):
+        }
+      case let .error(error):
+        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel, store: store) {
           TodayBriefErrorContent(display: errorDisplay(for: error)) { store.send(.retryTapped) }
-        case let .ready(brief, freshness):
+        }
+      case let .ready(brief, freshness):
+        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel, store: store) {
           TodayReadyContent(
             store: store,
             cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
           )
         }
       }
-      .padding(CoachSpacing.spaceLg)
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .background(.coachBackground)
   }
@@ -140,21 +150,54 @@ private struct TodaySectionToggle: View {
   }
 }
 
-// MARK: - Lifecycle states
+// MARK: - Loaded-content frame
 
-/// A centered spinner + message — the `.syncing` / `.generating` loading states (PRD §6/§8.2).
-private struct TodayLoadingContent: View {
-  let message: String
+/// The loaded-content frame: the screen header + Exercise|Nutrition toggle above the state's content,
+/// in a scroll view. The idle/loading states render chrome-free + centered instead (the `2 ·`/`3 ·
+/// Loading` mockups have no header/toggle), so the header/toggle live here rather than unconditionally.
+private struct TodayContentScroll<Content: View>: View {
+  let dateSubtitle: String
+  let syncedLabel: String?
+  @Bindable var store: StoreOf<TodayFeature>
+  @ViewBuilder let content: Content
 
   var body: some View {
-    VStack(spacing: CoachSpacing.spaceMd) {
-      ProgressView()
-      Text(message)
-        .font(.coachTextMd)
-        .foregroundStyle(.coachForegroundMuted)
+    ScrollView {
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+        TodayHeader(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel)
+        TodaySectionToggle(store: store)
+        content
+      }
+      .padding(CoachSpacing.spaceLg)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, CoachSpacing.spaceLg)
+  }
+}
+
+// MARK: - Lifecycle states
+
+/// The designed loading copy + step lists for `.syncing` / `.generating` (`2 ·`/`3 · Loading` mockups),
+/// factored out so the two states read declaratively. `.generating` shows step 1 done, step 2 active.
+private enum LoadingCopy {
+  static let syncingProgress = 0.3
+  static let syncingTitle = "Syncing health data…"
+  static let syncingSubtitle = "Pulling sleep, HRV and resting heart rate from Apple Health."
+  static var syncingSteps: [SyncStep] {
+    [
+      SyncStep(id: 0, label: "Syncing health data", state: .active),
+      SyncStep(id: 1, label: "Building today's brief", state: .pending),
+    ]
+  }
+
+  static let generatingProgress = 0.7
+  static let generatingTitle = "Building today's brief…"
+  static let generatingSubtitle =
+    "Weighing your recovery, sleep and yesterday's load. This takes a few seconds."
+  static var generatingSteps: [SyncStep] {
+    [
+      SyncStep(id: 0, label: "Health data synced", state: .done),
+      SyncStep(id: 1, label: "Building today's brief", state: .active),
+    ]
   }
 }
 
@@ -337,12 +380,5 @@ private struct CheckInQuestionRow: View {
       Spacer(minLength: CoachSpacing.spaceSm)
       YesNoToggle(isOn: $isOn)
     }
-  }
-}
-
-private extension BriefViewState {
-  var isIdle: Bool {
-    if case .idle = self { return true }
-    return false
   }
 }
