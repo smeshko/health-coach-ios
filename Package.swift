@@ -139,6 +139,12 @@ let package = Package(
         // for the `LogCategory` vocabulary; the toggles are written through the `DevSettings` log seam
         // (keyed by rawValue), so this adds no client→client coupling beyond reading the enum.
         "LogClient",
+        // The You-tab root + DEBUG dev menu are styled against the shared design tokens (the Settings
+        // design reference): neutral background, accent tint, card surfaces, type + spacing scale.
+        "DesignSystem",
+        // The log viewer parses log timestamps back into `Date`s using the app's canonical Europe/Sofia
+        // frame (`Calendar.europeSofia`) — the same frame the live `CoachLogHandler` wrote them in.
+        "CoachCore",
       ],
       path: "Sources/Features/SettingsFeature/Sources",
       swiftSettings: [
@@ -272,6 +278,9 @@ let package = Package(
       dependencies: [
         "LogClient",
         "DevSettings",
+        // Timestamps render in the app's canonical Europe/Sofia frame (`Calendar.europeSofia`) — the
+        // same value `useEuropeSofia()` pins `\.calendar` to — so console + viewer agree on wall-clock.
+        "CoachCore",
         .product(name: "Logging", package: "swift-log"),
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],

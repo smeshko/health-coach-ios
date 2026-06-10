@@ -7,6 +7,7 @@
   #if DEBUG
     import CoachTestSupport
     import ComposableArchitecture
+    import Foundation
     import LogClient
     import SnapshotTesting
     import SwiftUI
@@ -18,14 +19,17 @@
     struct LogViewerViewSnapshotTests {
       @Test func test_logViewer() {
         let lines = [
-          "12:00:00.000 INFO [lifecycle] app did finish launching",
-          "12:00:00.250 DEBUG [tca] AppFeature.onAppear",
-          "12:00:01.100 NOTICE [http] GET /probe → 200 — ms=84",
-          "12:00:02.500 ERROR [http] GET /brief → 401 — status=401",
+          "2026-06-10 12:00:00.000 INFO [lifecycle] app did finish launching",
+          "2026-06-10 12:00:00.250 DEBUG [tca] AppFeature.onAppear",
+          "2026-06-10 12:00:01.100 NOTICE [http] GET /probe → 200 — ms=84",
+          "2026-06-10 12:00:02.500 ERROR [http] GET /brief → 401 — status=401",
         ]
-        // Pin `readRecent` to the same lines so the view's `.onAppear` reload is idempotent.
+        // Pin `readRecent` to the same lines so the view's `.onAppear` reload is idempotent, and pin
+        // `\.date` (the reducer reads it on appear to anchor the date filter; default range is `.all`,
+        // so the instant doesn't affect what renders).
         let view = withDependencies {
           $0.log.readRecent = { lines }
+          $0.date = .constant(Date(timeIntervalSince1970: 1_749_556_800))
         } operation: {
           NavigationStack {
             LogViewerView(

@@ -49,4 +49,29 @@
       }
     }
   }
+
+  extension LogLevel {
+    /// The level's label in the log viewer's minimum-severity picker + per-row badge.
+    var devMenuLabel: String {
+      switch self {
+      case .debug: "Debug"
+      case .info: "Info"
+      case .notice: "Notice"
+      case .error: "Error"
+      }
+    }
+  }
+
+  extension DateRange {
+    /// The range's label in the log viewer's date-filter picker.
+    var devMenuLabel: String {
+      switch self {
+      case .all: "All time"
+      case .last15min: "Last 15 min"
+      case .lastHour: "Last hour"
+      case .today: "Today"
+      case .last24h: "Last 24h"
+      }
+    }
+  }
 #endif

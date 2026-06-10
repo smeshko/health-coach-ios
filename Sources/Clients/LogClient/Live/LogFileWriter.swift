@@ -33,6 +33,7 @@ public actor LogFileWriter {
   private enum Command: Sendable {
     case write(String)
     case flush(@Sendable () -> Void)
+    case clear(@Sendable () -> Void)
   }
 
   private let directory: URL
@@ -103,13 +104,37 @@ public actor LogFileWriter {
     }
   }
 
+  /// Delete every persisted log file and reset the rotation counter — backs `LogClient.clear` (the
+  /// DEBUG log viewer's "Clear" action). Routed through the same FIFO stream as the writes, so it is
+  /// ordered **after** every line enqueued before it (a clear truly clears what was just logged) and
+  /// never interleaves with an in-flight append.
+  public nonisolated func clear() async {
+    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+      continuation.yield(.clear { cont.resume() })
+    }
+  }
+
   private func handle(_ command: Command) {
     switch command {
     case let .write(line):
       write(line)
     case let .flush(signal):
       signal()
+    case let .clear(signal):
+      removeAllFiles()
+      signal()
     }
+  }
+
+  /// Remove every `coach-*.log` file and reset the rotation state so the next write starts fresh at
+  /// `coach-0.log`. Best-effort: an undeletable file is skipped.
+  private func removeAllFiles() {
+    let urls = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+    for url in urls where url.pathExtension == "log" && url.lastPathComponent.hasPrefix("coach-") {
+      try? fileManager.removeItem(at: url)
+    }
+    fileIndex = 0
+    currentSize = 0
   }
 
   private func write(_ line: String) {

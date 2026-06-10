@@ -1,5 +1,6 @@
 #if DEBUG
   import ComposableArchitecture
+  import DesignSystem
   import DevSettings
   import LogClient
   import SampleData
@@ -12,6 +13,11 @@
   /// (`devMenuLabel`), not raw `rawValue`s. The whole file is `#if DEBUG`, so it is absent from RELEASE.
   public struct DevMenuView: View {
     @Bindable var store: StoreOf<DevMenuFeature>
+    /// Gates the seed so it fires exactly once per presentation. Without it SwiftUI delivers a stale
+    /// `.onAppear` while the sheet is torn down by the `.main → .onboarding` swap that "Reset token"
+    /// triggers — that late `.presented(.onAppear)` reaches the root after it is already `.onboarding`,
+    /// tripping TCA's "received a child action when child state was set to a different case" warning.
+    @State private var didSeed = false
 
     public init(store: StoreOf<DevMenuFeature>) {
       self.store = store
@@ -51,6 +57,7 @@
         } footer: {
           Text("Off serves live data. On routes each endpoint to the selected fixture.")
         }
+        .listRowBackground(Color.coachSurface)
 
         Section("Logging") {
           ForEach(LogCategory.allCases, id: \.self) { category in
@@ -65,18 +72,27 @@
           }
           Button("View logs") { store.send(.viewLogsTapped) }
         }
+        .listRowBackground(Color.coachSurface)
 
         Section("Session") {
           Button("Reset token & restart onboarding", role: .destructive) {
             store.send(.resetTokenTapped)
           }
         }
+        .listRowBackground(Color.coachSurface)
       }
+      .scrollContentBackground(.hidden)
+      .background(Color.coachBackground)
+      .tint(.coachAccent)
       .navigationTitle("Dev Menu")
       .navigationDestination(item: $store.scope(state: \.logViewer, action: \.logViewer)) { logStore in
         LogViewerView(store: logStore)
       }
-      .onAppear { store.send(.onAppear) }
+      .onAppear {
+        guard !didSeed else { return }
+        didSeed = true
+        store.send(.onAppear)
+      }
     }
   }
 #endif

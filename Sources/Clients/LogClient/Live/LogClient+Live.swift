@@ -45,7 +45,9 @@ extension LogClient: DependencyKey {
         logger.log(level: level.loggerLevel, "\(message)", metadata: entryMetadata)
       },
       // The DEBUG log viewer (Phase 7.4) reads the rotating files back through the same writer.
-      readRecent: { await writer.recentLines() }
+      readRecent: { await writer.recentLines() },
+      // …and clears them through the same writer (FIFO-ordered after any in-flight append).
+      clear: { await writer.clear() }
     )
   }
 }
