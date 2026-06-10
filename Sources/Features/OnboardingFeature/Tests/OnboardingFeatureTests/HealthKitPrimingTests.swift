@@ -83,7 +83,7 @@ struct HealthKitPrimingTests {
   }
 
   @Test func test_continueTapped_fromDegraded_emitsFinished() async {
-    let summary = HealthKitPriming.DegradedSummary(missing: [.sleep], bannerSignal: .sleep)
+    let summary = HealthKitPriming.DegradedSummary(missing: [.sleep])
     let store = TestStore(initialState: HealthKitPriming.State(phase: .degraded(summary))) {
       HealthKitPriming()
     }
@@ -115,8 +115,8 @@ struct HealthKitPrimingTests {
   }
 
   /// Partial: the probe returns no `sleep`/`vo2Max` samples (others present) → only those rows are
-  /// missing and the banner names `sleep` — **derived from empty slices**, NOT the status map (the hint
-  /// is deliberately all-`.notDetermined` to prove inference ignores it).
+  /// missing — **derived from empty slices**, NOT the status map (the hint is deliberately
+  /// all-`.notDetermined` to prove inference ignores it).
   @Test func test_partial_inferenceFromEmptySlices_ignoresStatusMap() async {
     let store = TestStore(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
@@ -136,7 +136,7 @@ struct HealthKitPrimingTests {
       $0.missingRows = [.sleep, .vo2Max]
       $0.phase = .degraded(
         HealthKitPriming.DegradedSummary(
-          missing: [.sleep, .vo2Max], bannerSignal: .sleep, statusHint: HKFixtures.allNotDetermined
+          missing: [.sleep, .vo2Max], statusHint: HKFixtures.allNotDetermined
         )
       )
     }
@@ -160,7 +160,7 @@ struct HealthKitPrimingTests {
     await store.receive(\.authorizationResponse) {
       $0.missingRows = Set(PrimingRow.allCases)
       $0.phase = .degraded(
-        HealthKitPriming.DegradedSummary(missing: Set(PrimingRow.allCases), bannerSignal: .sleep)
+        HealthKitPriming.DegradedSummary(missing: Set(PrimingRow.allCases))
       )
     }
     await store.send(.continueTapped)
@@ -187,7 +187,7 @@ struct HealthKitPrimingTests {
     await store.receive(\.authorizationResponse) {
       $0.missingRows = Set(PrimingRow.allCases)
       $0.phase = .degraded(
-        HealthKitPriming.DegradedSummary(missing: Set(PrimingRow.allCases), bannerSignal: .sleep)
+        HealthKitPriming.DegradedSummary(missing: Set(PrimingRow.allCases))
       )
     }
   }
@@ -222,14 +222,6 @@ struct HealthKitPrimingTests {
     // activity is not a RecordType — presence comes from the activity array (folds into Active & basal).
     let onlyActivity = missingRows(from: HealthSampleSet(activity: [HKFixtures.sampleActivity]))
     #expect(!onlyActivity.contains(.activeBasalEnergy))
-  }
-
-  /// The banner priority is total and resolves a fully-missing set to `sleep`.
-  @Test func test_topSignal_isTotal_andPrioritizesSleep() {
-    #expect(topSignal(Set(PrimingRow.allCases)) == .sleep)
-    #expect(topSignal([.bodyWeight, .vo2Max]) == .vo2Max)
-    #expect(topSignal([.dietary]) == .dietary)
-    #expect(topSignal([]) == nil)
   }
 }
 

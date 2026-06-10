@@ -31,7 +31,7 @@
     }
 
     @Test func test_degradedPermissions_partialState() {
-      let summary = HealthKitPriming.DegradedSummary(missing: [.sleep, .vo2Max], bannerSignal: .sleep)
+      let summary = HealthKitPriming.DegradedSummary(missing: [.sleep, .vo2Max])
       let view = DegradedPermissionsView(
         store: Store(initialState: HealthKitPriming.State(phase: .degraded(summary))) {
           HealthKitPriming()

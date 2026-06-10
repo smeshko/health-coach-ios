@@ -25,21 +25,18 @@ public struct HealthKitPriming {
     case degraded(DegradedSummary)
   }
 
-  /// The degraded-screen payload: which rows are missing (inferred from empty delta slices), the single
-  /// banner signal (top-priority missing row), and the corroborating status hint (the read-auth map,
-  /// used only to sharpen wording — never to decide "missing"; DECISIONS #2).
+  /// The degraded-screen payload: which rows are missing (inferred from empty delta slices) and the
+  /// corroborating status hint (the read-auth map, used only to sharpen wording — never to decide
+  /// "missing"; DECISIONS #2).
   public struct DegradedSummary: Equatable, Sendable {
     public var missing: Set<PrimingRow>
-    public var bannerSignal: PrimingRow?
     public var statusHint: [HealthDataCategory: HealthAuthorizationStatus]
 
     public init(
       missing: Set<PrimingRow>,
-      bannerSignal: PrimingRow?,
       statusHint: [HealthDataCategory: HealthAuthorizationStatus] = [:]
     ) {
       self.missing = missing
-      self.bannerSignal = bannerSignal
       self.statusHint = statusHint
     }
   }
@@ -161,12 +158,10 @@ public struct HealthKitPriming {
     }
   }
 
-  /// Land the `.degraded` phase from an inferred missing-row set, naming the single banner signal.
+  /// Land the `.degraded` phase from an inferred missing-row set.
   private func degrade(_ state: inout State, missing: Set<PrimingRow>) -> Effect<Action> {
     state.missingRows = missing
-    state.phase = .degraded(
-      DegradedSummary(missing: missing, bannerSignal: topSignal(missing), statusHint: state.statusHint)
-    )
+    state.phase = .degraded(DegradedSummary(missing: missing, statusHint: state.statusHint))
     return .none
   }
 }
@@ -193,15 +188,4 @@ private func categoryIsEmpty(_ category: HealthDataCategory, in samples: HealthS
   default:
     !samples.records.contains { category.recordTypes.contains($0.type) }
   }
-}
-
-/// The single banner signal — the highest-priority missing row by a **total, fixed** order over every
-/// `PrimingRow` (so any missing set resolves deterministically, no undefined tail), matching the design's
-/// one-sentence banner (sleep is most impactful).
-func topSignal(_ rows: Set<PrimingRow>) -> PrimingRow? {
-  let priority: [PrimingRow] = [
-    .sleep, .vo2Max, .heartRate, .hrv, .restingHeartRate, .workoutsEffort,
-    .activeBasalEnergy, .steps, .runningForm, .bodyWeight, .dietary,
-  ]
-  return priority.first(where: rows.contains)
 }

@@ -80,6 +80,6 @@ private struct DegradedSignalRow: View {
     store: Store(initialState: HealthKitPriming.State()) {
       HealthKitPriming()
     },
-    summary: HealthKitPriming.DegradedSummary(missing: [.sleep, .vo2Max], bannerSignal: .sleep)
+    summary: HealthKitPriming.DegradedSummary(missing: [.sleep, .vo2Max])
   )
 }
