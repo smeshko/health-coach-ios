@@ -335,14 +335,12 @@ private struct CheckInSection: View {
         PrimaryButton("Save & build today's brief", isLoading: store.saveStatus == .saving) {
           store.send(.saveTapped)
         }
+        // The footer shows a precise clock time only for a save made this session (`lastSavedAt`); a
+        // check-in loaded from earlier today has only a day-key, so it shows day-relative copy instead.
         if let savedAt = store.lastSavedAt {
-          HStack(spacing: CoachSpacing.space2xs) {
-            Image(systemName: "checkmark.circle")
-            Text("Last saved \(savedTime(savedAt)) · tap any answer to edit")
-          }
-          .font(.coachTextXs)
-          .foregroundStyle(.coachForegroundSubtle)
-          .frame(maxWidth: .infinity)
+          CheckInFooter(text: "Last saved \(savedTime(savedAt)) · tap any answer to edit")
+        } else if store.existing != nil {
+          CheckInFooter(text: "Saved earlier today · tap any answer to edit")
         }
       }
     }
@@ -357,6 +355,23 @@ private struct CheckInSection: View {
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "h:mm a"
     return formatter.string(from: date)
+  }
+}
+
+/// The check-in card's "✓ <message>" footer (`1 · Daily Check-in.png`) — a checkmark + a single muted,
+/// centered line. The message varies by save state (precise time for a same-session save, day-relative
+/// for a loaded check-in); the chrome is identical, so it lives in one struct.
+private struct CheckInFooter: View {
+  let text: String
+
+  var body: some View {
+    HStack(spacing: CoachSpacing.space2xs) {
+      Image(systemName: "checkmark.circle")
+      Text(text)
+    }
+    .font(.coachTextXs)
+    .foregroundStyle(.coachForegroundSubtle)
+    .frame(maxWidth: .infinity)
   }
 }
 

@@ -73,9 +73,8 @@ struct CheckInComponentTests {
       $0.giSymptoms = true
       $0.illness = true
       $0.kneePain = 3
-      // Footer's "Last saved" seeds from the loaded check-in's day-date (the model has no precise save
-      // instant); a fresh save overwrites it with the wall-clock `\.date`.
-      $0.lastSavedAt = stored.date
+      // `lastSavedAt` is NOT seeded on load — the persisted check-in has only a day-key, not a save
+      // instant (the footer shows day-relative copy for the loaded case, keyed off `existing`).
     }
   }
 

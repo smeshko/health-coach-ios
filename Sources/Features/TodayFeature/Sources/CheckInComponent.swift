@@ -27,10 +27,11 @@ public struct CheckInComponent {
     /// Today's loaded check-in (`nil` until `task` resolves, or when none is logged — a normal state).
     public var existing: DomainModels.CheckIn?
     public var saveStatus: SaveStatus
-    /// When the check-in was last persisted — drives the "Last saved <time>" footer. `nil` until a save
-    /// happens or an existing same-day check-in is loaded (footer hidden while `nil`). A successful save
-    /// stamps it with `\.date`; a loaded check-in seeds it from its day-date (the model carries no
-    /// precise save instant). Purely presentational — DECISIONS #2's clamp invariant is untouched.
+    /// The wall-clock instant of the **most recent save this session** — drives the footer's "Last saved
+    /// <time>". `nil` until a save happens. Set from `\.date` on `saveResponse(.success)`. It is *not*
+    /// seeded on load: the persisted `CheckIn` carries only a `startOfDay` day-key (no save instant), so
+    /// rendering a clock time from it would show a wrong "12:00 AM"; the loaded case shows day-relative
+    /// footer copy keyed off `existing` instead. Purely presentational — DECISIONS #2's clamp is untouched.
     public var lastSavedAt: Date?
 
     public init(
@@ -99,7 +100,8 @@ public struct CheckInComponent {
         state.giSymptoms = checkIn.giSymptoms
         state.illness = checkIn.illness
         state.kneePain = checkIn.kneePain
-        state.lastSavedAt = checkIn.date
+        // Don't seed `lastSavedAt` here — the persisted check-in has only a day-key, not a save instant,
+        // so the footer would show "12:00 AM". The loaded case uses day-relative copy keyed off `existing`.
         return .none
 
       case let .giSymptomsToggled(isOn):
