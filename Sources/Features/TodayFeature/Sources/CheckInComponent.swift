@@ -27,19 +27,26 @@ public struct CheckInComponent {
     /// Today's loaded check-in (`nil` until `task` resolves, or when none is logged — a normal state).
     public var existing: DomainModels.CheckIn?
     public var saveStatus: SaveStatus
+    /// When the check-in was last persisted — drives the "Last saved <time>" footer. `nil` until a save
+    /// happens or an existing same-day check-in is loaded (footer hidden while `nil`). A successful save
+    /// stamps it with `\.date`; a loaded check-in seeds it from its day-date (the model carries no
+    /// precise save instant). Purely presentational — DECISIONS #2's clamp invariant is untouched.
+    public var lastSavedAt: Date?
 
     public init(
       giSymptoms: Bool = false,
       illness: Bool = false,
       kneePain: Int = 0,
       existing: DomainModels.CheckIn? = nil,
-      saveStatus: SaveStatus = .idle
+      saveStatus: SaveStatus = .idle,
+      lastSavedAt: Date? = nil
     ) {
       self.giSymptoms = giSymptoms
       self.illness = illness
       self.kneePain = kneePain
       self.existing = existing
       self.saveStatus = saveStatus
+      self.lastSavedAt = lastSavedAt
     }
   }
 
@@ -92,6 +99,7 @@ public struct CheckInComponent {
         state.giSymptoms = checkIn.giSymptoms
         state.illness = checkIn.illness
         state.kneePain = checkIn.kneePain
+        state.lastSavedAt = checkIn.date
         return .none
 
       case let .giSymptomsToggled(isOn):
@@ -126,6 +134,7 @@ public struct CheckInComponent {
 
       case .saveResponse(.success):
         state.saveStatus = .saved
+        state.lastSavedAt = date.now
         return .send(.delegate(.checkInSaved))
 
       case .saveResponse(.failure):

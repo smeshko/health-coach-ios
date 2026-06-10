@@ -73,6 +73,9 @@ struct CheckInComponentTests {
       $0.giSymptoms = true
       $0.illness = true
       $0.kneePain = 3
+      // Footer's "Last saved" seeds from the loaded check-in's day-date (the model has no precise save
+      // instant); a fresh save overwrites it with the wall-clock `\.date`.
+      $0.lastSavedAt = stored.date
     }
   }
 
@@ -103,7 +106,11 @@ struct CheckInComponentTests {
     await store.send(.giSymptomsToggled(true)) { $0.giSymptoms = true }
     await store.send(.kneePainChanged(4)) { $0.kneePain = 4 }
     await store.send(.saveTapped) { $0.saveStatus = .saving }
-    await store.receive(\.saveResponse) { $0.saveStatus = .saved }
+    await store.receive(\.saveResponse) {
+      $0.saveStatus = .saved
+      // A successful save stamps the footer with the wall-clock instant (pinned `\.date`).
+      $0.lastSavedAt = instant
+    }
     await store.receive(\.delegate, .checkInSaved)
     await store.finish()
 
