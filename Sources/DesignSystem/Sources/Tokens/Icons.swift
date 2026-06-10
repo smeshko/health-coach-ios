@@ -27,6 +27,8 @@ public enum Icon: String, CaseIterable, Sendable {
   // Rest-day.
   case restHero
   case drop
+  // Health / loading.
+  case heartPulse
 
   /// The SF Symbol name.
   public var systemName: String {
@@ -50,6 +52,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case .ruler: "ruler"
     case .restHero: "leaf.fill"
     case .drop: "drop.fill"
+    case .heartPulse: "heart.fill"
     }
   }
 
@@ -75,6 +78,7 @@ public enum Icon: String, CaseIterable, Sendable {
     case .ruler: "Distance"
     case .restHero: "Rest"
     case .drop: "Hydration"
+    case .heartPulse: "Heart / health"
     }
   }
 }
