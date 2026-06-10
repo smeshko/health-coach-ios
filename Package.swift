@@ -12,6 +12,7 @@ let package = Package(
     .library(name: "AppFeature", targets: ["AppFeature"]),
     .library(name: "OnboardingFeature", targets: ["OnboardingFeature"]),
     .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
+    .library(name: "TodayFeature", targets: ["TodayFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
     .library(name: "WireModels", targets: ["WireModels"]),
     .library(name: "DomainModels", targets: ["DomainModels"]),
@@ -1117,6 +1118,72 @@ let package = Package(
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
       path: "Sources/Features/OnboardingFeature/Tests/OnboardingFeatureSnapshotTests",
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The Today tab's hero "daily brief" feature (ARCHITECTURE §4.5, PRD §6/§8.1): the universal
+    // `BriefViewState` lifecycle + the morning orchestration (check-in → sync → daily brief). A pure
+    // feature — depends ONLY on the repo INTERFACES (`BriefRepository`/`SyncRepository`/
+    // `CheckInRepository`) + `DesignSystem` + `DomainModels` + `CoachCore` (the §3 feature dependency
+    // rule) — never a `*Live`, data-source client, GRDB, HealthKit, or WireModels.
+    .target(
+      name: "TodayFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "BriefRepository",
+        "SyncRepository",
+        "CheckInRepository",
+        "DesignSystem",
+        "DomainModels",
+        "CoachCore",
+      ],
+      path: "Sources/Features/TodayFeature/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // TodayFeature exhaustive TestStore (host) — the orchestration (sync-before-brief, sync-fail blocks
+    // the brief, cache-hit, brief-error, non-typed-throw, skip-check-in), the check-in clamp/upsert, and
+    // the debounced Refresh + cancellation. Logic only — no snapshot/UIKit symbols (§4.6 split).
+    // `Clocks` (a DIRECT dep — a transitively-resolved package is not importable) supplies `TestClock`/
+    // `ImmediateClock` for the debounce; production injects the built-in `\.continuousClock`.
+    .testTarget(
+      name: "TodayFeatureTests",
+      dependencies: [
+        "TodayFeature",
+        "BriefRepository",
+        "SyncRepository",
+        "CheckInRepository",
+        "DomainModels",
+        // `SampleData` vends the `DailyBrief` fixtures the orchestration tests return from the stubbed
+        // `BriefRepository` (the `cached` flag is flipped per test to exercise the Freshness branch).
+        "SampleData",
+        "CoachCore",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "Clocks", package: "swift-clocks"),
+      ],
+      path: "Sources/Features/TodayFeature/Tests/TodayFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // TodayView snapshots (the loading / generating / sync-failed states, light + dark) — iOS 26
+    // simulator only, via `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty
+    // module on the host. `exclude: ["__Snapshots__"]` keeps the committed references out of the target
+    // (otherwise SwiftPM warns "unhandled files").
+    .testTarget(
+      name: "TodayFeatureSnapshotTests",
+      dependencies: [
+        "TodayFeature",
+        "DomainModels",
+        "SampleData",
+        "CoachTestSupport",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/TodayFeature/Tests/TodayFeatureSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
