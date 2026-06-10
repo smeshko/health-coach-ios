@@ -47,21 +47,6 @@ struct AtomsCatalogView: View {
         }
         SegTabs(selection: .constant(.exercise))
         SegTabs(selection: .constant(.nutrition))
-        group("YesNoToggle") {
-          YesNoToggle(isOn: .constant(true))
-          YesNoToggle(isOn: .constant(false))
-        }
-        VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
-          Text("DotStepper").font(.coachText2xs).foregroundStyle(.coachForegroundSubtle)
-          HStack(spacing: CoachSpacing.spaceXs) {
-            Pill(PainSeverity.badge(for: 2), tone: .warning)
-            DotStepper(value: .constant(2))
-          }
-          HStack(spacing: CoachSpacing.spaceXs) {
-            Pill(PainSeverity.badge(for: 0), tone: .warning)
-            DotStepper(value: .constant(0))
-          }
-        }
       }
       .padding(CoachSpacing.spaceMd)
     }
