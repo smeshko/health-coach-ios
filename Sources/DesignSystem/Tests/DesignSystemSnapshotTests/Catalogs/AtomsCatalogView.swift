@@ -47,6 +47,10 @@ struct AtomsCatalogView: View {
         }
         SegTabs(selection: .constant(.exercise))
         SegTabs(selection: .constant(.nutrition))
+        group("YesNoToggle") {
+          YesNoToggle(isOn: .constant(true))
+          YesNoToggle(isOn: .constant(false))
+        }
       }
       .padding(CoachSpacing.spaceMd)
     }
