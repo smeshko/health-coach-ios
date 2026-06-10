@@ -63,6 +63,7 @@
             )
             .disabled(category.isAlwaysOn)
           }
+          Button("View logs") { store.send(.viewLogsTapped) }
         }
 
         Section("Session") {
@@ -72,6 +73,9 @@
         }
       }
       .navigationTitle("Dev Menu")
+      .navigationDestination(item: $store.scope(state: \.logViewer, action: \.logViewer)) { logStore in
+        LogViewerView(store: logStore)
+      }
       .onAppear { store.send(.onAppear) }
     }
   }

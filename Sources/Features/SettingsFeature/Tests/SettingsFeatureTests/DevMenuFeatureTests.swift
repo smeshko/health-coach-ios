@@ -133,6 +133,15 @@
       #expect(recorder.setLogCalls.value.isEmpty)
     }
 
+    @Test func test_viewLogsTapped_presentsAndDismissesLogViewer() async {
+      let store = TestStore(initialState: DevMenuFeature.State()) {
+        DevMenuFeature()
+      }
+
+      await store.send(.viewLogsTapped) { $0.logViewer = LogViewerFeature.State() }
+      await store.send(.logViewer(.dismiss)) { $0.logViewer = nil }
+    }
+
     @Test func test_resetTokenTapped_clearsTokenAndEmitsDelegate() async {
       let cleared = LockIsolated(false)
       let store = TestStore(initialState: DevMenuFeature.State()) {

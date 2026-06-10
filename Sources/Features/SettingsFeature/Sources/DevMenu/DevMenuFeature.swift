@@ -35,6 +35,8 @@
       /// Whether each verbose log category is enabled. Mirrors `dev.isLogCategoryEnabled(_:)` over
       /// `LogCategory.allCases`; always-on categories (`.http`) are seeded `true` and never written.
       public var logEnabled: [LogCategory: Bool] = [:]
+      /// The pushed log-viewer screen (LOGGING → "View logs"), `nil` when not presented.
+      @Presents public var logViewer: LogViewerFeature.State?
       public init() {}
     }
 
@@ -43,6 +45,8 @@
       case useMockDataToggled(Bool)
       case scenarioSelected(SampleScenario, DevEndpoint)
       case logCategoryToggled(LogCategory, Bool)
+      case viewLogsTapped
+      case logViewer(PresentationAction<LogViewerFeature.Action>)
       case resetTokenTapped
       case delegate(Delegate)
     }
@@ -85,6 +89,11 @@
           state.logEnabled[category] = enabled
           dev.setLogCategoryEnabled(enabled, category.rawValue)
           return .none
+        case .viewLogsTapped:
+          state.logViewer = LogViewerFeature.State()
+          return .none
+        case .logViewer:
+          return .none
         case .resetTokenTapped:
           // Clear the stored bearer token, then bubble `tokenReset` so the shell swaps to onboarding —
           // re-testing the connect / onboarding flow on demand without uninstalling.
@@ -95,6 +104,9 @@
         case .delegate:
           return .none
         }
+      }
+      .ifLet(\.$logViewer, action: \.logViewer) {
+        LogViewerFeature()
       }
     }
   }
