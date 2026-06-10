@@ -1157,6 +1157,9 @@ let package = Package(
         "SyncRepository",
         "CheckInRepository",
         "DomainModels",
+        // `SampleData` vends the `DailyBrief` fixtures the orchestration tests return from the stubbed
+        // `BriefRepository` (the `cached` flag is flipped per test to exercise the Freshness branch).
+        "SampleData",
         "CoachCore",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "Clocks", package: "swift-clocks"),
