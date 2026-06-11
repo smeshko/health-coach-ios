@@ -12,13 +12,18 @@ extension GalleryComponent {
     GalleryComponent(name: "Pill") { AnyView(PillPage()) },
     GalleryComponent(name: "Chip") { AnyView(ChipPage()) },
     GalleryComponent(name: "Banner") { AnyView(BannerPage()) },
+    GalleryComponent(name: "InsetCallout") { AnyView(InsetCalloutPage()) },
     GalleryComponent(name: "DayBadge") { AnyView(DayBadgePage()) },
     GalleryComponent(name: "IconBadge") { AnyView(IconBadgePage()) },
     GalleryComponent(name: "SegmentedBar") { AnyView(SegmentedBarPage()) },
     GalleryComponent(name: "BarColumns") { AnyView(BarColumnsPage()) },
+    GalleryComponent(name: "MacroDonut") { AnyView(MacroDonutPage()) },
   ]
 
   @MainActor static let composites: [GalleryComponent] = [
     GalleryComponent(name: "Chart") { AnyView(ChartGalleryPage()) },
+    GalleryComponent(name: "Narrative") { AnyView(NarrativePage()) },
+    GalleryComponent(name: "NutritionGauge") { AnyView(NutritionGaugePage()) },
+    GalleryComponent(name: "SessionCard") { AnyView(SessionCardPage()) },
   ]
 }

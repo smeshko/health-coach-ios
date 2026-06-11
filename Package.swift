@@ -150,6 +150,9 @@ let package = Package(
         // The You-tab root + DEBUG dev menu are styled against the shared design tokens (the Settings
         // design reference): neutral background, accent tint, card surfaces, type + spacing scale.
         "DesignSystem",
+        // The DEBUG dev menu surfaces the design-system gallery (component/token browser) as a sheet.
+        // Used only behind `#if DEBUG`; absent from RELEASE behaviour.
+        "DesignSystemGallery",
         // The log viewer parses log timestamps back into `Date`s using the app's canonical Europe/Sofia
         // frame (`Calendar.europeSofia`) — the same frame the live `CoachLogHandler` wrote them in.
         "CoachCore",

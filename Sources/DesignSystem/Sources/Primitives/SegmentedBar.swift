@@ -4,7 +4,8 @@ import SwiftUI
 /// colors, an optional floating `Marker`, and optional per-segment labels beneath. Every horizontal bar
 /// in the system is a configuration of this one component:
 ///
-/// - `.zones(target:)` — a 5-segment HR meter (Z1–Z5) with a marker centered on the target zone.
+/// - `.zones(active:)` — a 5-segment HR meter (Z1–Z5), markerless: each active zone is shown in its
+///   full zone color, the rest muted to the same color at low opacity.
 /// - `.readiness(score:)` — a 3-band meter (Recover 50% / Ease off 25% / Ready 25%) with a marker at
 ///   the score.
 /// - `.range(_:total:tone:)` — a markerless effort meter: `total` equal segments with a contiguous
@@ -127,20 +128,29 @@ public struct SegmentedBar: View {
 // MARK: - Named shapes
 
 public extension SegmentedBar {
-  /// A 5-segment HR zone meter (Z1–Z5) with the marker centered on `target`, labels below.
-  static func zones(target: Int) -> SegmentedBar {
-    let clamped = min(max(target, 1), 5)
-    let segments = (1 ... 5).map { Segment(color: zoneColor($0)) }
+  /// A 5-segment HR zone meter (Z1–Z5), markerless. Each `active` zone is filled in its full zone
+  /// color; every other segment is muted to its own zone color at `zoneMutedOpacity`. The active zones'
+  /// labels are raised (bold + colored); the rest stay subtle. `active` may name more than one zone.
+  static func zones(active: Set<Int>) -> SegmentedBar {
+    let activeZones = Set(active.map { min(max($0, 1), 5) })
+    let segments = (1 ... 5).map { zone -> Segment in
+      let color = zoneColor(zone)
+      return Segment(color: activeZones.contains(zone) ? color : color.opacity(Metrics.zoneMutedOpacity))
+    }
     let labels = (1 ... 5).map {
-      SegmentLabel(text: "Z\($0)", color: zoneColor($0), isActive: $0 == clamped)
+      SegmentLabel(text: "Z\($0)", color: zoneColor($0), isActive: activeZones.contains($0))
     }
     return SegmentedBar(
       segments: segments,
-      marker: MarkerPosition(segmentIndex: clamped - 1, fraction: 0.5, glow: zoneColor(clamped)),
       labels: labels,
       segmentHeight: Metrics.barSegmentHeight,
       width: Metrics.barWidth
     )
+  }
+
+  /// Convenience for the common single-target case (e.g. "Zone · Z2 target").
+  static func zones(target: Int) -> SegmentedBar {
+    zones(active: [target])
   }
 
   /// A 3-band readiness meter (Recover 50% / Ease off 25% / Ready 25%) with the marker at `score`.
@@ -271,6 +281,8 @@ private enum Metrics {
   static let barWidth: CGFloat = 320
   static let barHeight: CGFloat = 32
   static let segmentBarHeight: CGFloat = 14
+  /// Opacity applied to a non-active zone segment (its own zone color, dimmed).
+  static let zoneMutedOpacity: CGFloat = 0.2
   static let markerWidth: CGFloat = 4
   static let markerHeight: CGFloat = 18
   static let markerRadius: CGFloat = 2

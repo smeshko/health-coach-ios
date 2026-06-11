@@ -41,6 +41,20 @@ struct AtomsCatalogView: View {
             message: "Favor low-residue meals around today's run."
           )
         }
+        VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
+          Text("InsetCallout").font(.coachText2xs).foregroundStyle(.coachForegroundSubtle)
+          InsetCallout(icon: Icon.prehab.systemName, content: "Foot prehab")
+          InsetCallout(
+            icon: "figure.walk",
+            headline: "An easy 20 min walk — completely optional",
+            content: "Stretch your legs, if you feel like it"
+          )
+          InsetCallout(
+            icon: "cross.case.fill", tone: .warning,
+            headline: "Knee pain", content: "7 / 10 this morning",
+            surface: .raised
+          )
+        }
         VStack(spacing: CoachSpacing.spaceXs) {
           PrimaryButton("Continue", icon: "checkmark") {}
           SecondaryButton("Not now") {}
