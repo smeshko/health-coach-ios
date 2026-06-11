@@ -191,7 +191,11 @@ private struct ActiveSessionBody: View {
           .foregroundStyle(.coachForegroundMuted)
       }
       if !prehabFlags.isEmpty {
-        PrehabAddOn(labels: prehabFlags.map(\.label))
+        // Prehab-family flags become the add-on callout (no model subtitle → headline omitted).
+        InsetCallout(
+          icon: Icon.prehab.systemName, tone: .accent,
+          content: prehabFlags.map(\.label).joined(separator: " · ")
+        )
       }
 
       SessionFooter(onSwap: onSwap, onSkip: onSkip)
@@ -236,22 +240,10 @@ private struct RestDayBody: View {
       }
 
       // Authored optional-activity suggestion (DS chrome — the model carries no such prompt).
-      HStack(spacing: CoachSpacing.spaceSm) {
-        IconBadge("figure.walk", shape: .square, size: .md, tone: .accent)
-        VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-          Text("Stretch your legs, if you feel like it")
-            .font(.coachTextSm)
-            .foregroundStyle(.coachForeground)
-          Text("An easy 20 min walk — completely optional")
-            .font(.coachTextXs)
-            .foregroundStyle(.coachForegroundMuted)
-        }
-        Spacer(minLength: 0)
-      }
-      .padding(CoachSpacing.spaceMd)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        RoundedRectangle(cornerRadius: CoachRadius.md, style: .continuous).fill(.coachSurfaceSunken)
+      InsetCallout(
+        icon: "figure.walk", tone: .accent,
+        headline: "An easy 20 min walk — completely optional",
+        content: "Stretch your legs, if you feel like it"
       )
 
       VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
@@ -290,29 +282,6 @@ private struct RecoveryItem: View {
         .multilineTextAlignment(.center)
     }
     .frame(maxWidth: .infinity)
-  }
-}
-
-/// The prehab add-on — a soft sunken box with a leading "+" badge and the prehab flag label(s). Presence
-/// and label are derived from the session's prehab-family flags; no fabricated duration/subtitle.
-private struct PrehabAddOn: View {
-  let labels: [String]
-
-  var body: some View {
-    HStack(spacing: CoachSpacing.spaceSm) {
-      Image(systemName: Icon.prehab.systemName)
-        .font(.system(size: Metrics.prehabIcon))
-        .foregroundStyle(.coachAccent)
-      Text(labels.joined(separator: " · "))
-        .font(.coachTextSm)
-        .foregroundStyle(.coachForeground)
-      Spacer(minLength: 0)
-    }
-    .padding(CoachSpacing.spaceMd)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      RoundedRectangle(cornerRadius: CoachRadius.md, style: .continuous).fill(.coachSurfaceSunken)
-    )
   }
 }
 
@@ -371,9 +340,8 @@ private extension Zone {
   }
 }
 
-/// Eyebrow tracking, icon sizes, and the effort scale length — named constants, no inline literals.
+/// Eyebrow tracking and the effort scale length — named constants, no inline literals.
 private enum Metrics {
   static let eyebrowTracking: CGFloat = 0.8
-  static let prehabIcon: CGFloat = 22
   static let effortScale = 10
 }

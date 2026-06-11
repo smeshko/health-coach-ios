@@ -12,6 +12,7 @@ extension GalleryComponent {
     GalleryComponent(name: "Pill") { AnyView(PillPage()) },
     GalleryComponent(name: "Chip") { AnyView(ChipPage()) },
     GalleryComponent(name: "Banner") { AnyView(BannerPage()) },
+    GalleryComponent(name: "InsetCallout") { AnyView(InsetCalloutPage()) },
     GalleryComponent(name: "DayBadge") { AnyView(DayBadgePage()) },
     GalleryComponent(name: "IconBadge") { AnyView(IconBadgePage()) },
     GalleryComponent(name: "SegmentedBar") { AnyView(SegmentedBarPage()) },

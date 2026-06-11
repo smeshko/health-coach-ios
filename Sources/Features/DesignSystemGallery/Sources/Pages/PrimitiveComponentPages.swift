@@ -107,6 +107,27 @@ struct IconBadgePage: View {
   }
 }
 
+struct InsetCalloutPage: View {
+  var body: some View {
+    GalleryScaffold(title: "InsetCallout") {
+      stateLabel("Sunken · content only (prehab add-on)")
+      InsetCallout(icon: Icon.prehab.systemName, content: "Foot prehab")
+      stateLabel("Sunken · headline + content (rest-day suggestion)")
+      InsetCallout(
+        icon: "figure.walk",
+        headline: "An easy 20 min walk — completely optional",
+        content: "Stretch your legs, if you feel like it"
+      )
+      stateLabel("Raised · headline + content (forced-rest echo)")
+      InsetCallout(
+        icon: "cross.case.fill", tone: .warning,
+        headline: "Knee pain", content: "7 / 10 this morning",
+        surface: .raised
+      )
+    }
+  }
+}
+
 struct BannerPage: View {
   var body: some View {
     GalleryScaffold(title: "Banner") {
