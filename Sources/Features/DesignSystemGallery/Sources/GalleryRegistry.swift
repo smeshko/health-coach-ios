@@ -20,5 +20,6 @@ extension GalleryComponent {
 
   @MainActor static let composites: [GalleryComponent] = [
     GalleryComponent(name: "Chart") { AnyView(ChartGalleryPage()) },
+    GalleryComponent(name: "Narrative") { AnyView(NarrativePage()) },
   ]
 }
