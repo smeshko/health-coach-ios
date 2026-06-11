@@ -63,6 +63,7 @@ public struct TodayView: View {
         TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
           TodayReadyContent(
             store: store,
+            brief: brief,
             cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
           )
         }
@@ -224,14 +225,13 @@ private struct TodayBriefErrorContent: View {
   }
 }
 
-/// The `ready` content area: the cached-freshness label, the check-in section, and the 8.2/8.3/8.4 seam
-/// placeholders. The readiness gauge (8.2), session card (8.3), and nutrition (8.4) fill the seams
-/// later — 8.2 also mounts the Exercise|Nutrition `SegTabs` toggle here (hidden until actual brief
-/// content exists to switch between; `selectedSection`/`sectionSelected` already carry it). The
-/// check-in's final placement is an open design note (kept here as planned — re-saving rebuilds the
-/// brief).
+/// The `ready` content area: the cached-freshness label, the **readiness gauge** (Phase 8.3) above the
+/// **forced-REST vs normal-session** switch (`TodaySessionMode`, Phase 8.3), the check-in section, and the
+/// nutrition seam (Phase 8.5). The Exercise|Nutrition `SegTabs` toggle is wired through
+/// `selectedSection`/`sectionSelected`; the nutrition arm is the 8.5 seam.
 private struct TodayReadyContent: View {
   @Bindable var store: StoreOf<TodayFeature>
+  let brief: DomainModels.DailyBrief
   let cachedLabel: String?
 
   var body: some View {
@@ -244,13 +244,44 @@ private struct TodayReadyContent: View {
 
       switch store.selectedSection {
       case .exercise:
-        // MARK: - Phase 8.2 readiness
+        // The readiness gauge (Phase 8.3), scoped so its "why" toggle persists. The summary narrative
+        // ("Good morning …") is parent-filtered and passed in.
+        if let readinessStore = store.scope(state: \.readiness, action: \.readiness) {
+          ReadinessComponentView(
+            store: readinessStore,
+            summary: brief.narrative.filter { $0.type == .summary }
+          )
+        }
 
-        // MARK: - Phase 8.3 session
+        // Forced-REST vs the ordinary session are **distinct rendered states** (ARCHITECTURE §8 / §1
+        // principle #6 / PRD §7.4.2), chosen by the authoritative `safetyGate.triggered` signal. The
+        // switch is **exhaustive** (no `default:`), mirroring the `briefState` discipline.
+        switch TodaySessionMode.from(brief) {
+        case let .forcedRest(gate, override):
+          // The dedicated calm forced-REST screen — read-only override session, no swap/skip/alternatives.
+          // `zoneRange` is nil here: the `rest`/`mobility` overrides carry no `zoneTarget` (→ no chip), and
+          // `TodayFeature` does not yet hold the profile zones (Phase 8.4 wires zone resolution for the
+          // normal session); an `active_recovery` override's Z1 chip is reconciled when that lands.
+          SafetyRestView(
+            store: Store(
+              initialState: SafetyRestComponent.State(
+                gate: gate, overrideSession: override, zoneRange: nil
+              )
+            ) { SafetyRestComponent() },
+            narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
+          )
+        case let .normal(session):
+          // TODO(8.4): the promoted `SessionFeature` renders this with the inline SWAP-TO list + skipOk.
+          // Until it merges, a thin read-only `SessionCard` stand-in renders the displayed session.
+          SessionCard(
+            session,
+            narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
+          )
+        }
 
         CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
       case .nutrition:
-        // MARK: - Phase 8.4 nutrition
+        // MARK: - Phase 8.5 nutrition
 
         Text("Nutrition")
           .font(.coachTextMd)

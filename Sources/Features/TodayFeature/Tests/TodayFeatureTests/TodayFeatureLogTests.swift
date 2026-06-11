@@ -36,7 +36,10 @@ struct TodayFeatureLogTests {
       $0.lastSyncedAt = instant
       $0.briefState = .generating
     }
-    await store.receive(\._briefResolved) { $0.briefState = .ready(brief, .fresh) }
+    await store.receive(\._briefResolved) {
+      $0.briefState = .ready(brief, .fresh)
+      $0.readiness = ReadinessComponent.State(readiness: brief.readiness)
+    }
 
     #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("morning orchestration") })
   }
