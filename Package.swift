@@ -1255,5 +1255,25 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // SessionFeatureView snapshots (the `Row.png` card variants + the swap states, light + dark) — iOS 26
+    // simulator only, via `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty
+    // module on the host. `exclude: ["__Snapshots__"]` keeps the committed references out of the target
+    // (otherwise SwiftPM warns "unhandled files"). Fixtures are inline `DomainModels` literals (the
+    // SampleData briefs can't drive the multi-zone-alternative / `.session`-narrative / rest cases).
+    .testTarget(
+      name: "SessionFeatureSnapshotTests",
+      dependencies: [
+        "SessionFeature",
+        "CoachTestSupport",
+        "DomainModels",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/SessionFeature/Tests/SessionFeatureSnapshotTests",
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
   ]
 )
