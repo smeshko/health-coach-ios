@@ -105,9 +105,35 @@ public struct SessionFeature {
 
   public init() {}
 
-  // The reducer body is added in TASK-002 (the swap/select/skip logic). An `EmptyReducer` keeps the
-  // scaffold compiling for TASK-001 (the State + `displayedSession`/`displayedZoneRange` derivations).
   public var body: some ReducerOf<Self> {
-    EmptyReducer()
+    Reduce { state, action in
+      switch action {
+      case .swapToggled:
+        // Expand/collapse the inline SWAP TO list. Independent of the selection — collapsing keeps a
+        // swapped `selectedAlternativeIndex` (PLAN inline decision).
+        state.isSwapExpanded.toggle()
+        return .none
+
+      case let .alternativeTapped(index):
+        // Toggle semantics (DECISIONS #2, revised): tapping the currently-selected index reverts to the
+        // recommended session (tap-again-to-revert); tapping an unselected in-range index selects it;
+        // out-of-range is a no-op. Display-only in every arm — no repository/server call (DECISIONS #1).
+        if index == state.selectedAlternativeIndex {
+          state.selectedAlternativeIndex = nil
+        } else if state.alternatives.indices.contains(index) {
+          state.selectedAlternativeIndex = index
+        }
+        return .none
+
+      case .skipTapped:
+        // Permission, not dismiss (PRD §7.4.3): emit the upward delegate, mutate no session/selection
+        // state. The parent owns what happens next; the card is never hidden here.
+        return .send(.delegate(.skipRequested))
+
+      case .delegate:
+        // Parent-observed — no state mutation (included so the `switch` is exhaustive).
+        return .none
+      }
+    }
   }
 }
