@@ -283,9 +283,18 @@ private struct TodayReadyContent: View {
       case .nutrition:
         // MARK: - Phase 8.5 nutrition
 
-        Text("Nutrition")
-          .font(.coachTextMd)
-          .foregroundStyle(.coachForegroundMuted)
+        // The TODAY'S FUEL panel + COACH NOTE, then the yesterday recap / no-food empty state — co-equal
+        // with the workout (PRD §7.4.4 / §6 principle 4). Both are render-only sub-components constructed
+        // inline from the loaded brief (the `SafetyRestComponent` precedent), so they hold no parent state
+        // and need no reducer scope.
+        NutritionView(
+          store: Store(initialState: NutritionComponent.State(brief: brief)) { NutritionComponent() }
+        )
+        YesterdayIntakeView(
+          store: Store(
+            initialState: YesterdayIntakeComponent.State(intakeYesterday: brief.intakeYesterday)
+          ) { YesterdayIntakeComponent() }
+        )
       }
     }
   }
