@@ -13,6 +13,7 @@ let package = Package(
     .library(name: "OnboardingFeature", targets: ["OnboardingFeature"]),
     .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
     .library(name: "TodayFeature", targets: ["TodayFeature"]),
+    .library(name: "SessionFeature", targets: ["SessionFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
     .library(name: "WireModels", targets: ["WireModels"]),
     .library(name: "DomainModels", targets: ["DomainModels"]),
@@ -1214,6 +1215,61 @@ let package = Package(
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
       path: "Sources/Features/TodayFeature/Tests/TodayFeatureSnapshotTests",
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The shared **daily session** feature (ARCHITECTURE §4.5 / D5 — the promoted hybrid component in its
+    // OWN target, not internal to TodayFeature): the `SessionCard` + the inline swap (SWAP TO / SWAPPED TO,
+    // tap-again-to-revert) + the permission-to-skip affordance. Parent-supplied input state — depends ONLY
+    // on `ComposableArchitecture` + `DesignSystem` + `DomainModels` + `CoachCore` (the §3 feature rule);
+    // NEVER a repository, data-source client, `WireModels`, GRDB, or HealthKit (it is given its data; swap
+    // is display-only, no server re-roll — DECISIONS #1).
+    .target(
+      name: "SessionFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "DesignSystem",
+        "DomainModels",
+        "CoachCore",
+      ],
+      path: "Sources/Features/SessionFeature/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // SessionFeature exhaustive TestStore (host) — the inline swap expand/collapse, the toggle
+    // select/revert, the out-of-range no-op, collapse-keeps-selection, the skip delegate, and
+    // empty-alternatives. Logic only — no snapshot/UIKit symbols (§4.6 split). Fixtures are inline
+    // `DomainModels` literals (the SampleData briefs can't drive the swap cases).
+    .testTarget(
+      name: "SessionFeatureTests",
+      dependencies: [
+        "SessionFeature",
+        "DomainModels",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      path: "Sources/Features/SessionFeature/Tests/SessionFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // SessionFeatureView snapshots (the `Row.png` card variants + the swap states, light + dark) — iOS 26
+    // simulator only, via `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty
+    // module on the host. `exclude: ["__Snapshots__"]` keeps the committed references out of the target
+    // (otherwise SwiftPM warns "unhandled files"). Fixtures are inline `DomainModels` literals (the
+    // SampleData briefs can't drive the multi-zone-alternative / `.session`-narrative / rest cases).
+    .testTarget(
+      name: "SessionFeatureSnapshotTests",
+      dependencies: [
+        "SessionFeature",
+        "CoachTestSupport",
+        "DomainModels",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/SessionFeature/Tests/SessionFeatureSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
