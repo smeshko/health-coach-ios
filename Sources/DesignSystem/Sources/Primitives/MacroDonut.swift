@@ -24,10 +24,19 @@ public struct MacroDonut<Center: View>: View {
   }
 
   let segments: [Segment]
+  let diameter: CGFloat
+  let lineWidth: CGFloat
   let center: Center
 
-  public init(segments: [Segment], @ViewBuilder center: () -> Center) {
+  public init(
+    segments: [Segment],
+    diameter: CGFloat? = nil,
+    lineWidth: CGFloat? = nil,
+    @ViewBuilder center: () -> Center
+  ) {
     self.segments = segments
+    self.diameter = diameter ?? Metrics.diameter
+    self.lineWidth = lineWidth ?? Metrics.ringWidth
     self.center = center()
   }
 
@@ -36,12 +45,12 @@ public struct MacroDonut<Center: View>: View {
       ForEach(arcs) { arc in
         Circle()
           .trim(from: arc.start, to: arc.end)
-          .stroke(arc.color, style: StrokeStyle(lineWidth: Metrics.ringWidth, lineCap: .butt))
+          .stroke(arc.color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
           .rotationEffect(.degrees(-90)) // trim 0 → 12 o'clock
       }
       center
     }
-    .frame(width: Metrics.diameter, height: Metrics.diameter)
+    .frame(width: diameter, height: diameter)
   }
 
   /// Resolved arc spans — each segment's normalized fraction laid end-to-end, inset by half a `gap` on
@@ -70,8 +79,8 @@ public struct MacroDonut<Center: View>: View {
 
 public extension MacroDonut where Center == EmptyView {
   /// A donut with no center content — just the ring.
-  init(segments: [Segment]) {
-    self.init(segments: segments) { EmptyView() }
+  init(segments: [Segment], diameter: CGFloat? = nil, lineWidth: CGFloat? = nil) {
+    self.init(segments: segments, diameter: diameter, lineWidth: lineWidth) { EmptyView() }
   }
 }
 
