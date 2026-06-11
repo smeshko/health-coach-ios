@@ -31,7 +31,7 @@ struct ReadinessComponentTests {
   /// The amber fixture's penalties (`sleep_below_7h` 10, `hrv_below_baseline` 8) map to their 5.1 labels
   /// with the server's **positive** points, in received order (no reorder/filter — principle #4).
   @Test func test_penaltyRows_mapLabelsAndPoints_inOrder() throws {
-    let rows = ReadinessComponent.State(readiness: try readiness(.dailyBriefAmber)).penaltyRows
+    let rows = try ReadinessComponent.State(readiness: readiness(.dailyBriefAmber)).penaltyRows
     #expect(rows == [
       ReadinessComponent.PenaltyRow(label: "Short sleep", points: 10),
       ReadinessComponent.PenaltyRow(label: "HRV below baseline", points: 8),
@@ -40,7 +40,7 @@ struct ReadinessComponentTests {
 
   /// The red fixture exercises a three-penalty list (order + labels preserved).
   @Test func test_penaltyRows_red_threeFactors() throws {
-    let rows = ReadinessComponent.State(readiness: try readiness(.dailyBriefRed)).penaltyRows
+    let rows = try ReadinessComponent.State(readiness: readiness(.dailyBriefRed)).penaltyRows
     #expect(rows == [
       ReadinessComponent.PenaltyRow(label: "Very short sleep", points: 20),
       ReadinessComponent.PenaltyRow(label: "Resting HR elevated", points: 15),
