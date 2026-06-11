@@ -40,11 +40,14 @@ private struct EyebrowSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-      Text(heading)
-        .font(.coachText2xs)
-        .textCase(.uppercase)
-        .tracking(Metrics.eyebrowTracking)
-        .foregroundStyle(.coachForegroundSubtle)
+      // An empty heading (e.g. the in-card session narrative) renders as a plain paragraph — no eyebrow.
+      if !heading.isEmpty {
+        Text(heading)
+          .font(.coachText2xs)
+          .textCase(.uppercase)
+          .tracking(Metrics.eyebrowTracking)
+          .foregroundStyle(.coachForegroundSubtle)
+      }
       Text(message)
         .font(.coachTextMd)
         .foregroundStyle(.coachForeground)
