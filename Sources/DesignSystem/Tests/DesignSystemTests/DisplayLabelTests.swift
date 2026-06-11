@@ -27,8 +27,21 @@ struct DisplayLabelTests {
 
   @Test func test_openEnums_knownCases_haveLabels() {
     #expect(Flag.qualityDay.label == "Quality Day")
-    #expect(SafetyReason.giFlare.label == "GI Flare")
-    #expect(PenaltyFactor.sleepBelow7h.label == "Sleep Below 7h")
+
+    // PenaltyFactor — the readiness "why" rows (§12.3 wording, not machine title-case).
+    #expect(PenaltyFactor.sleepBelow7h.label == "Short sleep")
+    #expect(PenaltyFactor.sleepBelow5h.label == "Very short sleep")
+    #expect(PenaltyFactor.hrvBelowBaseline.label == "HRV below baseline")
+    #expect(PenaltyFactor.rhrAboveBaseline.label == "Resting HR elevated")
+    #expect(PenaltyFactor.yesterdayHardDay.label == "Hard session yesterday")
+
+    // SafetyReason — the forced-REST reason chips (§12.3 wording).
+    #expect(SafetyReason.giFlare.label == "Gut flare")
+    #expect(SafetyReason.illness.label == "Feeling unwell")
+    #expect(SafetyReason.kneePainHigh.label == "Knee pain high")
+    #expect(SafetyReason.sleepBelow4h.label == "Very little sleep")
+    #expect(SafetyReason.rhrSpike.label == "Resting HR spike")
+    #expect(SafetyReason.hrvCrash.label == "HRV drop")
   }
 
   /// `.unknown(raw)` renders a graceful human label, never the raw key — for snake_case and camelCase.

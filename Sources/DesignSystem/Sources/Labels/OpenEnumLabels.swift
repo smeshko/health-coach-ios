@@ -26,12 +26,12 @@ extension Flag: DisplayLabel {
 extension SafetyReason: DisplayLabel {
   public var label: String {
     switch self {
-    case .giFlare: "GI Flare"
-    case .illness: "Illness"
-    case .kneePainHigh: "High Knee Pain"
-    case .sleepBelow4h: "Sleep Below 4h"
-    case .rhrSpike: "Resting HR Spike"
-    case .hrvCrash: "HRV Crash"
+    case .giFlare: "Gut flare"
+    case .illness: "Feeling unwell"
+    case .kneePainHigh: "Knee pain high"
+    case .sleepBelow4h: "Very little sleep"
+    case .rhrSpike: "Resting HR spike"
+    case .hrvCrash: "HRV drop"
     case let .unknown(raw): gracefulLabel(forUnknownRaw: raw)
     }
   }
@@ -40,11 +40,11 @@ extension SafetyReason: DisplayLabel {
 extension PenaltyFactor: DisplayLabel {
   public var label: String {
     switch self {
-    case .sleepBelow7h: "Sleep Below 7h"
-    case .sleepBelow5h: "Sleep Below 5h"
-    case .hrvBelowBaseline: "HRV Below Baseline"
-    case .rhrAboveBaseline: "RHR Above Baseline"
-    case .yesterdayHardDay: "Yesterday Was a Hard Day"
+    case .sleepBelow7h: "Short sleep"
+    case .sleepBelow5h: "Very short sleep"
+    case .hrvBelowBaseline: "HRV below baseline"
+    case .rhrAboveBaseline: "Resting HR elevated"
+    case .yesterdayHardDay: "Hard session yesterday"
     case let .unknown(raw): gracefulLabel(forUnknownRaw: raw)
     }
   }
