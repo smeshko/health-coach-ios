@@ -28,6 +28,11 @@ public struct TodayFeature {
     /// The morning check-in child (PRD §7.2). Always present; rendered standalone in `.checkInRequired`
     /// (the gate) and editable again under `ready`.
     public var checkIn: CheckInComponent.State
+    /// The readiness sub-component (Phase 8.3) — hydrated from `brief.readiness` when a brief resolves,
+    /// `nil` otherwise. Held in parent state (not derived per-render) so the "why" expand/collapse toggle
+    /// persists across re-renders (DECISIONS #1); scoped via `ifLet`. (The `SafetyRestComponent` is
+    /// render-only — no in-screen interaction — so it is constructed inline in the view, not held here.)
+    public var readiness: ReadinessComponent.State?
     /// The 2026-06-10 shell's Exercise | Nutrition segmented toggle (local UI state). 8.2/8.3 render
     /// under `.exercise`, 8.4 under `.nutrition`.
     public var selectedSection: TodaySection
@@ -38,11 +43,13 @@ public struct TodayFeature {
     public init(
       briefState: BriefViewState = .idle,
       checkIn: CheckInComponent.State = CheckInComponent.State(),
+      readiness: ReadinessComponent.State? = nil,
       selectedSection: TodaySection = .exercise,
       lastSyncedAt: Date? = nil
     ) {
       self.briefState = briefState
       self.checkIn = checkIn
+      self.readiness = readiness
       self.selectedSection = selectedSection
       self.lastSyncedAt = lastSyncedAt
     }
@@ -57,6 +64,8 @@ public struct TodayFeature {
     case sectionSelected(TodaySection)
     /// The morning check-in child's actions.
     case checkIn(CheckInComponent.Action)
+    /// The readiness child's actions (the "why" toggle) — scoped via `ifLet` while a brief is loaded.
+    case readiness(ReadinessComponent.Action)
     // Internal transition actions drive the orchestration's `BriefViewState` mutations through the
     // reducer. The leading underscore (TCA convention) trips `identifier_name`, so scope a disable.
     // swiftlint:disable identifier_name
@@ -137,6 +146,9 @@ public struct TodayFeature {
 
       case let ._briefResolved(brief, freshness):
         state.briefState = .ready(brief, freshness)
+        // Hydrate the readiness child from the resolved brief (Phase 8.3) so the gauge + its persisted
+        // "why" toggle render under `ready`. A fresh brief resets the toggle to collapsed.
+        state.readiness = ReadinessComponent.State(readiness: brief.readiness)
         return .none
 
       case let ._briefFailed(error):
@@ -151,7 +163,14 @@ public struct TodayFeature {
 
       case .checkIn:
         return .none
+
+      case .readiness:
+        // The "why" toggle is handled by the scoped child reducer (below).
+        return .none
       }
+    }
+    .ifLet(\.readiness, action: \.readiness) {
+      ReadinessComponent()
     }
   }
 

@@ -63,6 +63,7 @@ public struct TodayView: View {
         TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
           TodayReadyContent(
             store: store,
+            brief: brief,
             cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
           )
         }
@@ -224,14 +225,13 @@ private struct TodayBriefErrorContent: View {
   }
 }
 
-/// The `ready` content area: the cached-freshness label, the check-in section, and the 8.2/8.3/8.4 seam
-/// placeholders. The readiness gauge (8.2), session card (8.3), and nutrition (8.4) fill the seams
-/// later — 8.2 also mounts the Exercise|Nutrition `SegTabs` toggle here (hidden until actual brief
-/// content exists to switch between; `selectedSection`/`sectionSelected` already carry it). The
-/// check-in's final placement is an open design note (kept here as planned — re-saving rebuilds the
-/// brief).
+/// The `ready` content area: the cached-freshness label, the **readiness gauge** (Phase 8.3) above the
+/// **forced-REST vs normal-session** switch (`TodaySessionMode`, Phase 8.3), the check-in section, and the
+/// nutrition seam (Phase 8.5). The Exercise|Nutrition `SegTabs` toggle is wired through
+/// `selectedSection`/`sectionSelected`; the nutrition arm is the 8.5 seam.
 private struct TodayReadyContent: View {
   @Bindable var store: StoreOf<TodayFeature>
+  let brief: DomainModels.DailyBrief
   let cachedLabel: String?
 
   var body: some View {
@@ -244,136 +244,49 @@ private struct TodayReadyContent: View {
 
       switch store.selectedSection {
       case .exercise:
-        // MARK: - Phase 8.2 readiness
+        // The readiness gauge (Phase 8.3), scoped so its "why" toggle persists. The summary narrative
+        // ("Good morning …") is parent-filtered and passed in.
+        if let readinessStore = store.scope(state: \.readiness, action: \.readiness) {
+          ReadinessComponentView(
+            store: readinessStore,
+            summary: brief.narrative.filter { $0.type == .summary }
+          )
+        }
 
-        // MARK: - Phase 8.3 session
+        // Forced-REST vs the ordinary session are **distinct rendered states** (ARCHITECTURE §8 / §1
+        // principle #6 / PRD §7.4.2), chosen by the authoritative `safetyGate.triggered` signal. The
+        // switch is **exhaustive** (no `default:`), mirroring the `briefState` discipline.
+        switch TodaySessionMode.from(brief) {
+        case let .forcedRest(gate, override):
+          // The dedicated calm forced-REST screen — read-only override session, no swap/skip/alternatives.
+          // `zoneRange` is nil here: the `rest`/`mobility` overrides carry no `zoneTarget` (→ no chip), and
+          // `TodayFeature` does not yet hold the profile zones (Phase 8.4 wires zone resolution for the
+          // normal session); an `active_recovery` override's Z1 chip is reconciled when that lands.
+          SafetyRestView(
+            store: Store(
+              initialState: SafetyRestComponent.State(
+                gate: gate, overrideSession: override, zoneRange: nil
+              )
+            ) { SafetyRestComponent() },
+            narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
+          )
+        case let .normal(session):
+          // TODO(8.4): the promoted `SessionFeature` renders this with the inline SWAP-TO list + skipOk.
+          // Until it merges, a thin read-only `SessionCard` stand-in renders the displayed session.
+          SessionCard(
+            session,
+            narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
+          )
+        }
 
         CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
       case .nutrition:
-        // MARK: - Phase 8.4 nutrition
+        // MARK: - Phase 8.5 nutrition
 
         Text("Nutrition")
           .font(.coachTextMd)
           .foregroundStyle(.coachForegroundMuted)
       }
-    }
-  }
-}
-
-/// The morning check-in (PRD §7.2) restyled to `1 · Daily Check-in.png`: a "DAILY CHECK-IN" eyebrow (the
-/// mockup's "How are you today?" title + subtitle are dropped — they doubled up under the screen's
-/// "Today" header), a card with two Yes/No rows (helper copy) + the knee-pain segment stepper & severity
-/// badge, a "Save & build today's brief" button, and a "Last saved <time>" footer. `kneePain` edits route
-/// through `kneePainChanged` (clamped) — out-of-range is impossible (DECISIONS #2). The footer time is
-/// formatted in the Europe/Sofia frame so snapshots stay deterministic.
-private struct CheckInSection: View {
-  @Bindable var store: StoreOf<CheckInComponent>
-  @Dependency(\.calendar) var calendar
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
-      Text("DAILY CHECK-IN")
-        .font(.coachText2xs)
-        .tracking(0.4)
-        .foregroundStyle(.coachForegroundMuted)
-
-      VStack(spacing: CoachSpacing.spaceMd) {
-        CheckInQuestionRow(
-          title: "Any gut-flare signs today?",
-          helper: "Bloating, cramps or urgency",
-          isOn: Binding(get: { store.giSymptoms }, set: { store.send(.giSymptomsToggled($0)) })
-        )
-        Rectangle().fill(.coachBorder).frame(height: 1)
-        CheckInQuestionRow(
-          title: "Feeling ill or feverish?",
-          helper: "Sore throat, chills, fever",
-          isOn: Binding(get: { store.illness }, set: { store.send(.illnessToggled($0)) })
-        )
-        Rectangle().fill(.coachBorder).frame(height: 1)
-        VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
-          HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-              Text("Knee pain")
-                .font(.coachTextLg)
-                .foregroundStyle(.coachForeground)
-              Text("0 = none · 10 = worst")
-                .font(.coachTextSm)
-                .foregroundStyle(.coachForegroundMuted)
-            }
-            Spacer(minLength: CoachSpacing.spaceSm)
-            Pill(PainSeverity.badge(for: store.kneePain), tone: .warning)
-          }
-          SegmentStepper(
-            value: Binding(get: { store.kneePain }, set: { store.send(.kneePainChanged($0)) })
-          )
-        }
-      }
-      .padding(CoachSpacing.spaceMd)
-      .background(RoundedRectangle(cornerRadius: CoachRadius.card).fill(.coachSurface))
-
-      VStack(spacing: CoachSpacing.spaceSm) {
-        PrimaryButton("Save & build today's brief", isLoading: store.saveStatus == .saving) {
-          store.send(.saveTapped)
-        }
-        // The footer shows a precise clock time only for a save made this session (`lastSavedAt`); a
-        // check-in loaded from earlier today has only a day-key, so it shows day-relative copy instead.
-        if let savedAt = store.lastSavedAt {
-          CheckInFooter(text: "Last saved \(savedTime(savedAt)) · tap any answer to edit")
-        } else if store.existing != nil {
-          CheckInFooter(text: "Saved earlier today · tap any answer to edit")
-        }
-      }
-    }
-    .task { await store.send(.task).finish() }
-  }
-
-  /// "7:02 AM" in the Europe/Sofia frame (the pinned `\.calendar`); `en_US_POSIX` keeps it deterministic.
-  private func savedTime(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.calendar = calendar
-    formatter.timeZone = calendar.timeZone
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.dateFormat = "h:mm a"
-    return formatter.string(from: date)
-  }
-}
-
-/// The check-in card's "✓ <message>" footer (`1 · Daily Check-in.png`) — a checkmark + a single muted,
-/// centered line. The message varies by save state (precise time for a same-session save, day-relative
-/// for a loaded check-in); the chrome is identical, so it lives in one struct.
-private struct CheckInFooter: View {
-  let text: String
-
-  var body: some View {
-    HStack(spacing: CoachSpacing.space2xs) {
-      Image(systemName: "checkmark.circle")
-      Text(text)
-    }
-    .font(.coachTextXs)
-    .foregroundStyle(.coachForegroundSubtle)
-    .frame(maxWidth: .infinity)
-  }
-}
-
-/// One Yes/No question row in the check-in card — a title + helper line on the left, a `YesNoToggle` on
-/// the trailing edge (`1 · Daily Check-in.png`).
-private struct CheckInQuestionRow: View {
-  let title: String
-  let helper: String
-  @Binding var isOn: Bool
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline) {
-      VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-        Text(title)
-          .font(.coachTextLg)
-          .foregroundStyle(.coachForeground)
-        Text(helper)
-          .font(.coachTextSm)
-          .foregroundStyle(.coachForegroundMuted)
-      }
-      Spacer(minLength: CoachSpacing.spaceSm)
-      YesNoToggle(isOn: $isOn)
     }
   }
 }

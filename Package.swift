@@ -1206,6 +1206,10 @@ let package = Package(
         "DomainModels",
         "SampleData",
         "CoachTestSupport",
+        // The readiness / forced-REST snapshots frame the cards on `.coachBackground` with the spacing
+        // scale — the same page chrome the real screen uses. A test-only edge (DesignSystem is a shipping
+        // library; this never reaches the app graph).
+        "DesignSystem",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],

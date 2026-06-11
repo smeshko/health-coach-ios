@@ -45,7 +45,10 @@ struct TodayFeatureSaveTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
-    await store.receive(\._briefResolved) { $0.briefState = .ready(fresh, .fresh) }
+    await store.receive(\._briefResolved) {
+      $0.briefState = .ready(fresh, .fresh)
+      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+    }
 
     let flags = await recorder.flags
     #expect(flags == [true], "the save path regenerates via dailyBrief(refresh: true)")
@@ -82,7 +85,10 @@ struct TodayFeatureSaveTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
-    await store.receive(\._briefResolved) { $0.briefState = .ready(fresh, .fresh) }
+    await store.receive(\._briefResolved) {
+      $0.briefState = .ready(fresh, .fresh)
+      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+    }
 
     let flags = await recorder.flags
     #expect(flags == [true], "a re-save regenerates via dailyBrief(refresh: true)")
@@ -127,7 +133,10 @@ struct TodayFeatureSaveTests {
       $0.briefState = .generating
     }
     await clock.advance(by: TodayFeature.loadingPhaseMinDuration)
-    await store.receive(\._briefResolved) { $0.briefState = .ready(fresh, .fresh) }
+    await store.receive(\._briefResolved) {
+      $0.briefState = .ready(fresh, .fresh)
+      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+    }
 
     let count = await syncCount.count
     #expect(count == 2, "both runs invoked sync(); the first was cancelled before resolving")

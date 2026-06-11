@@ -35,7 +35,10 @@ struct TodayFeatureOrchestrationTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
-    await store.receive(\._briefResolved) { $0.briefState = .ready(fresh, .fresh) }
+    await store.receive(\._briefResolved) {
+      $0.briefState = .ready(fresh, .fresh)
+      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+    }
   }
 
   @Test func test_syncFailure_blocksBrief_setsSyncFailed_briefNeverCalled() async {
@@ -83,7 +86,10 @@ struct TodayFeatureOrchestrationTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
-    await store.receive(\._briefResolved) { $0.briefState = .ready(cached, .cached) }
+    await store.receive(\._briefResolved) {
+      $0.briefState = .ready(cached, .cached)
+      $0.readiness = ReadinessComponent.State(readiness: cached.readiness)
+    }
   }
 
   @Test func test_briefError_setsErrorCase_notSyncFailed() async {
@@ -199,6 +205,9 @@ struct TodayFeatureOrchestrationTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
-    await store.receive(\._briefResolved) { $0.briefState = .ready(fresh, .fresh) }
+    await store.receive(\._briefResolved) {
+      $0.briefState = .ready(fresh, .fresh)
+      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+    }
   }
 }
