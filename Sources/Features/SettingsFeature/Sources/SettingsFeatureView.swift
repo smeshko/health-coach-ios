@@ -2,6 +2,7 @@ import ComposableArchitecture
 import SwiftUI
 #if DEBUG
   import DesignSystem
+  import DesignSystemGallery
 #endif
 
 /// The You-tab root view (ARCHITECTURE §4.5). **Minimal in Phase 7.4**: its only content is a
@@ -30,22 +31,30 @@ public struct SettingsFeatureView: View {
             .foregroundStyle(.coachForegroundSubtle)
             .padding(.horizontal, CoachSpacing.spaceXs)
 
-          Button {
-            store.send(.devMenuTapped)
-          } label: {
-            HStack(spacing: CoachSpacing.spaceSm) {
-              Text("Dev Menu")
-                .font(.coachTextLg)
-                .foregroundStyle(.coachForeground)
-              Spacer(minLength: CoachSpacing.spaceSm)
-              Image(systemName: "chevron.right")
-                .font(.coachTextSm)
-                .foregroundStyle(.coachForegroundSubtle)
+          // One card, two rows divided by a hairline — a normal grouped-list section. The dev menu is
+          // TCA-routed; the gallery is a plain push (no state) onto the same You-tab stack because
+          // `DesignSystemGalleryList` omits its own `NavigationStack`.
+          VStack(spacing: 0) {
+            Button {
+              store.send(.devMenuTapped)
+            } label: {
+              DevSectionRow(title: "Dev Menu")
             }
-            .padding(CoachSpacing.spaceMd)
-            .background(RoundedRectangle(cornerRadius: CoachRadius.md).fill(.coachSurface))
+            .buttonStyle(.plain)
+
+            Rectangle()
+              .fill(.coachBorder)
+              .frame(height: 1)
+              .padding(.leading, CoachSpacing.spaceMd)
+
+            NavigationLink {
+              DesignSystemGalleryList()
+            } label: {
+              DevSectionRow(title: "Component Gallery")
+            }
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
+          .background(RoundedRectangle(cornerRadius: CoachRadius.md).fill(.coachSurface))
         }
         .padding(CoachSpacing.spaceMd)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -64,3 +73,27 @@ public struct SettingsFeatureView: View {
     #endif
   }
 }
+
+#if DEBUG
+  /// A single DEV-section row (title + chevron affordance). The enclosing card supplies the surface and
+  /// the hairline divider, so the row itself is just padded content — `contentShape` keeps the whole
+  /// padded width (including the spacer) tappable.
+  private struct DevSectionRow: View {
+    let title: String
+
+    var body: some View {
+      HStack(spacing: CoachSpacing.spaceSm) {
+        Text(title)
+          .font(.coachTextLg)
+          .foregroundStyle(.coachForeground)
+        Spacer(minLength: CoachSpacing.spaceSm)
+        Image(systemName: "chevron.right")
+          .font(.coachTextSm)
+          .foregroundStyle(.coachForegroundSubtle)
+      }
+      .padding(CoachSpacing.spaceMd)
+      .frame(maxWidth: .infinity)
+      .contentShape(Rectangle())
+    }
+  }
+#endif

@@ -11,25 +11,36 @@ public struct DesignSystemGalleryView: View {
 
   public var body: some View {
     NavigationStack {
-      List {
-        Section("Design System") {
-          NavigationLink("Colors") { ColorsGalleryPage() }
-          NavigationLink("Typography") { TypographyGalleryPage() }
-          NavigationLink("Spacing & Radii") { SpacingGalleryPage() }
-          NavigationLink("Icons") { IconsGalleryPage() }
-        }
-        Section("Primitives") {
-          ForEach(GalleryComponent.primitives) { component in
-            NavigationLink(component.name) { component.page() }
-          }
-        }
-        Section("Composites") {
-          ForEach(GalleryComponent.composites) { component in
-            NavigationLink(component.name) { component.page() }
-          }
+      DesignSystemGalleryList()
+    }
+  }
+}
+
+/// The gallery's navigable list **without** an enclosing `NavigationStack`, so it can be pushed onto a
+/// host stack (e.g. the DEBUG dev menu's) — its `NavigationLink`s then push onto whichever stack already
+/// surrounds it. `DesignSystemGalleryView` wraps this in a stack for standalone presentation.
+public struct DesignSystemGalleryList: View {
+  public init() {}
+
+  public var body: some View {
+    List {
+      Section("Design System") {
+        NavigationLink("Colors") { ColorsGalleryPage() }
+        NavigationLink("Typography") { TypographyGalleryPage() }
+        NavigationLink("Spacing & Radii") { SpacingGalleryPage() }
+        NavigationLink("Icons") { IconsGalleryPage() }
+      }
+      Section("Primitives") {
+        ForEach(GalleryComponent.primitives) { component in
+          NavigationLink(component.name) { component.page() }
         }
       }
-      .navigationTitle("Design System")
+      Section("Composites") {
+        ForEach(GalleryComponent.composites) { component in
+          NavigationLink(component.name) { component.page() }
+        }
+      }
     }
+    .navigationTitle("Design System")
   }
 }

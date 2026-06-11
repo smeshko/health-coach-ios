@@ -180,10 +180,13 @@ struct BarColumnsPage: View {
 struct SegmentedBarPage: View {
   var body: some View {
     GalleryScaffold(title: "SegmentedBar") {
-      stateLabel("Zones (Z1–Z5 + marker)")
+      stateLabel("Zones (Z1–Z5, active highlighted)")
       ForEach(1 ... 5, id: \.self) { target in
         SegmentedBar.zones(target: target)
       }
+      stateLabel("Zones (multiple active)")
+      SegmentedBar.zones(active: [2, 3])
+      SegmentedBar.zones(active: [1, 4, 5])
       stateLabel("Readiness (3 bands + marker)")
       ForEach([10, 60, 88], id: \.self) { score in
         SegmentedBar.readiness(score: score)
