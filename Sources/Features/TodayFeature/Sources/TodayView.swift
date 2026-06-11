@@ -40,20 +40,15 @@ public struct TodayView: View {
         TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
           CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
         }
-      case .syncing:
+      // One branch for both loading states (not two `case`s) — a shared view identity is what lets the
+      // ring's trim tween 0.3 → 0.7 and the spinners keep turning across the syncing→generating handoff.
+      case .syncing, .generating:
+        let generating = store.briefState == .generating
         SyncProgressView(
-          progress: LoadingCopy.syncingProgress,
-          title: LoadingCopy.syncingTitle,
-          subtitle: LoadingCopy.syncingSubtitle,
-          steps: LoadingCopy.syncingSteps
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-      case .generating:
-        SyncProgressView(
-          progress: LoadingCopy.generatingProgress,
-          title: LoadingCopy.generatingTitle,
-          subtitle: LoadingCopy.generatingSubtitle,
-          steps: LoadingCopy.generatingSteps
+          progress: generating ? LoadingCopy.generatingProgress : LoadingCopy.syncingProgress,
+          title: generating ? LoadingCopy.generatingTitle : LoadingCopy.syncingTitle,
+          subtitle: generating ? LoadingCopy.generatingSubtitle : LoadingCopy.syncingSubtitle,
+          steps: generating ? LoadingCopy.generatingSteps : LoadingCopy.syncingSteps
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       case .syncFailed:
