@@ -16,6 +16,7 @@ extension GalleryComponent {
     GalleryComponent(name: "IconBadge") { AnyView(IconBadgePage()) },
     GalleryComponent(name: "SegmentedBar") { AnyView(SegmentedBarPage()) },
     GalleryComponent(name: "BarColumns") { AnyView(BarColumnsPage()) },
+    GalleryComponent(name: "MacroDonut") { AnyView(MacroDonutPage()) },
   ]
 
   @MainActor static let composites: [GalleryComponent] = [
