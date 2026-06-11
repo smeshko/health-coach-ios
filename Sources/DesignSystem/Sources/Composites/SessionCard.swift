@@ -6,11 +6,17 @@ import SwiftUI
 /// and the real swap/skip actions are the consuming feature's (8.4 `SessionFeature`, Decision 2). The
 /// feature injects `onSwap`/`onSkip` (default no-op / hidden) and draws the list around the card.
 ///
-/// Everything shown is **model-backed or derived** from the `SessionBlock`'s real fields — the category
-/// badge (strength-family `Card` → "STRENGTH", `card == .rest` → "REST", else the `Intensity` label), the
-/// header icon, the duration numeral, the zone bar, the flags row, and the prehab add-on. The only
-/// authored strings are short category chrome (the header sub-line); no fabricated RPE / reserve / rest /
-/// lift / cue copy is rendered (Decision 3).
+/// The session's `card` selects the layout:
+/// - **rest** (`card == .rest`) — the narrative, an authored optional-activity suggestion box, the "To
+///   help recovery along" recovery row, and the "Rest is training too." footer; no numeral/zone/swap.
+/// - **cardio** (a `zoneTarget`) — the duration numeral + the markerless `SegmentedBar.zones` bar.
+/// - **strength / no-zone** — the duration numeral + the `SegmentedBar.range` 1–10 effort scale with the
+///   **derived** zone→RPE band (`effortBand(for:)`).
+///
+/// Everything shown is model-backed or derived from the `SessionBlock`'s real fields (the category badge,
+/// the header icon, the duration, the zone/effort meter, the flags row, the prehab add-on). The only
+/// authored strings are short category chrome (the header sub-line, the rest-day suggestion + recovery
+/// copy, the effort-scale endpoints); no fabricated RPE / reserve / rest / lift / cue copy (Decision 3).
 public struct SessionCard: View {
   let block: SessionBlock
   let zoneRange: ZoneRange?
@@ -35,58 +41,13 @@ public struct SessionCard: View {
   public var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
       SessionHeader(block: block)
-
-      // Duration numeral + unit (the unit carries the intensity word for a cardio session).
-      HStack(alignment: .lastTextBaseline, spacing: CoachSpacing.spaceXs) {
-        Text(durationNumeral)
-          .font(.coachText3xl)
-          .foregroundStyle(.coachForeground)
-        Text(durationUnit)
-          .font(.coachTextMd)
-          .foregroundStyle(.coachForegroundMuted)
+      if block.card == .rest {
+        RestDayBody(narrative: narrative)
+      } else {
+        ActiveSessionBody(
+          block: block, zoneRange: zoneRange, narrative: narrative, onSwap: onSwap, onSkip: onSkip
+        )
       }
-
-      // Zone presentation — the markerless Z1–Z5 bar, captioned by the passed `zoneRange` (omitted when
-      // nil), with the bpm/spm line from the model beneath.
-      if let zone = block.zoneTarget {
-        VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
-          if let zoneRange {
-            HStack {
-              Text("Zone \(zone.number) target")
-                .textCase(.uppercase)
-                .tracking(Metrics.eyebrowTracking)
-              Spacer(minLength: CoachSpacing.spaceSm)
-              Text("\(zoneRange.low)–\(zoneRange.high) bpm")
-            }
-            .font(.coachText2xs)
-            .foregroundStyle(.coachForegroundSubtle)
-          }
-          SegmentedBar.zones(target: zone.number)
-          if let bpmSpm = bpmSpmLine {
-            Text(bpmSpm)
-              .font(.coachTextXs)
-              .foregroundStyle(.coachForegroundMuted)
-          }
-        }
-      }
-
-      // In-card narrative slot — the passed `.session` slice, verbatim, via the shared renderer.
-      if !narrative.isEmpty {
-        NarrativeRenderer(narrative)
-      }
-
-      // Flags meta row (non-prehab flags) + the prehab add-on chip.
-      if !metaFlags.isEmpty {
-        Divider().overlay(.coachBorder)
-        Text(metaFlags.map(\.label).joined(separator: " · "))
-          .font(.coachTextXs)
-          .foregroundStyle(.coachForegroundMuted)
-      }
-      if !prehabFlags.isEmpty {
-        PrehabAddOn(labels: prehabFlags.map(\.label))
-      }
-
-      SessionFooter(onSwap: onSwap, onSkip: onSkip)
     }
     .padding(CoachSpacing.spaceLg)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,31 +60,6 @@ public struct SessionCard: View {
         )
     )
   }
-
-  /// The big duration figure — a low–high window, collapsing to a single value when the bounds match.
-  private var durationNumeral: String {
-    block.durationMinLow == block.durationMinHigh
-      ? "\(block.durationMinLow)"
-      : "\(block.durationMinLow)–\(block.durationMinHigh)"
-  }
-
-  /// The unit beside the numeral. A cardio session carries the intensity word ("minutes, easy"); other
-  /// sessions stay "minutes" (no fabricated "· 4 lifts").
-  private var durationUnit: String {
-    block.zoneTarget != nil ? "minutes, \(block.intensity.label.lowercased())" : "minutes"
-  }
-
-  /// The bpm/spm line from the model — each half omitted when its field is nil, the whole line nil when
-  /// neither is present.
-  private var bpmSpmLine: String? {
-    var parts: [String] = []
-    if let bpm = block.hrCapBpm { parts.append("≤ \(bpm) bpm") }
-    if let spm = block.cadenceSpm { parts.append("~\(spm) spm") }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
-  }
-
-  private var metaFlags: [Flag] { block.flags.filter { !$0.isPrehab } }
-  private var prehabFlags: [Flag] { block.flags.filter(\.isPrehab) }
 }
 
 /// The card header — the derived card icon, the title (`Card.label`) + the authored category sub-line, and
@@ -138,6 +74,7 @@ private struct SessionHeader: View {
         Text(block.card.label)
           .font(.coachTextLg)
           .foregroundStyle(.coachForeground)
+          .fixedSize(horizontal: false, vertical: true) // wrap a long card name rather than truncate
         if let subtitle = headerSubtitle {
           Text(subtitle)
             .font(.coachTextSm)
@@ -183,6 +120,176 @@ private struct SessionHeader: View {
     case .footPrehab, .glutePrehab, .mobility: "Prehab & mobility"
     case .rest: "Let the work land"
     }
+  }
+}
+
+/// The active (non-rest) session body — duration numeral, the zone bar **or** the effort scale, the
+/// model's bpm/spm line, the in-card narrative, the flags row + prehab add-on, and the footer slots.
+private struct ActiveSessionBody: View {
+  let block: SessionBlock
+  let zoneRange: ZoneRange?
+  let narrative: [NarrativeSection]
+  let onSwap: (() -> Void)?
+  let onSkip: (() -> Void)?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+      // Duration numeral + unit (the unit carries the intensity word for a cardio session).
+      HStack(alignment: .lastTextBaseline, spacing: CoachSpacing.spaceXs) {
+        Text(durationNumeral)
+          .font(.coachText3xl)
+          .foregroundStyle(.coachForeground)
+        Text(durationUnit)
+          .font(.coachTextMd)
+          .foregroundStyle(.coachForegroundMuted)
+      }
+
+      if let zone = block.zoneTarget {
+        // Cardio: the markerless Z1–Z5 bar, captioned by the passed `zoneRange` (omitted when nil),
+        // with the model's bpm/spm line beneath.
+        VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
+          if let zoneRange {
+            HStack {
+              Text("Zone \(zone.number) target")
+                .textCase(.uppercase)
+                .tracking(Metrics.eyebrowTracking)
+              Spacer(minLength: CoachSpacing.spaceSm)
+              Text("\(zoneRange.low)–\(zoneRange.high) bpm")
+            }
+            .font(.coachText2xs)
+            .foregroundStyle(.coachForegroundSubtle)
+          }
+          SegmentedBar.zones(target: zone.number)
+          if let bpmSpm = bpmSpmLine {
+            Text(bpmSpm)
+              .font(.coachTextXs)
+              .foregroundStyle(.coachForegroundMuted)
+          }
+        }
+      } else {
+        // Strength / no-zone: the 1–10 effort scale with the derived band, endpoints labelled (no "RPE N").
+        VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
+          SegmentedBar.range(effortBand(for: block), total: Metrics.effortScale, tone: .warning)
+          HStack {
+            Text("1 · easy")
+            Spacer(minLength: CoachSpacing.spaceSm)
+            Text("max · \(Metrics.effortScale)")
+          }
+          .font(.coachText2xs)
+          .foregroundStyle(.coachForegroundSubtle)
+        }
+      }
+
+      if !narrative.isEmpty {
+        NarrativeRenderer(narrative)
+      }
+
+      if !metaFlags.isEmpty {
+        Divider().overlay(.coachBorder)
+        Text(metaFlags.map(\.label).joined(separator: " · "))
+          .font(.coachTextXs)
+          .foregroundStyle(.coachForegroundMuted)
+      }
+      if !prehabFlags.isEmpty {
+        PrehabAddOn(labels: prehabFlags.map(\.label))
+      }
+
+      SessionFooter(onSwap: onSwap, onSkip: onSkip)
+    }
+  }
+
+  /// The big duration figure — a low–high window, collapsing to a single value when the bounds match.
+  private var durationNumeral: String {
+    block.durationMinLow == block.durationMinHigh
+      ? "\(block.durationMinLow)"
+      : "\(block.durationMinLow)–\(block.durationMinHigh)"
+  }
+
+  /// The unit beside the numeral. A cardio session carries the intensity word ("minutes, easy"); other
+  /// sessions stay "minutes" (no fabricated "· 4 lifts").
+  private var durationUnit: String {
+    block.zoneTarget != nil ? "minutes, \(block.intensity.label.lowercased())" : "minutes"
+  }
+
+  /// The bpm/spm line from the model — each half omitted when its field is nil, the whole line nil when
+  /// neither is present.
+  private var bpmSpmLine: String? {
+    var parts: [String] = []
+    if let bpm = block.hrCapBpm { parts.append("≤ \(bpm) bpm") }
+    if let spm = block.cadenceSpm { parts.append("~\(spm) spm") }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
+  private var metaFlags: [Flag] { block.flags.filter { !$0.isPrehab } }
+  private var prehabFlags: [Flag] { block.flags.filter(\.isPrehab) }
+}
+
+/// The rest-day body — the narrative, an authored optional-activity suggestion box, the "To help recovery
+/// along" recovery row, and the "Rest is training too." footer. No duration / zone / flags / swap.
+private struct RestDayBody: View {
+  let narrative: [NarrativeSection]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+      if !narrative.isEmpty {
+        NarrativeRenderer(narrative)
+      }
+
+      // Authored optional-activity suggestion (DS chrome — the model carries no such prompt).
+      HStack(spacing: CoachSpacing.spaceSm) {
+        IconBadge("figure.walk", shape: .square, size: .md, tone: .accent)
+        VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
+          Text("Stretch your legs, if you feel like it")
+            .font(.coachTextSm)
+            .foregroundStyle(.coachForeground)
+          Text("An easy 20 min walk — completely optional")
+            .font(.coachTextXs)
+            .foregroundStyle(.coachForegroundMuted)
+        }
+        Spacer(minLength: 0)
+      }
+      .padding(CoachSpacing.spaceMd)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        RoundedRectangle(cornerRadius: CoachRadius.md, style: .continuous).fill(.coachSurfaceSunken)
+      )
+
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
+        Text("To help recovery along")
+          .font(.coachTextXs)
+          .foregroundStyle(.coachForegroundSubtle)
+        HStack(alignment: .top, spacing: CoachSpacing.spaceSm) {
+          RecoveryItem(icon: "moon.fill", label: "Sleep well")
+          RecoveryItem(icon: Icon.drop.systemName, label: "Hydrate")
+          RecoveryItem(icon: "figure.mind.and.body", label: "Gentle mobility")
+        }
+      }
+
+      HStack {
+        Spacer()
+        Label("Rest is training too.", systemImage: "heart")
+          .font(.coachTextSm)
+          .foregroundStyle(.coachAccent)
+        Spacer()
+      }
+    }
+  }
+}
+
+/// One recovery suggestion — a soft circular icon badge above a muted label, sharing the row's width.
+private struct RecoveryItem: View {
+  let icon: String
+  let label: String
+
+  var body: some View {
+    VStack(spacing: CoachSpacing.spaceXs) {
+      IconBadge(icon, shape: .circle, size: .md, tone: .accent)
+      Text(label)
+        .font(.coachText2xs)
+        .foregroundStyle(.coachForegroundMuted)
+        .multilineTextAlignment(.center)
+    }
+    .frame(maxWidth: .infinity)
   }
 }
 
@@ -264,8 +371,9 @@ private extension Zone {
   }
 }
 
-/// Eyebrow tracking + icon sizes — named constants, no inline literals.
+/// Eyebrow tracking, icon sizes, and the effort scale length — named constants, no inline literals.
 private enum Metrics {
   static let eyebrowTracking: CGFloat = 0.8
   static let prehabIcon: CGFloat = 22
+  static let effortScale = 10
 }

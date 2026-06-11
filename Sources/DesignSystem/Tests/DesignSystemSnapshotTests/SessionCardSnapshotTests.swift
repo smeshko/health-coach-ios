@@ -1,5 +1,6 @@
-// SessionCard catalog snapshots — the workout/strength/rest-day variants on the single reference device
-// in light + dark. (TASK-005 lands the workout variants; TASK-006 extends the catalog with rest + strength.)
+// SessionCard catalog snapshots — light + dark on the single reference device. The cardio pair fits one
+// device frame; the taller strength + rest variants each get their own fixture so nothing clips below the
+// fold.
 
 #if canImport(UIKit)
   import CoachTestSupport
@@ -12,6 +13,14 @@
   struct SessionCardSnapshotTests {
     @Test func test_sessionCardCatalog() {
       assertCoachSnapshot(of: SessionCardCatalogView())
+    }
+
+    @Test func test_sessionCardStrength() {
+      assertCoachSnapshot(of: SessionCardStrengthCatalogView())
+    }
+
+    @Test func test_sessionCardRest() {
+      assertCoachSnapshot(of: SessionCardRestCatalogView())
     }
   }
 #endif

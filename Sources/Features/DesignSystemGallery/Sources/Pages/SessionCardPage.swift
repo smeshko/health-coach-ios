@@ -2,9 +2,9 @@ import DesignSystem
 import DomainModels
 import SwiftUI
 
-/// Composite gallery page — the `SessionCard` workout variants (`Today · Exercise.png`): an easy run
-/// (Z2 zone bar + zone-range caption + cadence line + in-card narrative + prehab add-on + footer slots)
-/// and a quality session (Z4 bar + hr-cap line). The rest-day + strength variants land in TASK-006.
+/// Composite gallery page — the `SessionCard` variants: an easy run + a quality session
+/// (`Today · Exercise.png`), a strength session with the 1–10 effort scale
+/// (`Strength · Duration-led.png`), and a rest day (`Cell.png`).
 struct SessionCardPage: View {
   var body: some View {
     GalleryScaffold(title: "SessionCard") {
@@ -53,6 +53,45 @@ struct SessionCardPage: View {
         ],
         onSwap: {},
         onSkip: {}
+      )
+
+      stateLabel("Strength (effort scale)")
+      SessionCard(
+        SessionBlock(
+          card: .strengthLower,
+          intensity: .quality,
+          durationMinLow: 45,
+          durationMinHigh: 45,
+          flags: [.qualityDay, .prehabGlute]
+        ),
+        narrative: [
+          NarrativeSection(
+            type: .session,
+            heading: "",
+            body: "Leave a couple reps in the tank on every set — we're building, not testing. Add "
+              + "load only when all sets feel clean."
+          ),
+        ],
+        onSwap: {},
+        onSkip: {}
+      )
+
+      stateLabel("Rest day")
+      SessionCard(
+        SessionBlock(
+          card: .rest,
+          intensity: .recovery,
+          durationMinLow: 0,
+          durationMinHigh: 0
+        ),
+        narrative: [
+          NarrativeSection(
+            type: .session,
+            heading: "",
+            body: "Nothing to chase today. Let the week's work settle in — this is when your body "
+              + "actually adapts and gets stronger."
+          ),
+        ]
       )
     }
   }

@@ -2,13 +2,13 @@ import DesignSystem
 import DomainModels
 import SwiftUI
 
-/// Snapshot fixture for the `SessionCard` composite. The workout variants, drawn from the design
-/// references (`Today · Exercise.png`): an easy run (Z2 zone bar + zone-range caption + cadence line +
-/// the in-card session narrative + a prehab add-on + footer slots) and a quality session (Z4 bar + an
-/// hr-cap line, no zone-range caption). The rest-day + strength variants are added in TASK-006.
+/// Snapshot fixture for the `SessionCard` **cardio** variants (`Today · Exercise.png`): an easy run
+/// (Z2 zone bar + zone-range caption + cadence line + the in-card session narrative + a prehab add-on +
+/// footer slots) and a quality session (Z4 bar + an hr-cap line, no zone-range caption). The strength +
+/// rest variants are tall, so each gets its own device-fitting fixture below.
 struct SessionCardCatalogView: View {
   var body: some View {
-    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+    sessionCardCatalogColumn {
       SessionCard(
         SessionBlock(
           card: .easyRun,
@@ -54,8 +54,70 @@ struct SessionCardCatalogView: View {
         onSkip: {}
       )
     }
-    .padding(CoachSpacing.spaceMd)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    .background(.coachBackground)
   }
+}
+
+/// The **strength / effort-scale** variant (`Strength · Duration-led.png`): the duration numeral + the
+/// 1–10 `SegmentedBar.range` effort scale with the derived band, the narrative, the flags, and a prehab
+/// add-on. Only model-backed data (no fabricated RPE/reserve/rest/lift copy).
+struct SessionCardStrengthCatalogView: View {
+  var body: some View {
+    sessionCardCatalogColumn {
+      SessionCard(
+        SessionBlock(
+          card: .strengthLower,
+          intensity: .quality,
+          durationMinLow: 45,
+          durationMinHigh: 45,
+          flags: [.qualityDay, .prehabGlute]
+        ),
+        narrative: [
+          NarrativeSection(
+            type: .session,
+            heading: "",
+            body: "Leave a couple reps in the tank on every set — we're building, not testing. Add "
+              + "load only when all sets feel clean."
+          ),
+        ],
+        onSwap: {},
+        onSkip: {}
+      )
+    }
+  }
+}
+
+/// The **rest-day** variant (`Cell.png`): the narrative, the authored optional-activity suggestion box,
+/// the "To help recovery along" recovery row, and the "Rest is training too." footer (no swap).
+struct SessionCardRestCatalogView: View {
+  var body: some View {
+    sessionCardCatalogColumn {
+      SessionCard(
+        SessionBlock(
+          card: .rest,
+          intensity: .recovery,
+          durationMinLow: 0,
+          durationMinHigh: 0
+        ),
+        narrative: [
+          NarrativeSection(
+            type: .session,
+            heading: "",
+            body: "Nothing to chase today. Let the week's work settle in — this is when your body "
+              + "actually adapts and gets stronger."
+          ),
+        ]
+      )
+    }
+  }
+}
+
+/// Shared column scaffold — the card(s) on the app background with standard padding.
+@ViewBuilder
+private func sessionCardCatalogColumn(@ViewBuilder _ content: () -> some View) -> some View {
+  VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+    content()
+  }
+  .padding(CoachSpacing.spaceMd)
+  .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+  .background(.coachBackground)
 }
