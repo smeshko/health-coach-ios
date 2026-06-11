@@ -1,5 +1,6 @@
 import APIClient
 import ComposableArchitecture
+import LogClient
 import OnboardingFeature
 import TokenClient
 
@@ -51,6 +52,7 @@ public struct AppFeature {
 
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.tokenClient) var tokenClient
+  @Dependency(\.log) var log
 
   public init() {}
 
@@ -59,18 +61,24 @@ public struct AppFeature {
       switch action {
       case .onboarding(.delegate(.connected)):
         // Onboarding finished → swap in the tab bar.
+        log.info("Connected — switching onboarding → main", category: .app)
         state = .main(MainTabs.State())
         return .none
       case .main(.delegate(.tokenReset)):
         // The You tab cleared the session (the DEBUG dev menu's "reset token", or Phase 10.2's
         // Disconnect row) → swap back to onboarding so the connect flow can be re-run without relaunch.
+        log.info("Token reset — switching main → onboarding", category: .app)
         state = .onboarding(OnboardingFeature.State())
         return .none
-      case ._appWillAppear, ._sessionEvent:
+      case ._appWillAppear:
+        log.info("App will appear — opening session-event stream", category: .lifecycle)
+        return reduceSessionRouting(into: &state, action: action)
+      case ._sessionEvent:
         return reduceSessionRouting(into: &state, action: action)
       case ._restoreSession:
         // Background token check: read the stored bearer token off the launch path. We don't probe the
         // network (an invalid token is the 401 path's job; §13), so launch works offline.
+        log.info("Restoring session — reading stored token", category: .lifecycle)
         return .run { [tokenClient] send in
           let token = try? await tokenClient.read()
           await send(._tokenChecked(hasToken: token?.isEmpty == false))
@@ -78,7 +86,11 @@ public struct AppFeature {
       case let ._tokenChecked(hasToken):
         // Happy-path-first: stay in the default `.main` when a token exists; fall back to onboarding only
         // for the no-token edge case, and only if a 401 hasn't already routed us off `.main`.
-        guard !hasToken, case .main = state else { return .none }
+        guard !hasToken, case .main = state else {
+          log.info("Launch token check — staying put", category: .app, metadata: ["hasToken": "\(hasToken)"])
+          return .none
+        }
+        log.info("Launch token absent — falling back to onboarding", category: .app)
         state = .onboarding(OnboardingFeature.State())
         return .none
       case .onboarding, .main:
@@ -91,5 +103,8 @@ public struct AppFeature {
     .ifCaseLet(\.main, action: \.main) {
       MainTabs()
     }
+    // App-root `.tca` action trace (DECISIONS #4) — label-only, gated by the per-category DevSettings
+    // toggle in `LogClientLive`. Outermost so it observes every action entering the root exactly once.
+    .logActions()
   }
 }

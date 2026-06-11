@@ -1,4 +1,5 @@
 import BriefRepository
+import Clocks
 import CoachCore
 import ComposableArchitecture
 import SyncRepository
@@ -6,11 +7,12 @@ import Testing
 
 @testable import TodayFeature
 
-/// Exhaustive `TestStore` coverage (ARCHITECTURE D18) for the morning orchestration: **sync strictly
-/// before the brief** (D15/§11), a sync failure **blocking** the brief (the brief stub is invoked 0
-/// times, D23/§8.2), the cache-hit `.ready(.cached)` resolve, the brief-error terminal, the load-bearing
-/// **non-typed-throw** catch-all (a 401 from `sync()` is not a `SyncError`), the skip-check-in path, and
-/// retry from a blocked state. The debounce + cancellation suite is TASK-004.
+/// Exhaustive `TestStore` coverage (ARCHITECTURE D18) for the morning orchestration: the **check-in
+/// gate** (no check-in today → `.checkInRequired`, sync never called), **sync strictly before the
+/// brief** (D15/§11), a sync failure **blocking** the brief (the brief stub is invoked 0 times,
+/// D23/§8.2), the cache-hit `.ready(.cached)` resolve, the brief-error terminal, the load-bearing
+/// **non-typed-throw** catch-all (a 401 from `sync()` is not a `SyncError`), and retry from a blocked
+/// state. The save-triggered re-entry + cancellation suite is `TodayFeatureSaveTests`.
 @MainActor
 struct TodayFeatureOrchestrationTests {
   @Test func test_onAppOpen_success_syncThenBrief_readyFresh() async {
@@ -21,7 +23,8 @@ struct TodayFeatureOrchestrationTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
     }
@@ -43,7 +46,8 @@ struct TodayFeatureOrchestrationTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(sofiaInstant())
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { throw SyncError.network }
       $0.briefRepository.dailyBrief = { _ in
         await counter.increment()
@@ -67,7 +71,8 @@ struct TodayFeatureOrchestrationTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in cached }
     }
@@ -88,7 +93,8 @@ struct TodayFeatureOrchestrationTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in throw BriefError.serverError }
     }
@@ -111,7 +117,8 @@ struct TodayFeatureOrchestrationTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(sofiaInstant())
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { throw WeirdError() } // e.g. the propagated 401 — NOT a SyncError (4.3)
       $0.briefRepository.dailyBrief = { _ in
         await counter.increment()
@@ -135,7 +142,8 @@ struct TodayFeatureOrchestrationTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in throw WeirdError() }
     }
@@ -149,26 +157,26 @@ struct TodayFeatureOrchestrationTests {
     await store.receive(\._briefFailed) { $0.briefState = .error(.transientGenerationFailed) }
   }
 
-  @Test func test_skipCheckIn_nilCurrent_stillReachesReady() async {
-    let now = sofiaInstant()
-    let fresh = sampleBrief(cached: false)
+  @Test func test_noCheckInToday_gatesChain_checkInRequired_syncNeverCalled() async {
+    let syncCounter = BriefCallCounter()
     let store = TestStore(initialState: TodayFeature.State()) {
       TodayFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
-      $0.date = .constant(now)
-      $0.checkInRepository.current = { _ in nil } // no check-in logged — must not hard-block
-      $0.syncRepository.sync = { sampleSyncResult() }
-      $0.briefRepository.dailyBrief = { _ in fresh }
+      $0.date = .constant(sofiaInstant())
+      $0.checkInRepository.current = { _ in nil } // nothing saved today → the gate
+      $0.syncRepository.sync = {
+        await syncCounter.increment()
+        return sampleSyncResult()
+      }
+      $0.briefRepository.dailyBrief = { _ in sampleBrief(cached: false) }
     }
 
     await store.send(.onAppOpen)
-    await store.receive(\._syncStarted) { $0.briefState = .syncing }
-    await store.receive(\._generating) {
-      $0.lastSyncedAt = now
-      $0.briefState = .generating
-    }
-    await store.receive(\._briefResolved) { $0.briefState = .ready(fresh, .fresh) }
+    await store.receive(\._checkInRequired) { $0.briefState = .checkInRequired }
+
+    let count = await syncCounter.count
+    #expect(count == 0, "no check-in today → the chain stops at the gate; sync MUST NOT run")
   }
 
   @Test func test_retryFromSyncFailed_rerunsChain_reachesReady() async {
@@ -179,7 +187,8 @@ struct TodayFeatureOrchestrationTests {
     } withDependencies: {
       $0.calendar = .europeSofia
       $0.date = .constant(now)
-      $0.checkInRepository.current = { _ in nil }
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
     }

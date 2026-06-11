@@ -73,6 +73,8 @@ struct CheckInComponentTests {
       $0.giSymptoms = true
       $0.illness = true
       $0.kneePain = 3
+      // `lastSavedAt` is NOT seeded on load — the persisted check-in has only a day-key, not a save
+      // instant (the footer shows day-relative copy for the loaded case, keyed off `existing`).
     }
   }
 
@@ -103,7 +105,11 @@ struct CheckInComponentTests {
     await store.send(.giSymptomsToggled(true)) { $0.giSymptoms = true }
     await store.send(.kneePainChanged(4)) { $0.kneePain = 4 }
     await store.send(.saveTapped) { $0.saveStatus = .saving }
-    await store.receive(\.saveResponse) { $0.saveStatus = .saved }
+    await store.receive(\.saveResponse) {
+      $0.saveStatus = .saved
+      // A successful save stamps the footer with the wall-clock instant (pinned `\.date`).
+      $0.lastSavedAt = instant
+    }
     await store.receive(\.delegate, .checkInSaved)
     await store.finish()
 

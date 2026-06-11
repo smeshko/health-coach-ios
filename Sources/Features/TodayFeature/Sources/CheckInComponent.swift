@@ -10,8 +10,8 @@ import Foundation
 /// repo owns the Europe/Sofia date key, 4.4).
 ///
 /// An **internal** component of `TodayFeature` (ARCHITECTURE §4.5 / D5 "internal unless promoted") —
-/// never its own target. A failed save is **non-fatal** (reverts to `.idle`, no error UI): a missing or
-/// failed check-in must never block the brief (PRD §7.2).
+/// never its own target. A failed save is **non-fatal** (reverts to `.idle`, no error UI, no delegate —
+/// the parent's chain is only re-entered by a *successful* save).
 @Reducer
 public struct CheckInComponent {
   /// The save lifecycle — `.saved` flips to `.idle` again on the next edit (a binding/toggle). 1-level
@@ -27,24 +27,33 @@ public struct CheckInComponent {
     /// Today's loaded check-in (`nil` until `task` resolves, or when none is logged — a normal state).
     public var existing: DomainModels.CheckIn?
     public var saveStatus: SaveStatus
+    /// The wall-clock instant of the **most recent save this session** — drives the footer's "Last saved
+    /// <time>". `nil` until a save happens. Set from `\.date` on `saveResponse(.success)`. It is *not*
+    /// seeded on load: the persisted `CheckIn` carries only a `startOfDay` day-key (no save instant), so
+    /// rendering a clock time from it would show a wrong "12:00 AM"; the loaded case shows day-relative
+    /// footer copy keyed off `existing` instead. Purely presentational — DECISIONS #2's clamp is untouched.
+    public var lastSavedAt: Date?
 
     public init(
       giSymptoms: Bool = false,
       illness: Bool = false,
       kneePain: Int = 0,
       existing: DomainModels.CheckIn? = nil,
-      saveStatus: SaveStatus = .idle
+      saveStatus: SaveStatus = .idle,
+      lastSavedAt: Date? = nil
     ) {
       self.giSymptoms = giSymptoms
       self.illness = illness
       self.kneePain = kneePain
       self.existing = existing
       self.saveStatus = saveStatus
+      self.lastSavedAt = lastSavedAt
     }
   }
 
   /// The only thing the child tells its parent (`TodayFeature`): "the check-in was saved", so the parent
-  /// can offer Refresh (PRD §8.6 — editing the check-in after the brief regenerates it). 1-level nested.
+  /// re-enters the sync→brief chain ("Save & build today's brief" — a saved/edited check-in builds or
+  /// regenerates the brief). 1-level nested.
   public enum Delegate: Equatable { case checkInSaved }
 
   public enum Action {
@@ -92,6 +101,8 @@ public struct CheckInComponent {
         state.giSymptoms = checkIn.giSymptoms
         state.illness = checkIn.illness
         state.kneePain = checkIn.kneePain
+        // Don't seed `lastSavedAt` here — the persisted check-in has only a day-key, not a save instant,
+        // so the footer would show "12:00 AM". The loaded case uses day-relative copy keyed off `existing`.
         return .none
 
       case let .giSymptomsToggled(isOn):
@@ -126,10 +137,11 @@ public struct CheckInComponent {
 
       case .saveResponse(.success):
         state.saveStatus = .saved
+        state.lastSavedAt = date.now
         return .send(.delegate(.checkInSaved))
 
       case .saveResponse(.failure):
-        // Non-fatal: a failed check-in must never block the brief (PRD §7.2). Surface quietly.
+        // Non-fatal: revert quietly so the user can retry — no delegate, so the parent chain stays put.
         state.saveStatus = .idle
         return .none
 

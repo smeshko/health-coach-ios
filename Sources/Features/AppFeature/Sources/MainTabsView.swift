@@ -2,6 +2,7 @@ import ComposableArchitecture
 import DesignSystem
 import SettingsFeature
 import SwiftUI
+import TodayFeature
 
 /// The main tab bar (the `.main` branch). Three tabs — **Today / Week / You** — each its own
 /// `NavigationStack` bound to an independent per-tab `StackState`. Tab roots and pushed destinations are
@@ -17,7 +18,7 @@ struct MainTabsView: View {
       )
     ) {
       NavigationStack(path: $store.scope(state: \.today, action: \.today)) {
-        TabRootPlaceholder(title: "Today", icon: Icon.today.systemName)
+        TodayView(store: store.scope(state: \.todayRoot, action: \.todayRoot))
       } destination: { store in
         switch store.case {
         case .placeholder: PlaceholderDestinationView()
@@ -47,6 +48,11 @@ struct MainTabsView: View {
       .tag(MainTabs.Tab.settings)
     }
     .tint(.coachAccent)
+    // Drive the Today morning orchestration (check-in → sync → daily brief) once when the tab bar
+    // appears. `MainTabsView` mounts once per `.main` session (the outer `AppView` container does not
+    // re-mount on a branch swap), so this fires once — the "host sends `onAppOpen` on app-open" seam.
+    // NOTE: the 401→cancel-`appWork` linkage (AppFeature `CancelID.appWork`) is still a later seam.
+    .task { store.send(.todayRoot(.onAppOpen)) }
   }
 }
 
