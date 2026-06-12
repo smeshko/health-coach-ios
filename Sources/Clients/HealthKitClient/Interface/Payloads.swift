@@ -39,19 +39,6 @@ public struct HealthRecordPayload: Sendable, Equatable {
   }
 }
 
-/// A per-workout statistic (HK `type` is a free string).
-public struct WorkoutStatPayload: Sendable, Equatable {
-  public var type: String
-  public var value: Double
-  public var unit: String
-
-  public init(type: String, value: Double, unit: String) {
-    self.type = type
-    self.value = value
-    self.unit = unit
-  }
-}
-
 /// A workout sample as plain transport data.
 public struct WorkoutPayload: Sendable, Equatable {
   public var uuid: String
@@ -62,8 +49,6 @@ public struct WorkoutPayload: Sendable, Equatable {
   public var distanceM: Double?
   public var activeEnergyKcal: Double?
   public var effortScore: Int?
-  public var zoneMinutes: [String: Double]?
-  public var statistics: [WorkoutStatPayload]
 
   public init(
     uuid: String,
@@ -73,9 +58,7 @@ public struct WorkoutPayload: Sendable, Equatable {
     durationS: Double,
     distanceM: Double? = nil,
     activeEnergyKcal: Double? = nil,
-    effortScore: Int? = nil,
-    zoneMinutes: [String: Double]? = nil,
-    statistics: [WorkoutStatPayload] = []
+    effortScore: Int? = nil
   ) {
     self.uuid = uuid
     self.type = type
@@ -85,8 +68,6 @@ public struct WorkoutPayload: Sendable, Equatable {
     self.distanceM = distanceM
     self.activeEnergyKcal = activeEnergyKcal
     self.effortScore = effortScore
-    self.zoneMinutes = zoneMinutes
-    self.statistics = statistics
   }
 }
 

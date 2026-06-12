@@ -28,7 +28,7 @@ struct HealthKitToWireTests {
     #expect(wire.unit == "count/min")
     #expect(wire.category == "resting")
     #expect(wire.source == "Watch")
-    #expect(wire.metadata == .object(["motion": .string("still")]))
+    #expect(wire.metadata == ["motion": "still"])
   }
 
   @Test func test_wireHealthRecord_nilOptionals() {
@@ -41,7 +41,7 @@ struct HealthKitToWireTests {
     #expect(wire.metadata == nil)
   }
 
-  @Test func test_wireWorkout_mapsStatsAndOptionals() {
+  @Test func test_wireWorkout_mapsOptionals() {
     let payload = WorkoutPayload(
       uuid: "w1",
       type: "running",
@@ -50,9 +50,7 @@ struct HealthKitToWireTests {
       durationS: 600,
       distanceM: 2500,
       activeEnergyKcal: 300,
-      effortScore: 7,
-      zoneMinutes: ["z2": 8.5],
-      statistics: [WorkoutStatPayload(type: "heart_rate", value: 150, unit: "count/min")]
+      effortScore: 7
     )
     let wire = wireWorkout(payload)
     #expect(wire.uuid == "w1")
@@ -61,8 +59,6 @@ struct HealthKitToWireTests {
     #expect(wire.distanceM == 2500)
     #expect(wire.activeEnergyKcal == 300)
     #expect(wire.effortScore == 7)
-    #expect(wire.zoneMinutes == ["z2": 8.5])
-    #expect(wire.statistics == [WorkoutStat(type: "heart_rate", value: 150, unit: "count/min")])
   }
 
   @Test func test_wireActivitySummary_mapsRingFields() {
@@ -104,9 +100,13 @@ struct HealthKitToWireTests {
     #expect(request.checkin == nil)
     #expect(request.strengthTest == nil)
 
-    // Encodes to a server-valid body and round-trips.
+    // Encodes to a server-valid body: empty arrays, the two optionals omitted.
     let data = try WireCoder.encoder.encode(request)
-    let decoded = try WireCoder.decoder.decode(SyncRequest.self, from: data)
-    #expect(decoded == request)
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect((object["records"] as? [Any])?.isEmpty == true)
+    #expect((object["workouts"] as? [Any])?.isEmpty == true)
+    #expect((object["activitySummary"] as? [Any])?.isEmpty == true)
+    #expect(object["checkin"] == nil)
+    #expect(object["strengthTest"] == nil)
   }
 }

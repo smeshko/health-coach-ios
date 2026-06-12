@@ -84,9 +84,6 @@
       return quantitySample.quantity.doubleValue(for: unit)
     }
 
-    // `zoneMinutes` and per-workout `statistics` are intentionally left empty here: their HK→wire
-    // unit mapping is owned by `SyncRepository` (Epic 4.3), which builds the `SyncRequest`. The canned
-    // test value carries a stat to exercise the payload *shape*; live enrichment lands in 4.3.
     static func workoutPayload(from workout: HKWorkout) -> WorkoutPayload {
       let distance = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
         .sumQuantity()?.doubleValue(for: .meter())
@@ -101,9 +98,7 @@
         durationS: workout.duration,
         distanceM: distance,
         activeEnergyKcal: energy,
-        effortScore: effort,
-        zoneMinutes: nil,
-        statistics: []
+        effortScore: effort
       )
     }
 

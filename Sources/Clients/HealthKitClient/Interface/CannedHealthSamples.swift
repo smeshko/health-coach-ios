@@ -32,8 +32,7 @@ enum CannedHealthSamples {
       workouts: [
         WorkoutPayload(
           uuid: "wk-run", type: "HKWorkoutActivityTypeRunning", start: afterAnchor, end: afterAnchor,
-          durationS: 2700, distanceM: 8000, activeEnergyKcal: 540, effortScore: 7,
-          statistics: [WorkoutStatPayload(type: "heartRate", value: 152, unit: "count/min")]
+          durationS: 2700, distanceM: 8000, activeEnergyKcal: 540, effortScore: 7
         ),
       ],
       activity: [

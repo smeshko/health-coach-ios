@@ -163,12 +163,6 @@ struct DecodeRoundTripTests {
 
   // MARK: - Request bodies: empty body + format:date encode
 
-  @Test func test_syncRequest_emptyAndFullRoundTrip() throws {
-    try assertRoundTrips(SyncRequest.self, from: "{}")
-    let empty = try decode(SyncRequest.self, from: "{}")
-    #expect(empty == SyncRequest())
-  }
-
   @Test func test_briefRequests_emptyBody() throws {
     #expect(try decode(DailyBriefRequest.self, from: "{}") == DailyBriefRequest(date: nil))
     #expect(try decode(WeeklyBriefRequest.self, from: "{}") == WeeklyBriefRequest(isoWeek: nil))

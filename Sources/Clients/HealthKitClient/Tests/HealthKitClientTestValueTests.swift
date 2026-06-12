@@ -18,9 +18,8 @@ struct HealthKitClientTestValueTests {
     #expect(set.records.count == 3)
     #expect(set.workouts.count == 1)
     #expect(set.activity.count == 1)
-    // The canned workout carries an RPE and a stat (Epic 4.3 maps these to the wire shape).
+    // The canned workout carries an RPE (Epic 4.3 maps these to the wire shape).
     #expect(set.workouts.first?.effortScore == 7)
-    #expect(set.workouts.first?.statistics.count == 1)
   }
 
   @Test func test_filteredAfter_isInclusiveAtTheBoundary() {
