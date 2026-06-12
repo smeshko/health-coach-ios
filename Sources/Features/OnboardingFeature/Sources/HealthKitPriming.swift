@@ -25,37 +25,26 @@ public struct HealthKitPriming {
     case degraded(DegradedSummary)
   }
 
-  /// The degraded-screen payload: which rows are missing (inferred from empty delta slices) and the
-  /// corroborating status hint (the read-auth map, used only to sharpen wording — never to decide
-  /// "missing"; DECISIONS #2).
+  /// The degraded-screen payload: which rows are missing (inferred from empty delta slices).
   public struct DegradedSummary: Equatable, Sendable {
     public var missing: Set<PrimingRow>
-    public var statusHint: [HealthDataCategory: HealthAuthorizationStatus]
 
-    public init(
-      missing: Set<PrimingRow>,
-      statusHint: [HealthDataCategory: HealthAuthorizationStatus] = [:]
-    ) {
+    public init(missing: Set<PrimingRow>) {
       self.missing = missing
-      self.statusHint = statusHint
     }
   }
 
   @ObservableState
   public struct State: Equatable {
     public var phase: PrimingPhase
-    /// The best-effort read-auth hint (corroboration / `.healthDataUnavailable` short-circuit only).
-    public var statusHint: [HealthDataCategory: HealthAuthorizationStatus]
     /// The rows inferred missing from the empty-delta probe (drives the degraded view).
     public var missingRows: Set<PrimingRow>
 
     public init(
       phase: PrimingPhase = .priming,
-      statusHint: [HealthDataCategory: HealthAuthorizationStatus] = [:],
       missingRows: Set<PrimingRow> = []
     ) {
       self.phase = phase
-      self.statusHint = statusHint
       self.missingRows = missingRows
     }
   }
@@ -108,8 +97,7 @@ public struct HealthKitPriming {
           }
         }
 
-      case let .authorizationResponse(.success(hint)):
-        state.statusHint = hint
+      case .authorizationResponse(.success):
         state.phase = .checking
         // One-shot, watermark-neutral presence probe since the far past — "is there any sample at all",
         // not a 30-day window, so an old-but-granted category still reads present (DECISIONS #2).
@@ -161,7 +149,7 @@ public struct HealthKitPriming {
   /// Land the `.degraded` phase from an inferred missing-row set.
   private func degrade(_ state: inout State, missing: Set<PrimingRow>) -> Effect<Action> {
     state.missingRows = missing
-    state.phase = .degraded(DegradedSummary(missing: missing, statusHint: state.statusHint))
+    state.phase = .degraded(DegradedSummary(missing: missing))
     return .none
   }
 }

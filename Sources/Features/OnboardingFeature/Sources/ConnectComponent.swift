@@ -43,10 +43,6 @@ public struct ConnectComponent {
 
   public enum Action: BindableAction {
     case binding(BindingAction<State>)
-    /// The view's Paste affordance. No clipboard `@Dependency` is pinned in the architecture yet
-    /// (DECISIONS 4), so the view reads `UIPasteboard` directly and feeds `.tokenPasted`; this stays as
-    /// an explicit no-op target for a future clipboard dependency.
-    case pasteTapped
     case tokenPasted(String)
     case connectTapped
     /// Carries "probe returned without throwing" (success — the `Bool` value is irrelevant per §6/3.1)
@@ -68,11 +64,6 @@ public struct ConnectComponent {
         // Any field edit clears a prior error back to idle — re-entry / re-paste is the only recovery
         // path (FR-ONB-1: no account/recovery flow).
         state.validation = .idle
-        return .none
-
-      case .pasteTapped:
-        // No-op: the pasted string arrives via `.tokenPasted` from the view's `PasteButton`
-        // (DECISIONS 4). Kept so the Paste affordance has a stable action target.
         return .none
 
       case let .tokenPasted(value):
