@@ -17,7 +17,7 @@ format:
 lint:
 	swiftlint lint --strict
 
-# Host logic tests (CoachCoreTests + AppFeatureTests) on the macOS host.
+# The full package unit-test suite (all non-snapshot targets) on the macOS host.
 test:
 	swift test
 
