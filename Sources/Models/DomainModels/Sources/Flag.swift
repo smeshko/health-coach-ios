@@ -26,6 +26,7 @@ public enum Flag: Sendable, Hashable {
 /// `.unknown(raw)`. Normalizing, not lossless: `.unknown("quality_day")` round-trips to `.qualityDay`
 /// (DECISIONS D2 — no fixture or production path produces a case-colliding `.unknown`).
 extension Flag: Codable {
+  // swiftlint:disable:next cyclomatic_complexity
   public init(from decoder: Decoder) throws {
     let raw = try decoder.singleValueContainer().decode(String.self)
     switch raw {

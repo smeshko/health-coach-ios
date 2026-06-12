@@ -71,6 +71,9 @@ struct RecordConformanceTests {
     #expect(fetchedCheckIn == checkIn)
 
     let fetchedWatermark = try database.reader().read { db in try SyncWatermarkRecord.fetchOne(db) }
-    #expect(fetchedWatermark?.lastStrengthTestSyncedWeek == week, "the ISOWeek marker round-trips non-nil through the real schema")
+    #expect(
+      fetchedWatermark?.lastStrengthTestSyncedWeek == week,
+      "the ISOWeek marker round-trips non-nil through the real schema"
+    )
   }
 }

@@ -16,7 +16,7 @@ struct CodableTests {
   }
 
   private func encodedString(_ value: some Encodable) throws -> String {
-    String(decoding: try encoder.encode(value), as: UTF8.self)
+    try #require(String(bytes: try encoder.encode(value), encoding: .utf8))
   }
 
   // MARK: - Closed enums: wire raw strings

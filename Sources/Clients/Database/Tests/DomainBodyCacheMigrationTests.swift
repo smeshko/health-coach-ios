@@ -24,7 +24,10 @@ struct DomainBodyCacheMigrationTests {
         arguments: [day, true, day, "v3", Data("OLD_FORMAT_BLOB".utf8)]
       )
       try db.execute(
-        sql: "INSERT INTO weeklyPlan (isoWeek, weekStart, constantsRecomputed, generatedAt, cached, body) VALUES (?, ?, ?, ?, ?, ?)",
+        sql: """
+        INSERT INTO weeklyPlan (isoWeek, weekStart, constantsRecomputed, generatedAt, cached, body)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
         arguments: ["2026-W24", day, false, day, false, Data("OLD_FORMAT_BLOB".utf8)]
       )
       try db.execute(
