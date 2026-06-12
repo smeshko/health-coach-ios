@@ -1,7 +1,7 @@
 import Foundation
 
 /// A rendered narrative block, shown verbatim to the athlete (ARCHITECTURE principle #1).
-public struct NarrativeSection: Equatable, Sendable {
+public struct NarrativeSection: Equatable, Codable, Sendable {
   public var type: NarrativeType
   public var heading: String
   public var body: String

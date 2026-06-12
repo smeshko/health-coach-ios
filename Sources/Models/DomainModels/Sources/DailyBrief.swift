@@ -2,7 +2,7 @@ import Foundation
 
 /// The daily brief, with the wire `{ data, narrative }` envelope flattened — reducers/views see the
 /// data fields and `narrative` directly.
-public struct DailyBrief: Equatable, Sendable {
+public struct DailyBrief: Equatable, Codable, Sendable {
   public var date: Date
   public var readiness: Readiness
   public var safetyGate: SafetyGate

@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Added in Phase 2.3 as the domain peer of `StrengthTestRecord` (see ``CheckIn``). Plain
 /// `Equatable`/`Sendable`, no `Codable`/GRDB.
-public struct StrengthTest: Equatable, Sendable {
+public struct StrengthTest: Equatable, Codable, Sendable {
   public var date: Date
   public var maxPushups: Int
   public var maxPullups: Int

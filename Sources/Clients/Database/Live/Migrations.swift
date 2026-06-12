@@ -63,6 +63,18 @@ extension DatabaseClient {
       }
     }
 
+    // Phase 11.2: DomainModels adopt in-module Codable, replacing the hand-written body coding (the
+    // open-enum shape changed from a `kind`/`raw` discriminator to a single raw string). The three
+    // composite `body` blobs were written by the old coders, so
+    // clear them once — the caches are re-fetchable, not durable data, and GRDB runs migrations at DB
+    // open before any read, so nothing ever decodes an old-format blob (DECISIONS D3). The flat
+    // records (check-in, strength test, watermarks) store no body blob and are untouched.
+    migrator.registerMigration("v3_clearDomainBodyCaches") { db in
+      try db.execute(sql: "DELETE FROM \(DailyBriefRecord.databaseTableName)")
+      try db.execute(sql: "DELETE FROM \(WeeklyPlanRecord.databaseTableName)")
+      try db.execute(sql: "DELETE FROM \(ProfileRecord.databaseTableName)")
+    }
+
     return migrator
   }
 }
