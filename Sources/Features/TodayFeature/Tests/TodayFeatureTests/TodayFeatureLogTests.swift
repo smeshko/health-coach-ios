@@ -4,6 +4,7 @@ import Clocks
 import CoachCore
 import ComposableArchitecture
 import LogClient
+import SessionFeature
 import SyncRepository
 import Testing
 
@@ -27,6 +28,7 @@ struct TodayFeatureLogTests {
       $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in brief }
+      $0.profileRepository.zones = { sampleZones() }
       $0.log = .recording(into: recorder)
     }
 
@@ -36,9 +38,11 @@ struct TodayFeatureLogTests {
       $0.lastSyncedAt = instant
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(brief, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: brief.readiness)
+      $0.session = expectedSessionState(brief, zones: sampleZones())
     }
 
     #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("morning orchestration") })

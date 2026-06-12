@@ -1,6 +1,7 @@
 import Clocks
 import CoachCore
 import ComposableArchitecture
+import SessionFeature
 import SyncRepository
 import Testing
 
@@ -31,6 +32,7 @@ struct TodayFeatureSaveTests {
         await recorder.record(refresh)
         return fresh
       }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     await store.send(.checkIn(.saveTapped)) { $0.checkIn.saveStatus = .saving }
@@ -45,9 +47,11 @@ struct TodayFeatureSaveTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+      $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
 
     let flags = await recorder.flags
@@ -71,6 +75,7 @@ struct TodayFeatureSaveTests {
         await recorder.record(refresh)
         return fresh
       }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     // Edit + re-save with a brief already shown → the chain re-runs and a fresh brief replaces the cache.
@@ -85,9 +90,11 @@ struct TodayFeatureSaveTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+      $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
 
     let flags = await recorder.flags
@@ -113,6 +120,7 @@ struct TodayFeatureSaveTests {
         return sampleSyncResult()
       }
       $0.briefRepository.dailyBrief = { _ in fresh }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     // First run starts and suspends inside sync().
@@ -133,9 +141,11 @@ struct TodayFeatureSaveTests {
       $0.briefState = .generating
     }
     await clock.advance(by: TodayFeature.loadingPhaseMinDuration)
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+      $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
 
     let count = await syncCount.count

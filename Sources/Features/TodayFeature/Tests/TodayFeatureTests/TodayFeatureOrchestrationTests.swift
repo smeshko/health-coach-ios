@@ -2,6 +2,7 @@ import BriefRepository
 import Clocks
 import CoachCore
 import ComposableArchitecture
+import SessionFeature
 import SyncRepository
 import Testing
 
@@ -27,6 +28,7 @@ struct TodayFeatureOrchestrationTests {
       $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     await store.send(.onAppOpen)
@@ -35,9 +37,11 @@ struct TodayFeatureOrchestrationTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+      $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
   }
 
@@ -78,6 +82,7 @@ struct TodayFeatureOrchestrationTests {
       $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in cached }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     await store.send(.onAppOpen)
@@ -86,9 +91,11 @@ struct TodayFeatureOrchestrationTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(cached, .cached)
       $0.readiness = ReadinessComponent.State(readiness: cached.readiness)
+      $0.session = expectedSessionState(cached, zones: sampleZones())
     }
   }
 
@@ -197,6 +204,7 @@ struct TodayFeatureOrchestrationTests {
       $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     await store.send(.retryTapped)
@@ -205,9 +213,11 @@ struct TodayFeatureOrchestrationTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+      $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
   }
 }

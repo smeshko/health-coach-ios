@@ -3,15 +3,19 @@ import ComposableArchitecture
 import DesignSystem
 import DomainModels
 import Foundation
+import SessionFeature
 import SwiftUI
 import SyncRepository
 
 /// The Today tab's root view (the 2026-06-10 shell — `Today · Exercise.png` / `Today · Nutrition.png`):
-/// the "Today" title + Europe/Sofia date subtitle + the "● Synced …" pill, then an **exhaustive** switch
+/// the "Today" title + Europe/Sofia date subtitle + the "● Synced …" pill, over an **exhaustive** switch
 /// over `store.briefState` (no `default:`) — so the 8.2/8.3/8.4 phases add *content* to the `ready`
-/// branch without ever missing a lifecycle render path. The Exercise | Nutrition segmented toggle (the
-/// `SegTabs` primitive) is **not rendered yet** — it belongs above the brief content, and no brief
-/// content exists until 8.2/8.4 fill the `ready` seams; Phase 8.2 mounts it (in `ready` only).
+/// branch without ever missing a lifecycle render path. The morning **check-in is a full cover presented
+/// on top** of that brief content (the `ZStack`'s upper layer, the `.checkInRequired` gate —
+/// `1 · Daily Check-in.png`): while it's up the opaque cover hides the brief, and saving dismisses it
+/// to reveal the loaded brief — so the check-in never renders inline alongside the exercise/nutrition view.
+/// The Exercise | Nutrition segmented toggle (the `SegTabs` primitive) sits atop the `ready` content
+/// (`TodayReadyContent`), switching the brief between the exercise and nutrition sections.
 ///
 /// All chrome is `DesignSystem` tokens/primitives; the brief-error copy comes from the `DesignSystem`
 /// `ErrorDisplay` boundary (the feature maps the typed `BriefError` onto it). The sync-failed state shows
@@ -27,46 +31,60 @@ public struct TodayView: View {
   }
 
   public var body: some View {
-    Group {
-      switch store.briefState {
-      // Idle + the two loading states render chrome-free and centered — the `2 ·`/`3 · Loading` mockups
-      // have no header/toggle. Content states (below) carry them via `TodayContentScroll`.
-      case .idle:
-        ProgressView()
+    // The check-in is **not** a lifecycle branch — it presents as a full cover **on top** of the brief
+    // (the `ZStack`'s upper layer). While the gate is up, the opaque cover hides the exercise/nutrition
+    // brief entirely (the 2026-06-10 design: the check-in is its own screen, `1 · Daily Check-in.png`).
+    ZStack {
+      Group {
+        switch store.briefState {
+        // Idle + the two loading states render chrome-free and centered — the `2 ·`/`3 · Loading` mockups
+        // have no header/toggle. Content states (below) carry them via `TodayContentScroll`.
+        case .idle:
+          ProgressView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .checkInRequired:
+          // The brief is gated behind the check-in, so it hasn't loaded yet — the base stays empty; the
+          // check-in cover (below) is the entry screen on top.
+          Color.clear
+        // One branch for both loading states (not two `case`s) — a shared view identity is what lets the
+        // ring's trim tween 0.3 → 0.7 and the spinners keep turning across the syncing→generating handoff.
+        case .syncing, .generating:
+          let generating = store.briefState == .generating
+          SyncProgressView(
+            progress: generating ? LoadingCopy.generatingProgress : LoadingCopy.syncingProgress,
+            title: generating ? LoadingCopy.generatingTitle : LoadingCopy.syncingTitle,
+            subtitle: generating ? LoadingCopy.generatingSubtitle : LoadingCopy.syncingSubtitle,
+            steps: generating ? LoadingCopy.generatingSteps : LoadingCopy.syncingSteps
+          )
           .frame(maxWidth: .infinity, maxHeight: .infinity)
-      case .checkInRequired:
-        // The check-in gate (`1 · Daily Check-in.png`) — no brief yet, so no section toggle; saving
-        // re-enters the sync→brief chain.
+        case .syncFailed:
+          TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
+            TodaySyncFailedContent { store.send(.retryTapped) }
+          }
+        case let .error(error):
+          TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
+            TodayBriefErrorContent(display: errorDisplay(for: error)) { store.send(.retryTapped) }
+          }
+        case let .ready(brief, freshness):
+          TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
+            TodayReadyContent(
+              store: store,
+              brief: brief,
+              cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
+            )
+          }
+        }
+      }
+
+      // The morning check-in presented **on top** of the brief — an opaque full cover, so while the gate
+      // is up nothing from the exercise/nutrition brief shows through. Saving re-enters the sync→brief
+      // chain, which flips `briefState` off `.checkInRequired` and dismisses the cover to reveal the brief.
+      if store.briefState == .checkInRequired {
         TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
           CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
         }
-      // One branch for both loading states (not two `case`s) — a shared view identity is what lets the
-      // ring's trim tween 0.3 → 0.7 and the spinners keep turning across the syncing→generating handoff.
-      case .syncing, .generating:
-        let generating = store.briefState == .generating
-        SyncProgressView(
-          progress: generating ? LoadingCopy.generatingProgress : LoadingCopy.syncingProgress,
-          title: generating ? LoadingCopy.generatingTitle : LoadingCopy.syncingTitle,
-          subtitle: generating ? LoadingCopy.generatingSubtitle : LoadingCopy.syncingSubtitle,
-          steps: generating ? LoadingCopy.generatingSteps : LoadingCopy.syncingSteps
-        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-      case .syncFailed:
-        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
-          TodaySyncFailedContent { store.send(.retryTapped) }
-        }
-      case let .error(error):
-        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
-          TodayBriefErrorContent(display: errorDisplay(for: error)) { store.send(.retryTapped) }
-        }
-      case let .ready(brief, freshness):
-        TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
-          TodayReadyContent(
-            store: store,
-            brief: brief,
-            cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
-          )
-        }
+        .background(.coachBackground)
       }
     }
     .background(.coachBackground)
@@ -225,10 +243,12 @@ private struct TodayBriefErrorContent: View {
   }
 }
 
-/// The `ready` content area: the cached-freshness label, the **readiness gauge** (Phase 8.3) above the
-/// **forced-REST vs normal-session** switch (`TodaySessionMode`, Phase 8.3), the check-in section, and the
-/// nutrition seam (Phase 8.5). The Exercise|Nutrition `SegTabs` toggle is wired through
-/// `selectedSection`/`sectionSelected`; the nutrition arm is the 8.5 seam.
+/// The `ready` content area: the cached-freshness label, then either the **exercise** arm — the
+/// **readiness gauge** (Phase 8.3) above the **forced-REST vs normal-session** switch (`TodaySessionMode`,
+/// Phase 8.3) — or the **nutrition** arm (Phase 8.5). The check-in is **not** here: it presents as a full
+/// cover on top of this view (`TodayView`'s `ZStack`), so a loaded brief never shows the check-in inline
+/// (the 2026-06-10 design — the check-in is its own screen). The Exercise|Nutrition `SegTabs` toggle is
+/// wired through `selectedSection`/`sectionSelected`.
 private struct TodayReadyContent: View {
   @Bindable var store: StoreOf<TodayFeature>
   let brief: DomainModels.DailyBrief
@@ -236,6 +256,14 @@ private struct TodayReadyContent: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+      // The Exercise | Nutrition switcher (`Today · Exercise.png` / `Today · Nutrition.png`) — sits above
+      // the brief content, only in `ready` (no brief → no sections). Selection lives in `selectedSection`;
+      // taps route through `.sectionSelected` so the reducer owns the toggle (exhaustively testable).
+      SegTabs(selection: Binding(
+        get: { store.selectedSection == .nutrition ? .nutrition : .exercise },
+        set: { store.send(.sectionSelected($0 == .nutrition ? .nutrition : .exercise)) }
+      ))
+
       if let cachedLabel {
         Text(cachedLabel)
           .font(.coachTextXs)
@@ -270,22 +298,29 @@ private struct TodayReadyContent: View {
             ) { SafetyRestComponent() },
             narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
           )
-        case let .normal(session):
-          // TODO(8.4): the promoted `SessionFeature` renders this with the inline SWAP-TO list + skipOk.
-          // Until it merges, a thin read-only `SessionCard` stand-in renders the displayed session.
-          SessionCard(
-            session,
-            narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
-          )
+        case .normal:
+          // The promoted `SessionFeature` (Phase 8.4) renders the displayed session through the
+          // `SessionCard` with the inline SWAP-TO list + the warm skip affordance. The parent hydrates
+          // `state.session` exactly on the untripped (`.normal`) path, so the scope is non-nil here.
+          if let sessionStore = store.scope(state: \.session, action: \.session) {
+            SessionFeatureView(store: sessionStore)
+          }
         }
-
-        CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
       case .nutrition:
         // MARK: - Phase 8.5 nutrition
 
-        Text("Nutrition")
-          .font(.coachTextMd)
-          .foregroundStyle(.coachForegroundMuted)
+        // The TODAY'S FUEL panel + COACH NOTE, then the yesterday recap / no-food empty state — co-equal
+        // with the workout (PRD §7.4.4 / §6 principle 4). Both are render-only sub-components constructed
+        // inline from the loaded brief (the `SafetyRestComponent` precedent), so they hold no parent state
+        // and need no reducer scope.
+        NutritionView(
+          store: Store(initialState: NutritionComponent.State(brief: brief)) { NutritionComponent() }
+        )
+        YesterdayIntakeView(
+          store: Store(
+            initialState: YesterdayIntakeComponent.State(intakeYesterday: brief.intakeYesterday)
+          ) { YesterdayIntakeComponent() }
+        )
       }
     }
   }

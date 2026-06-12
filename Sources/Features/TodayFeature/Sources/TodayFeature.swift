@@ -4,6 +4,8 @@ import ComposableArchitecture
 import DomainModels
 import Foundation
 import LogClient
+import ProfileRepository
+import SessionFeature
 import SyncRepository
 
 /// The Today tab's root reducer (ARCHITECTURE §4.5, PRD §6/§8.1) — the hero "daily brief" screen. It owns
@@ -33,6 +35,16 @@ public struct TodayFeature {
     /// persists across re-renders (DECISIONS #1); scoped via `ifLet`. (The `SafetyRestComponent` is
     /// render-only — no in-screen interaction — so it is constructed inline in the view, not held here.)
     public var readiness: ReadinessComponent.State?
+    /// The promoted daily-session child (Phase 8.4) — the `SessionCard` + inline swap. Hydrated from the
+    /// resolved brief **only on an untripped day** (`!safetyGate.triggered`, the `.normal` mode); `nil`
+    /// otherwise (forced-REST renders the inline `SafetyRestView` instead, no swap/skip). Held in parent
+    /// state (not derived per-render) so the swap selection + expansion persist across re-renders
+    /// (DECISIONS #1); scoped via `ifLet`.
+    public var session: SessionFeature.State?
+    /// The five-zone bpm map (`ProfileRepository.zones()`), fetched by the orchestration and handed to the
+    /// session child so a *swapped* alternative's `zoneTarget` resolves its bpm range (DECISIONS #4).
+    /// `nil` until the fetch lands (or if it fails — a non-fatal degrade: the chip just doesn't render).
+    public var zones: Zones?
     /// The 2026-06-10 shell's Exercise | Nutrition segmented toggle (local UI state). 8.2/8.3 render
     /// under `.exercise`, 8.4 under `.nutrition`.
     public var selectedSection: TodaySection
@@ -44,12 +56,16 @@ public struct TodayFeature {
       briefState: BriefViewState = .idle,
       checkIn: CheckInComponent.State = CheckInComponent.State(),
       readiness: ReadinessComponent.State? = nil,
+      session: SessionFeature.State? = nil,
+      zones: Zones? = nil,
       selectedSection: TodaySection = .exercise,
       lastSyncedAt: Date? = nil
     ) {
       self.briefState = briefState
       self.checkIn = checkIn
       self.readiness = readiness
+      self.session = session
+      self.zones = zones
       self.selectedSection = selectedSection
       self.lastSyncedAt = lastSyncedAt
     }
@@ -66,6 +82,9 @@ public struct TodayFeature {
     case checkIn(CheckInComponent.Action)
     /// The readiness child's actions (the "why" toggle) — scoped via `ifLet` while a brief is loaded.
     case readiness(ReadinessComponent.Action)
+    /// The daily-session child's actions (inline swap + the skip-requested delegate) — scoped via `ifLet`
+    /// on an untripped day.
+    case session(SessionFeature.Action)
     // Internal transition actions drive the orchestration's `BriefViewState` mutations through the
     // reducer. The leading underscore (TCA convention) trips `identifier_name`, so scope a disable.
     // swiftlint:disable identifier_name
@@ -74,6 +93,9 @@ public struct TodayFeature {
     case _syncStarted
     case _syncFailed(SyncError)
     case _generating
+    /// The fetched HR zones (or `nil` if the fetch failed) — sent **before** `._briefResolved` so the
+    /// session child hydrates with `state.zones` already in place (DECISIONS #4).
+    case _zonesResolved(Zones?)
     case _briefResolved(DomainModels.DailyBrief, Freshness)
     case _briefFailed(BriefError)
     // swiftlint:enable identifier_name
@@ -94,6 +116,7 @@ public struct TodayFeature {
   @Dependency(\.checkInRepository) var checkInRepository
   @Dependency(\.syncRepository) var syncRepository
   @Dependency(\.briefRepository) var briefRepository
+  @Dependency(\.profileRepository) var profileRepository
   @Dependency(\.continuousClock) var clock
   @Dependency(\.calendar) var calendar
   @Dependency(\.date) var date
@@ -144,11 +167,30 @@ public struct TodayFeature {
         state.briefState = .generating
         return .none
 
+      case let ._zonesResolved(zones):
+        // The orchestration sends this before `._briefResolved`, so `state.zones` is in place when the
+        // session child hydrates below (DECISIONS #4). A `nil` fetch degrades silently (no zone chip).
+        state.zones = zones
+        return .none
+
       case let ._briefResolved(brief, freshness):
         state.briefState = .ready(brief, freshness)
         // Hydrate the readiness child from the resolved brief (Phase 8.3) so the gauge + its persisted
         // "why" toggle render under `ready`. A fresh brief resets the toggle to collapsed.
         state.readiness = ReadinessComponent.State(readiness: brief.readiness)
+        // Hydrate the daily-session child (Phase 8.4) — **only on an untripped day** (`.normal` mode);
+        // a tripped gate renders the inline `SafetyRestView` instead, so leave `session` nil there. The
+        // `.session` narrative slice is pre-filtered for the in-card slot (DECISIONS #3); a fresh brief
+        // re-seeds the child, resetting any swap selection/expansion.
+        state.session = brief.safetyGate.triggered
+          ? nil
+          : SessionFeature.State(
+            session: brief.session,
+            alternatives: brief.alternatives,
+            skipOk: brief.skipOk,
+            narrative: brief.narrative.filter { $0.type == .session },
+            zones: state.zones
+          )
         return .none
 
       case let ._briefFailed(error):
@@ -167,10 +209,23 @@ public struct TodayFeature {
       case .readiness:
         // The "why" toggle is handled by the scoped child reducer (below).
         return .none
+
+      case .session(.delegate(.skipRequested)):
+        // The athlete asked to skip today's session. Permission, not dismiss (PRD §7.4.3) — the card
+        // stays; the parent just records intent. Analytics/ack land later; for now an observability line.
+        log.info("Athlete requested to skip today's session", category: .lifecycle)
+        return .none
+
+      case .session:
+        // The inline swap (expand/collapse, select/revert) is handled by the scoped child reducer (below).
+        return .none
       }
     }
     .ifLet(\.readiness, action: \.readiness) {
       ReadinessComponent()
+    }
+    .ifLet(\.session, action: \.session) {
+      SessionFeature()
     }
   }
 
@@ -185,7 +240,7 @@ public struct TodayFeature {
   /// terminal retryable state instead.
   private func orchestrationEffect(refresh: Bool) -> Effect<Action> {
     let day = today
-    return .run { [checkInRepository, syncRepository, briefRepository, clock] send in
+    return .run { [checkInRepository, syncRepository, briefRepository, profileRepository, clock] send in
       // 1. The check-in gates the chain (2026-06-10 design): nothing saved today → show the check-in
       //    screen and stop. A read error degrades to the same gate (the user saves their way through).
       let existing = await (try? checkInRepository.current(day)) ?? nil
@@ -209,12 +264,19 @@ public struct TodayFeature {
         return
       }
 
-      // 3. Generate the brief (the open path uses `refresh: false`; the save path passes `true`).
+      // 3. Generate the brief (the open path uses `refresh: false`; the save path passes `true`). The HR
+      //    zones are fetched **concurrently** (`async let`) so the swap child can resolve a swapped
+      //    alternative's bpm range (DECISIONS #4) without adding latency; the fetch is non-fatal
+      //    (`try?` → `nil`) so a zones failure never blocks the brief, and `._zonesResolved` is sent
+      //    **before** `._briefResolved` so `state.zones` is in place when the child hydrates.
       await send(._generating)
       do {
         async let dwell: Void = clock.sleep(for: Self.loadingPhaseMinDuration)
+        async let zonesResult = try? await profileRepository.zones()
         let brief = try await briefRepository.dailyBrief(refresh)
+        let zones = await zonesResult
         try? await dwell
+        await send(._zonesResolved(zones))
         await send(._briefResolved(brief, brief.cached ? .cached : .fresh))
       } catch let error as BriefError {
         await send(._briefFailed(error))

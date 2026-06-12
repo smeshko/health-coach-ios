@@ -1156,6 +1156,12 @@ let package = Package(
         "BriefRepository",
         "SyncRepository",
         "CheckInRepository",
+        // The promoted daily-session child (Phase 8.4) — the `SessionCard` + inline SWAP-TO list — scoped
+        // under `ready`/`.normal`. Its own target (ARCHITECTURE §4.5/D5), consumed here as a child reducer.
+        "SessionFeature",
+        // `ProfileRepository` INTERFACE — the orchestration reads `zones()` so the swapped session resolves
+        // its bpm range (DECISIONS #4). Interface only (feature dependency rule), never *Live.
+        "ProfileRepository",
         "DesignSystem",
         "DomainModels",
         "CoachCore",
@@ -1180,6 +1186,9 @@ let package = Package(
         "BriefRepository",
         "SyncRepository",
         "CheckInRepository",
+        // The orchestration tests assert the hydrated `SessionFeature.State` child (Phase 8.4) on
+        // `._briefResolved`, so the test target imports the feature's state type.
+        "SessionFeature",
         "DomainModels",
         // `SampleData` vends the `DailyBrief` fixtures the orchestration tests return from the stubbed
         // `BriefRepository` (the `cached` flag is flipped per test to exercise the Freshness branch).
@@ -1204,6 +1213,8 @@ let package = Package(
       name: "TodayFeatureSnapshotTests",
       dependencies: [
         "TodayFeature",
+        // The coach-easy contrast renders the real Phase 8.4 `SessionFeatureView` (no longer a stand-in).
+        "SessionFeature",
         "DomainModels",
         "SampleData",
         "CoachTestSupport",
