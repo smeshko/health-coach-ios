@@ -20,21 +20,11 @@ func wireHealthRecord(_ payload: HealthRecordPayload) -> HealthRecord {
     unit: payload.unit,
     category: payload.category,
     source: payload.source,
-    metadata: payload.metadata.map(wireMetadata)
+    metadata: payload.metadata
   )
 }
 
-/// Map a `[String: String]` metadata bag to the tolerant wire `JSONValue` object (string-valued).
-private func wireMetadata(_ metadata: [String: String]) -> JSONValue {
-  .object(metadata.mapValues(JSONValue.string))
-}
-
-func wireWorkoutStat(_ payload: WorkoutStatPayload) -> WorkoutStat {
-  WorkoutStat(type: payload.type, value: payload.value, unit: payload.unit)
-}
-
-/// Map a HealthKit workout payload to the wire `Workout` (passing `zoneMinutes` through as the tolerant
-/// `str→number` map openapi defines).
+/// Map a HealthKit workout payload to the wire `Workout`.
 func wireWorkout(_ payload: WorkoutPayload) -> Workout {
   Workout(
     uuid: payload.uuid,
@@ -44,9 +34,7 @@ func wireWorkout(_ payload: WorkoutPayload) -> Workout {
     durationS: payload.durationS,
     distanceM: payload.distanceM,
     activeEnergyKcal: payload.activeEnergyKcal,
-    effortScore: payload.effortScore,
-    zoneMinutes: payload.zoneMinutes,
-    statistics: payload.statistics.map(wireWorkoutStat)
+    effortScore: payload.effortScore
   )
 }
 

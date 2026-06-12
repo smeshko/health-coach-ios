@@ -107,7 +107,6 @@ struct HealthKitPrimingTests {
 
     await store.send(.connectTapped) { $0.phase = .authorizing }
     await store.receive(\.authorizationResponse) {
-      $0.statusHint = HKFixtures.allAuthorized
       $0.phase = .checking
     }
     await store.receive(\.degradedProbeResponse) { $0.phase = .granted }
@@ -129,15 +128,12 @@ struct HealthKitPrimingTests {
 
     await store.send(.connectTapped) { $0.phase = .authorizing }
     await store.receive(\.authorizationResponse) {
-      $0.statusHint = HKFixtures.allNotDetermined
       $0.phase = .checking
     }
     await store.receive(\.degradedProbeResponse) {
       $0.missingRows = [.sleep, .vo2Max]
       $0.phase = .degraded(
-        HealthKitPriming.DegradedSummary(
-          missing: [.sleep, .vo2Max], statusHint: HKFixtures.allNotDetermined
-        )
+        HealthKitPriming.DegradedSummary(missing: [.sleep, .vo2Max])
       )
     }
   }

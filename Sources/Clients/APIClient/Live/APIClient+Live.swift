@@ -13,7 +13,6 @@ public extension APIClient {
   ) -> APIClient {
     let transport = Transport(baseURL: baseURL, session: session, tokenClient: tokenClient)
     return APIClient(
-      health: { try await transport.send(Routes.health) },
       // /probe returns a bare `[String: Bool]`; Connect only needs reachable+authed → 200 ⇒ true
       // (a 401 throws `.unauthorized` from `send` and emits on the stream).
       probe: {

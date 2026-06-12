@@ -27,9 +27,6 @@ struct TokenCatalogView: View {
           swatchRow("Zone 1", CoachColor.z1)
           swatchRow("Zone 3", CoachColor.z3)
           swatchRow("Zone 5", CoachColor.z5)
-          swatchRow("Easy", CoachColor.easy)
-          swatchRow("Quality", CoachColor.quality)
-          swatchRow("Recovery", CoachColor.recovery)
           swatchRow("Accent", CoachColor.accent)
           swatchRow("Surface", CoachColor.surface)
           swatchRow("Border", CoachColor.border)
@@ -70,10 +67,8 @@ struct TokenCatalogView: View {
           bandRow(.amber)
           bandRow(.red)
           labelRow("Card", Card.easyRun.label)
-          labelRow("Zone", Zone.z3.label)
           labelRow("Intensity", Intensity.quality.label)
           labelRow("DayType", DayType.hard.label)
-          labelRow("Narrative", NarrativeType.summary.label)
           labelRow("Tier", Tier.core.label)
           labelRow("Weekday", Weekday.mon.label)
           labelRow("Flag (known)", Flag.qualityDay.label)
@@ -100,7 +95,6 @@ struct TokenCatalogView: View {
 
   private func bandRow(_ band: ReadinessBand) -> some View {
     HStack(spacing: CoachSpacing.spaceXs) {
-      Image(systemName: band.iconName).foregroundStyle(band.color)
       Text(band.label).font(CoachFont.textSm).foregroundStyle(band.color)
     }
   }

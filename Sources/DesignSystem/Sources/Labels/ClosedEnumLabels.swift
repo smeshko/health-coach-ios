@@ -31,29 +31,7 @@ extension Card: DisplayLabel {
   }
 }
 
-extension Zone: DisplayLabel, DisplayColored {
-  public var label: String {
-    switch self {
-    case .z1: "Zone 1"
-    case .z2: "Zone 2"
-    case .z3: "Zone 3"
-    case .z4: "Zone 4"
-    case .z5: "Zone 5"
-    }
-  }
-
-  public var color: Color {
-    switch self {
-    case .z1: .coachZ1
-    case .z2: .coachZ2
-    case .z3: .coachZ3
-    case .z4: .coachZ4
-    case .z5: .coachZ5
-    }
-  }
-}
-
-extension ReadinessBand: DisplayLabel, DisplayColored, DisplayIconed {
+extension ReadinessBand: DisplayLabel, DisplayColored {
   public var label: String {
     switch self {
     case .green: "Ready"
@@ -69,14 +47,6 @@ extension ReadinessBand: DisplayLabel, DisplayColored, DisplayIconed {
     case .red: .coachNegative
     }
   }
-
-  public var iconName: String {
-    switch self {
-    case .green: "checkmark.circle.fill"
-    case .amber: "exclamationmark.triangle.fill"
-    case .red: "pause.circle.fill"
-    }
-  }
 }
 
 extension DayType: DisplayLabel {
@@ -89,7 +59,7 @@ extension DayType: DisplayLabel {
   }
 }
 
-extension Intensity: DisplayLabel, DisplayColored, DisplayIconed {
+extension Intensity: DisplayLabel, DisplayIconed {
   public var label: String {
     switch self {
     case .easy: "Easy"
@@ -98,31 +68,11 @@ extension Intensity: DisplayLabel, DisplayColored, DisplayIconed {
     }
   }
 
-  public var color: Color {
-    switch self {
-    case .easy: .coachEasy
-    case .quality: .coachQuality
-    case .recovery: .coachRecovery
-    }
-  }
-
   public var iconName: String {
     switch self {
     case .easy: "figure.walk"
     case .quality: "bolt.fill"
     case .recovery: "leaf.fill"
-    }
-  }
-}
-
-extension NarrativeType: DisplayLabel {
-  public var label: String {
-    switch self {
-    case .summary: "Summary"
-    case .session: "Session"
-    case .nutrition: "Nutrition"
-    case .caution: "Caution"
-    case .plan: "Plan"
     }
   }
 }

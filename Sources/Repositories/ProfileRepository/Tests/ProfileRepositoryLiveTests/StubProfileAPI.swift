@@ -17,7 +17,6 @@ final class StubProfileAPI: @unchecked Sendable {
 
   func makeClient() -> APIClient {
     APIClient(
-      health: { fatalError("unused") },
       probe: { fatalError("unused") },
       sync: { _ in fatalError("unused") },
       dailyBrief: { _, _ in fatalError("unused") },

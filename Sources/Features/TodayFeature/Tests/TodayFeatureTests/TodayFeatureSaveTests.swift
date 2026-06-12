@@ -35,9 +35,9 @@ struct TodayFeatureSaveTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.checkIn(.saveTapped)) { $0.checkIn.saveStatus = .saving }
+    await store.send(.checkIn(.saveTapped)) { $0.checkIn.isSaving = true }
     await store.receive(\.checkIn.saveResponse) {
-      $0.checkIn.saveStatus = .saved
+      $0.checkIn.isSaving = false
       $0.checkIn.lastSavedAt = now
     }
     // The delegate re-enters the chain: gate (now unlocked) → sync → brief.
@@ -79,9 +79,9 @@ struct TodayFeatureSaveTests {
     }
 
     // Edit + re-save with a brief already shown → the chain re-runs and a fresh brief replaces the cache.
-    await store.send(.checkIn(.saveTapped)) { $0.checkIn.saveStatus = .saving }
+    await store.send(.checkIn(.saveTapped)) { $0.checkIn.isSaving = true }
     await store.receive(\.checkIn.saveResponse) {
-      $0.checkIn.saveStatus = .saved
+      $0.checkIn.isSaving = false
       $0.checkIn.lastSavedAt = now
     }
     await store.receive(\.checkIn.delegate)

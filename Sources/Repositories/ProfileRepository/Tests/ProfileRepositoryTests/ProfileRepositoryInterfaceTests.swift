@@ -20,16 +20,6 @@ struct ProfileRepositoryInterfaceTests {
     try #expect(result == SampleData.profile().domain)
   }
 
-  @Test func test_mock_recomputeNotices_yieldsCannedNotice() async throws {
-    let stream = ProfileRepository.mock(scenario: .profile).recomputeNotices()
-    var received: RecomputeNotice?
-    for await notice in stream {
-      received = notice
-      break
-    }
-    #expect(received == RecomputeNotice(week: "2026-W04"))
-  }
-
   @Test func test_profileRepositoryError_isEquatable() {
     #expect(ProfileRepositoryError.fetchFailed(reason: "x") == .fetchFailed(reason: "x"))
     #expect(ProfileRepositoryError.fetchFailed(reason: "x") != .fetchFailed(reason: "y"))

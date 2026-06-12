@@ -36,7 +36,6 @@ final class StubAPIClient: @unchecked Sendable {
   /// Build an `APIClient` whose brief routes hit this stub; other routes trap.
   func makeClient() -> APIClient {
     APIClient(
-      health: { unimplemented("health") },
       probe: { unimplemented("probe") },
       sync: { _ in unimplemented("sync") },
       dailyBrief: { [self] _, refresh in

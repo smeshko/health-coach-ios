@@ -46,9 +46,10 @@ public struct AppFeature {
   }
 
   /// AppFeature's cancellation namespace (DECISIONS #2). `sessionStream` keeps the 401 subscription
-  /// alive for the whole process (never cancelled by the 401 handler); `appWork` is the bucket for the
-  /// app-open orchestration (Epic 8) that a 401 must clear.
-  public enum CancelID: Hashable, Sendable { case sessionStream, appWork }
+  /// alive for the whole process (never cancelled by the 401 handler). A 401 mid-orchestration is
+  /// contained by TCA's `ifCaseLet` child-effect teardown on the `.main → .onboarding` swap (pinned
+  /// by the 11.6 child-teardown test), not by a dedicated cancel ID.
+  public enum CancelID: Hashable, Sendable { case sessionStream }
 
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.tokenClient) var tokenClient

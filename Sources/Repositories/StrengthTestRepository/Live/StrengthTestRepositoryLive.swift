@@ -7,12 +7,6 @@ import GRDB
 import PersistenceModels
 import StrengthTestRepository
 
-/// A canned `.mock(scenario:)` selection (no `SampleData` strength fixture exists — Phase 2.3).
-public enum StrengthTestMockScenario: Sendable {
-  case logged
-  case empty
-}
-
 extension StrengthTestRepository: DependencyKey {
   public static let liveValue: StrengthTestRepository = .live
 
@@ -41,21 +35,6 @@ extension StrengthTestRepository: DependencyKey {
             .fetchOne(db)
         }
         return record?.toDomain()
-      }
-    )
-  }
-
-  /// Canned values, no live deps.
-  public static func mock(scenario: StrengthTestMockScenario) -> StrengthTestRepository {
-    StrengthTestRepository(
-      save: { _ in },
-      current: { date in
-        switch scenario {
-        case .logged:
-          DomainModels.StrengthTest(date: date, maxPushups: 30, maxPullups: 8)
-        case .empty:
-          nil
-        }
       }
     )
   }

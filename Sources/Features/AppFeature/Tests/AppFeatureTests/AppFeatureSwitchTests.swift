@@ -101,21 +101,11 @@ struct AppFeatureSwitchTests {
     }
   }
 
-  @Test func test_perTabStacks_areIndependent() async {
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
-      AppFeature()
-    }
-
-    // Pushing onto the Today stack must leave Week / You (settings) empty.
-    var expected = MainTabs.State()
-    expected.today[id: 0] = .placeholder(PlaceholderFeature.State())
-    await store.send(.main(.today(.push(id: 0, state: .placeholder(PlaceholderFeature.State()))))) {
-      $0 = .main(expected)
-    }
-
-    let mainState = store.state.main
-    #expect(mainState?.today.count == 1)
-    #expect(mainState?.weekly.count == 0)
-    #expect(mainState?.settings.count == 0)
+  @Test func test_perTabStacks_startEmpty() async {
+    // The Week / You drill-down stacks are caseless until Epics 9/10 add pushable destinations; the
+    // named slots exist and start empty. Stack-independence under pushes returns with those cases.
+    let mainState = MainTabs.State()
+    #expect(mainState.weekly.count == 0)
+    #expect(mainState.settings.count == 0)
   }
 }

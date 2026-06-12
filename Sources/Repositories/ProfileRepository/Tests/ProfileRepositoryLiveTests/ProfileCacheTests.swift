@@ -31,10 +31,9 @@ struct ProfileCacheTests {
     try await database.write { db in try ProfileRecord(domain: domain).save(db) }
   }
 
-  /// A live repository over a fresh recompute stream — isolates each test from the process-wide
-  /// `liveValue` stream. `static` so the `@Sendable` work closures don't capture the test case.
+  /// A fresh live repository. `static` so the `@Sendable` work closures don't capture the test case.
   private static func makeRepo() -> ProfileRepository {
-    .live(recompute: RecomputeStream())
+    .live()
   }
 
   @Test func test_cacheMiss_fetchesAndCaches() async throws {
@@ -64,24 +63,6 @@ struct ProfileCacheTests {
 
     #expect(result == fixture.domain)
     #expect(api.callCount == 0, "a cached profile serves without a network call")
-  }
-
-  @Test func test_refresh_overwrites() async throws {
-    let db = try DatabaseClient.makeInMemory()
-    var stale = try SampleData.profile().domain
-    stale.athlete.age = 99 // a distinguishable stale cached value
-    try await seedProfile(db, stale)
-    let fixture = try SampleData.profile()
-    let api = StubProfileAPI(result: .success(fixture.dto))
-
-    let result = try await run(api: api, database: db) {
-      try await Self.makeRepo().refresh()
-    }
-
-    #expect(result == fixture.domain, "refresh returns the fresh fetched profile")
-    #expect(api.callCount == 1)
-    let stored = try await db.read { dbx in try ProfileRecord.fetchOne(dbx, key: 1)?.toDomain() }
-    #expect(stored == fixture.domain, "the cached record is overwritten")
   }
 
   @Test func test_apiError_mapsToProfileError() async throws {

@@ -32,7 +32,6 @@ struct ColorsGalleryPage: View {
     Primitive(name: "accent-3-soft", light: "#F2E1DA", dark: "#36221D", color: CoachColor.accent3Soft),
     Primitive(name: "accent-4", light: "#DB7A3D", dark: "#E99157", color: CoachColor.accent4),
     Primitive(name: "accent-5", light: "#5E97B5", dark: "#71AAC8", color: CoachColor.accent5),
-    Primitive(name: "accent-6", light: "#B58A4E", dark: "#CAA06C", color: CoachColor.accent6),
   ]
 
   private let neutrals: [Primitive] = [
@@ -44,8 +43,6 @@ struct ColorsGalleryPage: View {
     Primitive(name: "neutral-60", light: "#6E6E73", dark: "#9D9CA3", color: CoachColor.neutral60),
     Primitive(name: "neutral-90", light: "#1A1A1C", dark: "#F3F2EE", color: CoachColor.neutral90),
     Primitive(name: "neutral-raised", light: "#FFFFFF", dark: "#3C3B42", color: CoachColor.neutralRaised),
-    Primitive(name: "neutral-ink", light: "#1C1C1E", dark: "#26262C", color: CoachColor.neutralInk),
-    Primitive(name: "neutral-glass", light: "#FFFFFFF2", dark: "#1F1E22F2", color: CoachColor.neutralGlass),
     Primitive(name: "static-white", light: "#FFFFFF", dark: "#FFFFFF", color: CoachColor.staticWhite),
   ]
 

@@ -52,9 +52,7 @@ public extension SampleData {
   // swiftlint:disable force_try
 
   static var dailyBriefGreen: DomainModels.DailyBrief { try! dailyBrief(.dailyBriefGreen).domain }
-  static var dailyBriefRest: DomainModels.DailyBrief { try! dailyBrief(.dailyBriefRestGIFlare).domain }
   static var dailyBriefNoFood: DomainModels.DailyBrief { try! dailyBrief(.dailyBriefNoFood).domain }
-  static var weeklyPlanDeload: DomainModels.WeeklyPlan { try! weeklyPlan(.weeklyPlanDeload).domain }
   static var sampleProfile: DomainModels.Profile { try! profile().domain }
 
   // swiftlint:enable force_try

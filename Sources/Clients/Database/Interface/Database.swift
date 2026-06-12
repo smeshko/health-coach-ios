@@ -3,7 +3,7 @@ import Foundation
 import GRDB
 
 /// The dumb persistence data source — a `Sendable` value owning access to a single GRDB queue via
-/// `reader`/`writer` closures, with generic typed `read`/`write`/`observe` facade methods that run a
+/// `reader`/`writer` closures, with generic typed `read`/`write` facade methods that run a
 /// caller-supplied transaction block (Decision #2 — swift-dependencies stored closures can't be
 /// generic, so genericity lives in these methods, mirroring `APIClient.send<R>`).
 ///
@@ -31,29 +31,6 @@ public struct Database: Sendable {
   /// Run a write transaction block (atomic) and return its typed result.
   public func write<T: Sendable>(_ work: @escaping @Sendable (GRDB.Database) throws -> T) async throws -> T {
     try await writer().write(work)
-  }
-
-  /// Observe a query: emits the initial value, then a fresh value whenever the query's result
-  /// changes (GRDB `ValueObservation` bridged to `AsyncStream`). The observation is cancelled when
-  /// the consuming `Task` is cancelled (the stream's `onTermination`).
-  public func observe<T: Sendable>(
-    _ fetch: @escaping @Sendable (GRDB.Database) throws -> T
-  ) -> AsyncStream<T> {
-    let observedReader = reader()
-    let observation = ValueObservation.tracking(fetch)
-    return AsyncStream { continuation in
-      let task = Task {
-        do {
-          for try await value in observation.values(in: observedReader) {
-            continuation.yield(value)
-          }
-        } catch {
-          // Observation error → end the stream (a mapping/DB failure surfaces upstream, not a crash).
-        }
-        continuation.finish()
-      }
-      continuation.onTermination = { _ in task.cancel() }
-    }
   }
 }
 

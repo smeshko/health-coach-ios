@@ -22,16 +22,8 @@ struct RequestBuildingTests {
 
   @Test func test_baseURLWithPathPrefix_isPreserved() throws {
     let prefixed = URL(string: "https://api.example.com/v1")!
-    let request = try urlRequest(for: Routes.health, baseURL: prefixed, bearer: nil)
-    #expect(request.url?.absoluteString == "https://api.example.com/v1/health")
-  }
-
-  @Test func test_health_isGet_noAuthHeader() throws {
-    let request = try urlRequest(for: Routes.health, baseURL: baseURL, bearer: bearer)
-    #expect(request.url?.absoluteString == "http://localhost:8000/health")
-    #expect(request.httpMethod == "GET")
-    #expect(request.value(forHTTPHeaderField: "Authorization") == nil, "/health must not be authenticated")
-    #expect(request.httpBody == nil)
+    let request = try urlRequest(for: Routes.probe, baseURL: prefixed, bearer: nil)
+    #expect(request.url?.absoluteString == "https://api.example.com/v1/probe")
   }
 
   @Test func test_probe_isGet_withAuthHeader() throws {
@@ -58,7 +50,13 @@ struct RequestBuildingTests {
     #expect(request.httpMethod == "POST")
     #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
-    #expect(try decodeBody(SyncRequest.self, request) == syncRequest)
+    // SyncRequest is encode-only; assert against the encoded JSON body.
+    let body = try #require(request.httpBody)
+    let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    let checkin = try #require(object["checkin"] as? [String: Any])
+    #expect(checkin["date"] as? String == "2026-06-06")
+    #expect(checkin["kneePain"] as? Int == 1)
+    #expect(checkin["giSymptoms"] as? Bool == false)
   }
 
   @Test func test_dailyBrief_refreshTrue_hasQuery_andBodyDecodesToDTO() throws {

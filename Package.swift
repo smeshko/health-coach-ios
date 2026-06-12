@@ -43,8 +43,8 @@ let package = Package(
     .library(name: "ProfileRepository", targets: ["ProfileRepository"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
     .library(name: "DesignSystem", targets: ["DesignSystem"]),
-    // TEMPORARY (Epic 5.5): the design-system gallery dev tool, rooted by App until Epic 06 restores
-    // the real AppView shell. Remove this product + target + the App dependency when Epic 06 lands.
+    // The design-system gallery — a permanent DEBUG dev-menu tool (reachable from Settings) for
+    // browsing tokens + components.
     .library(name: "DesignSystemGallery", targets: ["DesignSystemGallery"]),
   ],
   dependencies: [
@@ -56,8 +56,6 @@ let package = Package(
     // round-2 #B, verified). Depending on ComposableArchitecture here would pull all of TCA into the
     // bottom-of-graph CoachCore target.
     .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.4.0"),
-    // swift-tagged is pre-1.0; `from: "0.10.0"` is the floor.
-    .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
     // GRDB — SQLite record protocols for the PersistenceModels cache layer (§18: GRDB pinned
     // directly; SharingGRDB wraps it in Epic 04, but only the GRDB record protocols are used here).
     .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
@@ -167,7 +165,6 @@ let package = Package(
       name: "CoachCore",
       dependencies: [
         .product(name: "Dependencies", package: "swift-dependencies"),
-        .product(name: "Tagged", package: "swift-tagged"),
       ],
       path: "Sources/Core/CoachCore/Sources",
       swiftSettings: [
@@ -624,10 +621,10 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // TEMPORARY (Epic 5.5): a navigable design-system gallery (Colors/Typography/Icons + a subpage per
-    // component) rooted by App until Epic 06 restores the real shell. Depends on DesignSystem +
-    // DomainModels only (component states are built from inline DomainModels literals); never
-    // repositories / wire / GRDB / TCA.
+    // A navigable design-system gallery (Colors/Typography/Icons + a subpage per component) — a
+    // permanent DEBUG dev-menu tool reachable from Settings. Depends on DesignSystem + DomainModels
+    // only (component states are built from inline DomainModels literals); never repositories / wire
+    // / GRDB / TCA.
     .target(
       name: "DesignSystemGallery",
       dependencies: [

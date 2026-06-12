@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Allows both the quantity shape (`value` + `unit`) and the category shape (`category`) with no
 /// "exactly one of" validator — every sample-shape field is optional. `start`/`end` are
-/// `date-time`; `metadata` is a free `additionalProperties` map (``JSONValue``).
+/// `date-time`; `metadata` is a free `additionalProperties` map of string values.
 public struct HealthRecord: Codable, Sendable, Equatable {
   public var uuid: String
   public var type: WireEnum<RecordType>
@@ -14,7 +14,7 @@ public struct HealthRecord: Codable, Sendable, Equatable {
   public var unit: String?
   public var category: String?
   public var source: String?
-  public var metadata: JSONValue?
+  public var metadata: [String: String]?
 
   public init(
     uuid: String,
@@ -25,7 +25,7 @@ public struct HealthRecord: Codable, Sendable, Equatable {
     unit: String? = nil,
     category: String? = nil,
     source: String? = nil,
-    metadata: JSONValue? = nil
+    metadata: [String: String]? = nil
   ) {
     self.uuid = uuid
     self.type = type

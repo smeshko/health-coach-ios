@@ -26,15 +26,6 @@ public enum CoachFont {
   public static let text2xs = Font.system(size: 11, weight: .bold)
 }
 
-/// Weight tokens — `regular 400 / medium 500 / semibold 600 / bold 700`. Bind `fontWeight` to these,
-/// never a raw weight.
-public extension Font.Weight {
-  static let coachRegular = Font.Weight.regular
-  static let coachMedium = Font.Weight.medium
-  static let coachSemibold = Font.Weight.semibold
-  static let coachBold = Font.Weight.bold
-}
-
 /// Direct `Font.coach…` accessors — convenience mirrors of the `CoachFont` scale so call sites can pass a
 /// token straight to `.font` without naming `CoachFont` (e.g. `.font(.coachTextLg)`). These forward to
 /// the scale above — the single source of truth.

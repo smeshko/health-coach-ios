@@ -17,32 +17,26 @@ struct MainTabsView: View {
         set: { store.send(.tabSelected($0)) }
       )
     ) {
-      NavigationStack(path: $store.scope(state: \.today, action: \.today)) {
+      NavigationStack {
         TodayView(store: store.scope(state: \.todayRoot, action: \.todayRoot))
-      } destination: { store in
-        switch store.case {
-        case .placeholder: PlaceholderDestinationView()
-        }
       }
       .tabItem { Label("Today", systemImage: Icon.today.systemName) }
       .tag(MainTabs.Tab.today)
 
+      // Week / You destinations are caseless until Epics 9/10; the `EmptyView` arm is unreachable
+      // (the destination store is uninhabited) and exists only to type the closure.
       NavigationStack(path: $store.scope(state: \.weekly, action: \.weekly)) {
         TabRootPlaceholder(title: "This Week", icon: Icon.week.systemName)
-      } destination: { store in
-        switch store.case {
-        case .placeholder: PlaceholderDestinationView()
-        }
+      } destination: { _ in
+        EmptyView()
       }
       .tabItem { Label("Week", systemImage: Icon.week.systemName) }
       .tag(MainTabs.Tab.weekly)
 
       NavigationStack(path: $store.scope(state: \.settings, action: \.settings)) {
         SettingsFeatureView(store: store.scope(state: \.settingsRoot, action: \.settingsRoot))
-      } destination: { store in
-        switch store.case {
-        case .placeholder: PlaceholderDestinationView()
-        }
+      } destination: { _ in
+        EmptyView()
       }
       .tabItem { Label("You", systemImage: Icon.you.systemName) }
       .tag(MainTabs.Tab.settings)
@@ -51,7 +45,6 @@ struct MainTabsView: View {
     // Drive the Today morning orchestration (check-in → sync → daily brief) once when the tab bar
     // appears. `MainTabsView` mounts once per `.main` session (the outer `AppView` container does not
     // re-mount on a branch swap), so this fires once — the "host sends `onAppOpen` on app-open" seam.
-    // NOTE: the 401→cancel-`appWork` linkage (AppFeature `CancelID.appWork`) is still a later seam.
     .task { store.send(.todayRoot(.onAppOpen)) }
   }
 }
@@ -76,16 +69,5 @@ private struct TabRootPlaceholder: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(.coachBackground)
     .navigationTitle(title)
-  }
-}
-
-/// A pushed placeholder destination (the `*Path.placeholder` case).
-private struct PlaceholderDestinationView: View {
-  var body: some View {
-    Text("Placeholder")
-      .font(.coachTextLg)
-      .foregroundStyle(.coachForeground)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(.coachBackground)
   }
 }

@@ -41,10 +41,6 @@ struct DecodeRoundTripTests {
     try assertRoundTrips(SyncResponse.self, from: Fixtures.syncResponse)
   }
 
-  @Test func test_roundTrip_healthResponse() throws {
-    try assertRoundTrips(HealthResponse.self, from: Fixtures.healthResponse)
-  }
-
   @Test func test_roundTrip_errorResponse() throws {
     try assertRoundTrips(ErrorResponse.self, from: Fixtures.errorResponse)
   }
@@ -75,8 +71,18 @@ struct DecodeRoundTripTests {
   /// A winter (`+02:00`, no-DST) `date-time` decodes to the right instant and re-encodes with the
   /// winter Sofia offset — proving the encode path is DST-aware, not just the June `+03:00` case.
   @Test func test_dateTime_winterInstantIsDstAware() throws {
-    let json = #"{ "status": "ok", "serverTime": "2026-01-15T07:30:00+02:00" }"#
-    let response = try decode(HealthResponse.self, from: json)
+    let json = #"""
+    {
+      "recordsUpserted": 0,
+      "recordsDuplicate": 0,
+      "workoutsUpserted": 0,
+      "activityDaysUpserted": 0,
+      "checkinSaved": false,
+      "strengthTestSaved": false,
+      "serverTime": "2026-01-15T07:30:00+02:00"
+    }
+    """#
+    let response = try decode(SyncResponse.self, from: json)
 
     var utc = Calendar(identifier: .iso8601)
     utc.timeZone = try #require(TimeZone(identifier: "UTC"))
@@ -87,7 +93,7 @@ struct DecodeRoundTripTests {
 
     let reencoded = try encodedString(response)
     #expect(reencoded.contains("+02:00"), "winter instant must encode with Sofia's +02:00 offset: \(reencoded)")
-    try assertRoundTrips(HealthResponse.self, from: json)
+    try assertRoundTrips(SyncResponse.self, from: json)
   }
 
   // MARK: - Null vs absent are identical
@@ -156,12 +162,6 @@ struct DecodeRoundTripTests {
   }
 
   // MARK: - Request bodies: empty body + format:date encode
-
-  @Test func test_syncRequest_emptyAndFullRoundTrip() throws {
-    try assertRoundTrips(SyncRequest.self, from: "{}")
-    let empty = try decode(SyncRequest.self, from: "{}")
-    #expect(empty == SyncRequest())
-  }
 
   @Test func test_briefRequests_emptyBody() throws {
     #expect(try decode(DailyBriefRequest.self, from: "{}") == DailyBriefRequest(date: nil))

@@ -23,7 +23,7 @@ public struct CheckInRepository: Sendable {
 
 extension CheckInRepository: TestDependencyKey {
   /// Empty-state default: `save` is a no-op, `current` returns `nil` (no check-in logged). Tests that
-  /// need a stored value inject `.live` over an in-memory `Database` or `.mock(scenario:)`.
+  /// need a stored value inject `.live` over an in-memory `Database`.
   public static var testValue: CheckInRepository {
     CheckInRepository(save: { _ in }, current: { _ in nil })
   }
