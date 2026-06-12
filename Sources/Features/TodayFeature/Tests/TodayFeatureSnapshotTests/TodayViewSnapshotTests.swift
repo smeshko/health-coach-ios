@@ -15,7 +15,10 @@
   import CoachCore
   import CoachTestSupport
   import ComposableArchitecture
+  import DomainModels
   import Foundation
+  import SampleData
+  import SessionFeature
   import SnapshotTesting
   import Testing
 
@@ -75,9 +78,10 @@
       }
     }
 
-    /// The redesigned check-in screen (`1 · Daily Check-in.png`) — the `.checkInRequired` gate (no
-    /// section toggle), seeded to the mockup's "2 · Mild" knee pain and a 7:02 AM "Last saved" footer.
-    /// `current` is pinned so the card's `.task` load is a no-op and the seeded state is what's captured.
+    /// The redesigned check-in screen (`1 · Daily Check-in.png`) — the `.checkInRequired` gate, now an
+    /// opaque full **cover on top** of the (not-yet-loaded) brief, seeded to the mockup's "2 · Mild" knee
+    /// pain and a 7:02 AM "Last saved" footer. `current` is pinned so the card's `.task` load is a no-op and
+    /// the seeded state is what's captured.
     @Test func test_checkIn() {
       let state = TodayFeature.State(
         briefState: .checkInRequired,
@@ -87,6 +91,44 @@
         $0.calendar = .europeSofia
         $0.date = .constant(fixedInstant())
         $0.checkInRepository.current = { _ in nil }
+      } operation: {
+        assertCoachSnapshot(of: TodayView(store: Store(initialState: state) { TodayFeature() }))
+      }
+    }
+
+    /// A deterministic five-zone bpm map (matching the host helpers') so the ready session card renders.
+    private func zones() -> DomainModels.Zones {
+      DomainModels.Zones(
+        z1: DomainModels.ZoneRange(low: 95, high: 114),
+        z2: DomainModels.ZoneRange(low: 114, high: 133),
+        z3: DomainModels.ZoneRange(low: 133, high: 152),
+        z4: DomainModels.ZoneRange(low: 152, high: 171),
+        z5: DomainModels.ZoneRange(low: 171, high: 190)
+      )
+    }
+
+    /// The loaded `.ready` brief (the exercise arm) — the readiness gauge above the session card, with **no
+    /// inline check-in**: the check-in is its own cover screen (above), so a loaded brief never shows it
+    /// alongside the exercise/nutrition view (the 2026-06-10 design). The child sub-states are hydrated as
+    /// the reducer does on `._briefResolved`.
+    @Test func test_ready_exercise_noInlineCheckIn() {
+      let brief = SampleData.dailyBriefGreen
+      let map = zones()
+      let state = TodayFeature.State(
+        briefState: .ready(brief, .fresh),
+        readiness: ReadinessComponent.State(readiness: brief.readiness),
+        session: SessionFeature.State(
+          session: brief.session,
+          alternatives: brief.alternatives,
+          skipOk: brief.skipOk,
+          narrative: brief.narrative.filter { $0.type == .session },
+          zones: map
+        ),
+        zones: map
+      )
+      withDependencies {
+        $0.calendar = .europeSofia
+        $0.date = .constant(fixedInstant())
       } operation: {
         assertCoachSnapshot(of: TodayView(store: Store(initialState: state) { TodayFeature() }))
       }
