@@ -654,9 +654,12 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // Pure DTO→domain mapping functions (the read path). Sits at/above the repository-live tier
-    // (ARCHITECTURE §3: a repo *Live may depend on all model layers), below features. Depends on
-    // BOTH model layers; DomainModels itself never imports WireModels (DECISIONS Decision 1).
+    // Pure DTO→domain mapping functions (the read path). After Phase 11.3 shared the closed enums and
+    // folded the Profile/CheckIn/StrengthTest twins, only the REAL shape changes remain here — the
+    // brief `{data,narrative}` envelope flattening, intake mapping, date conversions, and the
+    // free-string open-enum maps. Sits at/above the repository-live tier (ARCHITECTURE §3: a repo
+    // *Live may depend on all model layers), below features. Depends on BOTH model layers;
+    // DomainModels itself never imports WireModels (DECISIONS Decision 1).
     .target(
       name: "WireDomainMapping",
       dependencies: [
