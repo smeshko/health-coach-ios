@@ -14,10 +14,6 @@ import Foundation
 /// the parent's chain is only re-entered by a *successful* save).
 @Reducer
 public struct CheckInComponent {
-  /// The save lifecycle — `.saved` flips to `.idle` again on the next edit (a binding/toggle). 1-level
-  /// nested (mirrors `ConnectComponent.Validation`).
-  public enum SaveStatus: Equatable, Sendable { case idle, saving, saved }
-
   @ObservableState
   public struct State: Equatable {
     public var giSymptoms: Bool
@@ -26,7 +22,8 @@ public struct CheckInComponent {
     public var kneePain: Int
     /// Today's loaded check-in (`nil` until `task` resolves, or when none is logged — a normal state).
     public var existing: DomainModels.CheckIn?
-    public var saveStatus: SaveStatus
+    /// True while a save effect is in flight (drives the spinner + the `saveTapped` re-entry guard).
+    public var isSaving: Bool
     /// The wall-clock instant of the **most recent save this session** — drives the footer's "Last saved
     /// <time>". `nil` until a save happens. Set from `\.date` on `saveResponse(.success)`. It is *not*
     /// seeded on load: the persisted `CheckIn` carries only a `startOfDay` day-key (no save instant), so
@@ -39,14 +36,14 @@ public struct CheckInComponent {
       illness: Bool = false,
       kneePain: Int = 0,
       existing: DomainModels.CheckIn? = nil,
-      saveStatus: SaveStatus = .idle,
+      isSaving: Bool = false,
       lastSavedAt: Date? = nil
     ) {
       self.giSymptoms = giSymptoms
       self.illness = illness
       self.kneePain = kneePain
       self.existing = existing
-      self.saveStatus = saveStatus
+      self.isSaving = isSaving
       self.lastSavedAt = lastSavedAt
     }
   }
@@ -70,7 +67,7 @@ public struct CheckInComponent {
     // swiftlint:disable identifier_name
     /// The loaded check-in (or `nil`) routed back from the `task` effect to seed state.
     case _currentLoaded(DomainModels.CheckIn?)
-    /// The `save` effect's result — success flips to `.saved` + emits the delegate; failure reverts.
+    /// The `save` effect's result — success clears `isSaving` + emits the delegate; failure reverts.
     case saveResponse(Result<Void, any Error>)
     // swiftlint:enable identifier_name
   }
@@ -119,7 +116,11 @@ public struct CheckInComponent {
         return .none
 
       case .saveTapped:
-        state.saveStatus = .saving
+        // Re-entry guard (D7): a second tap while saving would fire a second save → a second
+        // `checkInSaved` delegate → a duplicate orchestration. The button is `.disabled(isSaving)`,
+        // so this is UI-invisible defence.
+        guard !state.isSaving else { return .none }
+        state.isSaving = true
         let checkIn = DomainModels.CheckIn(
           date: today,
           giSymptoms: state.giSymptoms,
@@ -136,13 +137,13 @@ public struct CheckInComponent {
         }
 
       case .saveResponse(.success):
-        state.saveStatus = .saved
+        state.isSaving = false
         state.lastSavedAt = date.now
         return .send(.delegate(.checkInSaved))
 
       case .saveResponse(.failure):
         // Non-fatal: revert quietly so the user can retry — no delegate, so the parent chain stays put.
-        state.saveStatus = .idle
+        state.isSaving = false
         return .none
 
       case .delegate:

@@ -57,7 +57,7 @@ struct CheckInSection: View {
       .background(RoundedRectangle(cornerRadius: CoachRadius.card).fill(.coachSurface))
 
       VStack(spacing: CoachSpacing.spaceSm) {
-        PrimaryButton("Save & build today's brief", isLoading: store.saveStatus == .saving) {
+        PrimaryButton("Save & build today's brief", isLoading: store.isSaving) {
           store.send(.saveTapped)
         }
         // The footer shows a precise clock time only for a save made this session (`lastSavedAt`); a

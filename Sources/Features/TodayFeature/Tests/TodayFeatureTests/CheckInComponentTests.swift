@@ -30,25 +30,18 @@ struct CheckInComponentTests {
     return Calendar.europeSofia.date(from: components)!
   }
 
-  @Test func test_kneePainChanged_clampsHigh_to10() async {
-    let store = TestStore(initialState: CheckInComponent.State()) {
+  /// One clamp expression (`min(10, max(0, value))`), three representative inputs: above-range clamps
+  /// down to 10, below-range clamps up to 0, in-range passes through (DECISIONS #2).
+  @Test(arguments: [
+    (initial: 0, input: 15, expected: 10),
+    (initial: 5, input: -2, expected: 0),
+    (initial: 0, input: 7, expected: 7),
+  ])
+  func test_kneePainChanged_clampsTo0Through10(initial: Int, input: Int, expected: Int) async {
+    let store = TestStore(initialState: CheckInComponent.State(kneePain: initial)) {
       CheckInComponent()
     }
-    await store.send(.kneePainChanged(15)) { $0.kneePain = 10 }
-  }
-
-  @Test func test_kneePainChanged_clampsLow_to0() async {
-    let store = TestStore(initialState: CheckInComponent.State(kneePain: 5)) {
-      CheckInComponent()
-    }
-    await store.send(.kneePainChanged(-2)) { $0.kneePain = 0 }
-  }
-
-  @Test func test_kneePainChanged_inRange_passesThrough() async {
-    let store = TestStore(initialState: CheckInComponent.State()) {
-      CheckInComponent()
-    }
-    await store.send(.kneePainChanged(7)) { $0.kneePain = 7 }
+    await store.send(.kneePainChanged(input)) { $0.kneePain = expected }
   }
 
   @Test func test_task_seedsFieldsFromCurrentCheckIn() async {
@@ -104,9 +97,9 @@ struct CheckInComponentTests {
 
     await store.send(.giSymptomsToggled(true)) { $0.giSymptoms = true }
     await store.send(.kneePainChanged(4)) { $0.kneePain = 4 }
-    await store.send(.saveTapped) { $0.saveStatus = .saving }
+    await store.send(.saveTapped) { $0.isSaving = true }
     await store.receive(\.saveResponse) {
-      $0.saveStatus = .saved
+      $0.isSaving = false
       // A successful save stamps the footer with the wall-clock instant (pinned `\.date`).
       $0.lastSavedAt = instant
     }
@@ -128,8 +121,58 @@ struct CheckInComponentTests {
       $0.checkInRepository.save = { _ in throw SaveBoom() }
     }
 
-    await store.send(.saveTapped) { $0.saveStatus = .saving }
-    await store.receive(\.saveResponse) { $0.saveStatus = .idle }
+    await store.send(.saveTapped) { $0.isSaving = true }
+    await store.receive(\.saveResponse) { $0.isSaving = false }
     // No `.delegate(.checkInSaved)` — the exhaustive store fails on any unexpected received action.
+  }
+
+  /// D7 re-entry guard: a second `.saveTapped` while a save is in flight is a no-op — no second save
+  /// effect, so no duplicate `checkInSaved` delegate (which would trigger a duplicate orchestration).
+  @Test func test_saveTapped_whileSaving_isNoOp() async {
+    let recorder = SaveRecorder()
+    let gate = SaveGate()
+    let instant = sofiaDate(year: 2026, month: 6, day: 10)
+    let store = TestStore(initialState: CheckInComponent.State()) {
+      CheckInComponent()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(instant)
+      $0.checkInRepository.save = { checkIn in
+        await recorder.record(checkIn)
+        await gate.wait()
+      }
+    }
+
+    await store.send(.saveTapped) { $0.isSaving = true }
+    // Second tap while saving: guarded → no state change, no extra effect (exhaustive store enforces it).
+    await store.send(.saveTapped)
+    await gate.open()
+    await store.receive(\.saveResponse) {
+      $0.isSaving = false
+      $0.lastSavedAt = instant
+    }
+    await store.receive(\.delegate, .checkInSaved)
+    await store.finish()
+
+    let saved = await recorder.saved
+    #expect(saved.count == 1, "the re-entry guard prevents a duplicate save")
+  }
+}
+
+/// A one-shot gate that lets a stubbed `save` effect suspend mid-flight (so a second `.saveTapped`
+/// arrives while the first is in flight). Handles open-before-wait so the test can't deadlock.
+private actor SaveGate {
+  private var continuation: CheckedContinuation<Void, Never>?
+  private var opened = false
+
+  func wait() async {
+    if opened { return }
+    await withCheckedContinuation { continuation = $0 }
+  }
+
+  func open() {
+    opened = true
+    continuation?.resume()
+    continuation = nil
   }
 }
