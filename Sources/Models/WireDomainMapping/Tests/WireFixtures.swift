@@ -128,26 +128,4 @@ enum WireFixtures {
       ]
     )
   }
-
-  static func profile(
-    constantsRecomputedWeek: String? = "2026-W22"
-  ) -> WireModels.ProfileResponse {
-    WireModels.ProfileResponse(
-      athlete: WireModels.AthleteOut(age: 34, sex: "male", heightCm: 182, goalWeightKg: 75.0),
-      zones: WireModels.ZonesOut(
-        z1: WireModels.ZoneRange(low: 100, high: 130),
-        z2: WireModels.ZoneRange(low: 131, high: 145),
-        z3: WireModels.ZoneRange(low: 146, high: 160),
-        z4: WireModels.ZoneRange(low: 161, high: 175),
-        z5: WireModels.ZoneRange(low: 176, high: 190)
-      ),
-      thresholds: WireModels.ThresholdsOut(
-        maxHr: 190, rhrBaseline: 48, hrvBaselineMs: 65, easyHrCap: 150,
-        cadenceCurrentSpm: 172, cadenceTargetSpm: 180
-      ),
-      meta: WireModels.MetaOut(
-        constitutionVersion: "v3", constantsRecomputedWeek: constantsRecomputedWeek
-      )
-    )
-  }
 }

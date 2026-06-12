@@ -24,8 +24,9 @@ extension ProfileRepository: DependencyKey {
 }
 
 /// Cache-first fetch (Decision 1): serve the single cached `ProfileRecord` when present. On a miss,
-/// fetch `GET /profile`, map via the pure `domainProfile` (non-throwing), and persist. An `APIError`
-/// maps to a domain `ProfileRepositoryError.fetchFailed`.
+/// fetch `GET /profile` and persist. `ProfileResponse` is the canonical `DomainModels.Profile`
+/// (Phase 11.3 — no mapping layer), so the decoded value is the domain value. An `APIError` maps to a
+/// domain `ProfileRepositoryError.fetchFailed`.
 private func fetchProfile() async throws -> DomainModels.Profile {
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.database) var database
@@ -35,15 +36,14 @@ private func fetchProfile() async throws -> DomainModels.Profile {
     return try cached.toDomain()
   }
 
-  let dto: WireModels.ProfileResponse
+  let domain: DomainModels.Profile
   do {
-    dto = try await apiClient.profile()
+    domain = try await apiClient.profile()
   } catch let apiError as APIError {
     // A failed fetch surfaces a domain error; the previously cached profile (if any) is left intact
     // and still serves on the next cache-first `profile()` call.
     throw ProfileRepositoryError.fetchFailed(reason: "\(apiError)")
   }
-  let domain = domainProfile(dto)
 
   try await database.write { db in try ProfileRecord(domain: domain).save(db) }
   return domain

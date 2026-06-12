@@ -308,6 +308,8 @@ let package = Package(
       dependencies: [
         "CoachCore",
         "WireModels",
+        // The canned `/profile` testValue builds `DomainModels` profile types (Phase 11.3 fold).
+        "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/APIClient/Interface",
@@ -762,6 +764,9 @@ let package = Package(
         "DatabaseLive",
         "Database",
         "PersistenceModels",
+        "DomainModels",
+        // Test-only: a real profile fixture for the v3 cache-clear migration test (11.2).
+        "SampleData",
         "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],

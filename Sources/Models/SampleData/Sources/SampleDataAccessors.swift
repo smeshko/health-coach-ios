@@ -33,10 +33,12 @@ public extension SampleData {
     return (dto, domainWeeklyPlan(dto))
   }
 
-  /// The profile fixture as both its decoded DTO and its mapped domain value.
+  /// The profile fixture. `ProfileResponse` is the canonical `DomainModels.Profile` (Phase 11.3 — no
+  /// wire twin), so the decoded value is the domain value; the tuple keeps both labels for call-site
+  /// continuity (`.dto` feeds the API stub, `.domain` is the expected value — now identical).
   static func profile() throws -> (dto: WireModels.ProfileResponse, domain: DomainModels.Profile) {
-    let dto = try WireCoder.decoder.decode(WireModels.ProfileResponse.self, from: jsonData(for: .profile))
-    return (dto, domainProfile(dto))
+    let profile = try WireCoder.decoder.decode(WireModels.ProfileResponse.self, from: jsonData(for: .profile))
+    return (profile, profile)
   }
 
   /// The sync-response fixture (no domain peer in this phase).

@@ -75,20 +75,4 @@ enum CannedResponses {
     ),
     narrative: []
   )
-
-  static let profile = ProfileResponse(
-    athlete: AthleteOut(age: 34, sex: "male", heightCm: 182, goalWeightKg: 75),
-    zones: ZonesOut(
-      z1: ZoneRange(low: 100, high: 130),
-      z2: ZoneRange(low: 131, high: 145),
-      z3: ZoneRange(low: 146, high: 160),
-      z4: ZoneRange(low: 161, high: 175),
-      z5: ZoneRange(low: 176, high: 190)
-    ),
-    thresholds: ThresholdsOut(
-      maxHr: 190, rhrBaseline: 48, hrvBaselineMs: 65, easyHrCap: 150,
-      cadenceCurrentSpm: 172, cadenceTargetSpm: 180
-    ),
-    meta: MetaOut(constitutionVersion: "v3")
-  )
 }
