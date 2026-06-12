@@ -127,6 +127,8 @@ struct DailyCachePolicyTests {
       (envelopeError(.unauthorized, 401), .unauthorized),
       (envelopeError(.notFound, 404), .serverError),
       (.unauthorized, .unauthorized),
+      // An unknown error code fails envelope decode → `.unexpectedStatus` → retry-friendly (D3).
+      (.unexpectedStatus(500), .transientGenerationFailed),
     ]
 
     for (apiError, expected) in cases {

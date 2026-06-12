@@ -22,7 +22,7 @@ public extension SampleData {
     _ scenario: SampleScenario
   ) throws -> (dto: WireModels.DailyBrief, domain: DomainModels.DailyBrief) {
     let dto = try WireCoder.decoder.decode(WireModels.DailyBrief.self, from: jsonData(for: scenario))
-    return try (dto, domainDailyBrief(dto))
+    return (dto, domainDailyBrief(dto))
   }
 
   /// A weekly-plan scenario as both its decoded DTO and its mapped domain value.
@@ -30,7 +30,7 @@ public extension SampleData {
     _ scenario: SampleScenario
   ) throws -> (dto: WireModels.WeeklyPlan, domain: DomainModels.WeeklyPlan) {
     let dto = try WireCoder.decoder.decode(WireModels.WeeklyPlan.self, from: jsonData(for: scenario))
-    return try (dto, domainWeeklyPlan(dto))
+    return (dto, domainWeeklyPlan(dto))
   }
 
   /// The profile fixture as both its decoded DTO and its mapped domain value.

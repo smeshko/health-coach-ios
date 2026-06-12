@@ -1,32 +1,13 @@
 import DomainModels
 
-/// The raw-string ↔ typed-enum maps. Pure, non-throwing leaf helpers.
+/// The raw-string → open-enum maps for the three free-string fields (`flag`, `safetyReason`,
+/// `penaltyFactor`). Pure, non-throwing leaf helpers — they never fail: an unrecognised value
+/// becomes `.unknown(raw)`, carrying the raw string verbatim (ARCHITECTURE §5).
 ///
-/// The closed enums are now SHARED between the wire and domain layers (Phase 11.3) — a wire DTO
-/// field already holds the `DomainModels` type. The closed-enum helpers below are therefore trivial
-/// identity pass-throughs returning an optional (kept optional so the shape mappers' existing
-/// `guard let` / `flatMap` call sites are untouched; a later task removes them entirely). Free-string
-/// helpers never fail — an unrecognised value becomes `.unknown(raw)`, carrying the raw string
-/// verbatim (ARCHITECTURE §5).
+/// The closed enums are SHARED between the wire and domain layers (Phase 11.3) — a wire DTO field
+/// already holds the `DomainModels` type, so no closed-enum mapping is needed; the shape mappers use
+/// those fields directly.
 enum EnumMapping {
-  // MARK: - Closed enums (now shared wire↔domain → identity pass-through)
-
-  static func card(_ value: DomainModels.Card) -> DomainModels.Card? { value }
-
-  static func zone(_ value: DomainModels.Zone) -> DomainModels.Zone? { value }
-
-  static func band(_ value: DomainModels.ReadinessBand) -> DomainModels.ReadinessBand? { value }
-
-  static func dayType(_ value: DomainModels.DayType) -> DomainModels.DayType? { value }
-
-  static func intensity(_ value: DomainModels.Intensity) -> DomainModels.Intensity? { value }
-
-  static func narrativeType(_ value: DomainModels.NarrativeType) -> DomainModels.NarrativeType? { value }
-
-  static func tier(_ value: DomainModels.Tier) -> DomainModels.Tier? { value }
-
-  static func weekday(_ value: DomainModels.Weekday) -> DomainModels.Weekday? { value }
-
   // MARK: - Free-string fields (never fail — unknown carries the raw string verbatim)
 
   // swiftlint:disable:next cyclomatic_complexity

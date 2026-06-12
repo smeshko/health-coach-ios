@@ -28,24 +28,7 @@ struct EnumMappingTests {
     #expect(EnumMapping.penaltyFactor("brand_new") == .unknown("brand_new"))
   }
 
-  @Test func test_closedEnum_identityPassThrough() {
-    // The closed enums are now shared wire↔domain (Phase 11.3); the helpers are identity
-    // pass-throughs that simply return their input.
-    #expect(EnumMapping.card(.easyRun) == .easyRun)
-    #expect(EnumMapping.card(.rest) == .rest)
-    #expect(EnumMapping.zone(.z3) == .z3)
-    #expect(EnumMapping.band(.amber) == .amber)
-    #expect(EnumMapping.dayType(.hard) == .hard)
-    #expect(EnumMapping.intensity(.quality) == .quality)
-    #expect(EnumMapping.narrativeType(.caution) == .caution)
-    #expect(EnumMapping.tier(.extra) == .extra)
-    #expect(EnumMapping.weekday(.sun) == .sun)
-  }
-
-  @Test func test_closedEnum_everyCaseMaps() {
-    // Totality: the identity pass-through is non-nil for every shared card case.
-    for card in Card.allCases {
-      #expect(EnumMapping.card(card) == card, "unmapped card: \(card)")
-    }
-  }
+  // NOTE: the closed enums are now shared wire↔domain (Phase 11.3) — no `EnumMapping` helper exists
+  // for them, so there are no closed-enum mapping assertions here. Their strictness lives at the
+  // `WireModels` decode boundary (DecodeRoundTripTests).
 }

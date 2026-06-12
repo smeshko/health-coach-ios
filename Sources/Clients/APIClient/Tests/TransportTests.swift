@@ -103,6 +103,14 @@ extension URLProtocolStubSerialized {
       await assertThrows(.unexpectedStatus(500), from: { try await self.makeClient().profile() })
     }
 
+    @Test func test_envelope_unknownCode_decodesUnexpectedStatus() async throws {
+      // An envelope whose `code` is outside the closed `ErrorCode` set fails the `ErrorResponse`
+      // decode (closed enums decode strictly, Phase 11.3) → the transport falls back to
+      // `.unexpectedStatus(status)` rather than surfacing a bogus envelope (D3).
+      URLProtocolStub.box.setResponses([.init(status: 500, data: envelope("made_up_code"))])
+      await assertThrows(.unexpectedStatus(500), from: { try await self.makeClient().profile() })
+    }
+
     // MARK: - Retry (502/504, briefs only)
 
     @Test func test_502then200_brief_retriesAndSucceeds() async throws {

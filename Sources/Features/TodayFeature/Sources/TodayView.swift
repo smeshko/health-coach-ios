@@ -125,7 +125,7 @@ public struct TodayView: View {
 /// The refined per-code copy is Epic 05's `ErrorPresenter`; this is the closest existing vocabulary.
 private func errorDisplay(for error: BriefError) -> ErrorDisplay {
   switch error {
-  case .syncRequired, .insufficientData, .mappingFailed: .unknown
+  case .syncRequired, .insufficientData: .unknown
   case .transientGenerationFailed: .briefGenerationFailed
   case .validation: .validationError
   case .serverError: .internalError
