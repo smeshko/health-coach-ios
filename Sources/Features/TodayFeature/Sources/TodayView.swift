@@ -3,7 +3,6 @@ import ComposableArchitecture
 import DesignSystem
 import DomainModels
 import Foundation
-import SessionFeature
 import SwiftUI
 import SyncRepository
 
@@ -291,11 +290,9 @@ private struct TodayReadyContent: View {
           // `TodayFeature` does not yet hold the profile zones (Phase 8.4 wires zone resolution for the
           // normal session); an `active_recovery` override's Z1 chip is reconciled when that lands.
           SafetyRestView(
-            store: Store(
-              initialState: SafetyRestComponent.State(
-                gate: gate, overrideSession: override, zoneRange: nil
-              )
-            ) { SafetyRestComponent() },
+            gate: gate,
+            overrideSession: override,
+            zoneRange: nil,
             narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
           )
         case .normal:
@@ -313,14 +310,8 @@ private struct TodayReadyContent: View {
         // with the workout (PRD §7.4.4 / §6 principle 4). Both are render-only sub-components constructed
         // inline from the loaded brief (the `SafetyRestComponent` precedent), so they hold no parent state
         // and need no reducer scope.
-        NutritionView(
-          store: Store(initialState: NutritionComponent.State(brief: brief)) { NutritionComponent() }
-        )
-        YesterdayIntakeView(
-          store: Store(
-            initialState: YesterdayIntakeComponent.State(intakeYesterday: brief.intakeYesterday)
-          ) { YesterdayIntakeComponent() }
-        )
+        NutritionView(brief: brief)
+        YesterdayIntakeView(intake: brief.intakeYesterday)
       }
     }
   }

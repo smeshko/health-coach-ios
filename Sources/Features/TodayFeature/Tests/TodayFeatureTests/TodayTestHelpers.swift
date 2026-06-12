@@ -1,9 +1,12 @@
+import ComposableArchitecture
 import CoachCore
 import DomainModels
 import Foundation
 import SampleData
-import SessionFeature
 import SyncRepository
+import Testing
+
+@testable import TodayFeature
 
 // Shared test helpers for the TodayFeature orchestration + refresh suites. Free functions / actors (not
 // nested in a test struct) so the `@Sendable` dependency-stub closures capture only Sendable values,
@@ -73,6 +76,32 @@ func expectedSessionState(_ brief: DomainModels.DailyBrief, zones: DomainModels.
     narrative: brief.narrative.filter { $0.type == .session },
     zones: zones
   )
+}
+
+/// The success-chain `receive` walk shared by every orchestration that reaches `.ready` on an immediate
+/// clock — `_syncStarted` → `_generating` (records `lastSyncedAt`) → `_briefResolved` (hydrates the
+/// `.ready` state, the readiness child, `zones`, and the untripped session child). Extracted so the
+/// cache-hit / retry / save / log variants share one walk instead of copy-pasting it ~8× (Phase 11.4 D4);
+/// the only per-test knobs are the resolved `brief`, its `freshness`, the `now` instant, and the `zones`.
+@MainActor
+func receiveSuccessChain(
+  _ store: TestStoreOf<TodayFeature>,
+  brief: DomainModels.DailyBrief,
+  freshness: Freshness,
+  now: Date,
+  zones: DomainModels.Zones
+) async {
+  await store.receive(\._syncStarted) { $0.briefState = .syncing }
+  await store.receive(\._generating) {
+    $0.lastSyncedAt = now
+    $0.briefState = .generating
+  }
+  await store.receive(\._briefResolved) {
+    $0.briefState = .ready(brief, freshness)
+    $0.zones = zones
+    $0.readiness = ReadinessComponent.State(readiness: brief.readiness)
+    $0.session = expectedSessionState(brief, zones: zones)
+  }
 }
 
 /// A canned successful, zero-upsert sync result.

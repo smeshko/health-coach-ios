@@ -17,7 +17,7 @@
   import SwiftUI
   import Testing
 
-  @testable import SessionFeature
+  @testable import TodayFeature
 
   @MainActor
   struct SessionFeatureViewSnapshotTests {

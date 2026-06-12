@@ -5,7 +5,6 @@ import DomainModels
 import Foundation
 import LogClient
 import ProfileRepository
-import SessionFeature
 import SyncRepository
 
 /// The Today tab's root reducer (ARCHITECTURE §4.5, PRD §6/§8.1) — the hero "daily brief" screen. It owns
@@ -93,10 +92,11 @@ public struct TodayFeature {
     case _syncStarted
     case _syncFailed(SyncError)
     case _generating
-    /// The fetched HR zones (or `nil` if the fetch failed) — sent **before** `._briefResolved` so the
-    /// session child hydrates with `state.zones` already in place (DECISIONS #4).
-    case _zonesResolved(Zones?)
-    case _briefResolved(DomainModels.DailyBrief, Freshness)
+    /// The resolved brief + its freshness + the (non-fatal) HR zones, in **one** payload — the reducer
+    /// hydrates `state.zones` from it FIRST, then the session child reads `state.zones` while hydrating, so
+    /// there is no cross-action ordering to get wrong (DECISIONS #4 / Phase 11.4 D2). `zones == nil` is a
+    /// silent degrade (no zone chip).
+    case _briefResolved(DomainModels.DailyBrief, Freshness, Zones?)
     case _briefFailed(BriefError)
     // swiftlint:enable identifier_name
   }
@@ -167,14 +167,12 @@ public struct TodayFeature {
         state.briefState = .generating
         return .none
 
-      case let ._zonesResolved(zones):
-        // The orchestration sends this before `._briefResolved`, so `state.zones` is in place when the
-        // session child hydrates below (DECISIONS #4). A `nil` fetch degrades silently (no zone chip).
-        state.zones = zones
-        return .none
-
-      case let ._briefResolved(brief, freshness):
+      case let ._briefResolved(brief, freshness, zones):
         state.briefState = .ready(brief, freshness)
+        // Hydrate `state.zones` FIRST, from this single payload, so the session child below reads it while
+        // hydrating (DECISIONS #4 / Phase 11.4 D2 — one resolved payload, no cross-action ordering). A
+        // `nil` fetch degrades silently (no zone chip).
+        state.zones = zones
         // Hydrate the readiness child from the resolved brief (Phase 8.3) so the gauge + its persisted
         // "why" toggle render under `ready`. A fresh brief resets the toggle to collapsed.
         state.readiness = ReadinessComponent.State(readiness: brief.readiness)
@@ -267,8 +265,10 @@ public struct TodayFeature {
       // 3. Generate the brief (the open path uses `refresh: false`; the save path passes `true`). The HR
       //    zones are fetched **concurrently** (`async let`) so the swap child can resolve a swapped
       //    alternative's bpm range (DECISIONS #4) without adding latency; the fetch is non-fatal
-      //    (`try?` → `nil`) so a zones failure never blocks the brief, and `._zonesResolved` is sent
-      //    **before** `._briefResolved` so `state.zones` is in place when the child hydrates.
+      //    (`try?` → `nil`) so a zones failure never blocks the brief. Both fetches are awaited and ride
+      //    on **one** `._briefResolved(brief, freshness, zones)` payload, so the reducer hydrates
+      //    `state.zones` before the session child reads it — no cross-action ordering to get wrong
+      //    (Phase 11.4 D2, replacing the old separate zones-action-before-brief-action hazard).
       await send(._generating)
       do {
         async let dwell: Void = clock.sleep(for: Self.loadingPhaseMinDuration)
@@ -276,8 +276,7 @@ public struct TodayFeature {
         let brief = try await briefRepository.dailyBrief(refresh)
         let zones = await zonesResult
         try? await dwell
-        await send(._zonesResolved(zones))
-        await send(._briefResolved(brief, brief.cached ? .cached : .fresh))
+        await send(._briefResolved(brief, brief.cached ? .cached : .fresh, zones))
       } catch let error as BriefError {
         await send(._briefFailed(error))
       } catch {

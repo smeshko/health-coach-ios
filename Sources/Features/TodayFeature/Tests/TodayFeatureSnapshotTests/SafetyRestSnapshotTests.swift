@@ -16,7 +16,6 @@
   import DesignSystem
   import DomainModels
   import SampleData
-  import SessionFeature
   import SnapshotTesting
   import SwiftUI
   import Testing
@@ -44,12 +43,10 @@
     /// override session (rest card). No swap/skip/alternatives are wired.
     private func forcedRest(_ scenario: SampleScenario) -> some View {
       let brief = brief(scenario)
-      let store = Store(
-        initialState: SafetyRestComponent.State(gate: brief.safetyGate, overrideSession: brief.session)
-      ) { SafetyRestComponent() }
       return framed(
         SafetyRestView(
-          store: store,
+          gate: brief.safetyGate,
+          overrideSession: brief.session,
           narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
         )
       )

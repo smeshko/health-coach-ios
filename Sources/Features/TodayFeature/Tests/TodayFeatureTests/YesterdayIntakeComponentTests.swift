@@ -5,15 +5,13 @@ import Testing
 
 @testable import TodayFeature
 
-/// Exhaustive coverage (ARCHITECTURE D18) for `YesterdayIntakeComponent.State` — the pure presence mapping
-/// of the optional `intakeYesterday` onto `DisplayState` (DECISIONS #2): a whole-null intake → `.empty`
-/// (the first-class no-food state, §7.4.5/§8.5/§14), a present summary → `.logged` (even with all totals
-/// nil — the §5 distinction). The component computes no nutrition number (principle #4): the protein
-/// marker rides `vsTarget.proteinHit` verbatim, independent of the raw `proteinG`.
+/// Exhaustive coverage (ARCHITECTURE D18) for `YesterdayIntakeView`'s pure presence mapping of the optional
+/// `intake` onto `DisplayState`: a whole-null intake → `.empty` (the first-class no-food state,
+/// §7.4.5/§8.5/§14), a present summary → `.logged` (even with all totals nil — the §5 distinction).
+/// `YesterdayIntakeView` is render-only (a plain value-init view, no reducer, like `SafetyRestView`), so
+/// these are init-derivation assertions on the view's stored `display`.
 @MainActor
 struct YesterdayIntakeComponentTests {
-  private typealias State = YesterdayIntakeComponent.State
-
   private func brief(_ scenario: SampleScenario) throws -> DomainModels.DailyBrief {
     try SampleData.dailyBrief(scenario).domain
   }
@@ -37,47 +35,28 @@ struct YesterdayIntakeComponentTests {
     )
   }
 
-  @Test func test_init_withLoggedIntake_isLogged() throws {
-    let loaded = try brief(.dailyBriefGreen)
-    let intake = try #require(loaded.intakeYesterday)
-    #expect(State(intakeYesterday: intake).display == .logged(intake))
-  }
+  /// A present `intakeYesterday` maps to `.logged(summary)` (the fixture's logged intake rides through
+  /// verbatim); a whole-null `intakeYesterday` maps to `.empty` — never a `.logged` with zero totals.
+  @Test func test_init_loggedAndEmptyMapping() throws {
+    let logged = try brief(.dailyBriefGreen)
+    let intake = try #require(logged.intakeYesterday)
+    #expect(YesterdayIntakeView(intake: intake).display == .logged(intake))
 
-  @Test func test_init_withNullIntake_isEmpty() throws {
-    let loaded = try brief(.dailyBriefNoFood)
+    let noFood = try brief(.dailyBriefNoFood)
     // The fixture itself carries a whole-null intake …
-    #expect(loaded.intakeYesterday == nil)
+    #expect(noFood.intakeYesterday == nil)
     // … and the mapping takes the `.empty` branch — never a `.logged` with zero totals.
-    #expect(State(intakeYesterday: loaded.intakeYesterday).display == .empty)
-  }
-
-  /// The protein marker rides `vsTarget.proteinHit`, not the raw `proteinG`: two summaries with **identical**
-  /// `proteinG` but opposite `proteinHit` stay distinct through the state (the view reads `proteinHit`
-  /// verbatim — D4 / principle #4).
-  @Test func test_proteinMarker_tracksVsTargetProteinHit_notRawTotals() {
-    let hit = summary(proteinG: 100, proteinHit: true)
-    let miss = summary(proteinG: 100, proteinHit: false)
-
-    guard case let .logged(loggedHit) = State(intakeYesterday: hit).display,
-          case let .logged(loggedMiss) = State(intakeYesterday: miss).display
-    else {
-      Issue.record("expected both to be .logged")
-      return
-    }
-    // Same raw protein grams, opposite wire `proteinHit` — the component carries `vsTarget` verbatim.
-    #expect(loggedHit.proteinG == loggedMiss.proteinG)
-    #expect(loggedHit.vsTarget.proteinHit == true)
-    #expect(loggedMiss.vsTarget.proteinHit == false)
+    #expect(YesterdayIntakeView(intake: noFood.intakeYesterday).display == .empty)
   }
 
   /// §5: a present summary with **all macro totals nil** but `vsTarget` present is `.logged`, never
-  /// `.empty` (the `.empty` branch is reserved for a whole-null `intakeYesterday`). The `.logged` recap
-  /// then omits the nil totals — the calories %/protein marker still read from `vsTarget`.
+  /// `.empty` (the `.empty` branch is reserved for a whole-null `intake`). The `.logged` recap then omits
+  /// the nil totals — the calories %/protein marker still read from `vsTarget`.
   @Test func test_init_withLoggedIntake_nullMacroTotals_isLogged_notEmpty() {
     let totalsAllNil = summary(caloriesPct: 0.5, proteinHit: false)
-    let state = State(intakeYesterday: totalsAllNil)
-    #expect(state.display == .logged(totalsAllNil))
-    guard case let .logged(logged) = state.display else {
+    let display = YesterdayIntakeView(intake: totalsAllNil).display
+    #expect(display == .logged(totalsAllNil))
+    guard case let .logged(logged) = display else {
       Issue.record("expected .logged")
       return
     }
