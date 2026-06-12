@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 import Testing
 import WireModels
@@ -41,8 +42,8 @@ struct RequestBuildingTests {
   }
 
   @Test func test_sync_postsEncodedBody_withAuthAndContentType() throws {
-    let syncRequest = SyncRequest(checkin: DailyCheckin(
-      date: calendarDay(2026, 6, 6),
+    let syncRequest = SyncRequest(checkin: CheckIn(
+      date: calendarDay(2026, 6, 6).value,
       giSymptoms: false, kneePain: 1, illness: false
     ))
     let request = try urlRequest(for: Routes.sync(syncRequest), baseURL: baseURL, bearer: bearer)

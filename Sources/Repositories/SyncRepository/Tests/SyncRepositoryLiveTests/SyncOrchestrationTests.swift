@@ -214,7 +214,7 @@ struct SyncOrchestrationTests {
     }
 
     #expect(
-      stubs.capturedRequest?.strengthTest?.date == WireCalendarDate(wednesday),
+      stubs.capturedRequest?.strengthTest?.date == wednesday,
       "the strength test is sent dated today, not the day it was logged"
     )
     #expect(stubs.capturedRequest?.strengthTest?.maxPushups == 30, "the logged numbers are preserved")

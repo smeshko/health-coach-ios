@@ -48,25 +48,10 @@ func wireActivitySummary(_ payload: ActivitySummaryPayload) -> ActivitySummary {
   )
 }
 
-func wireDailyCheckin(_ checkIn: DomainModels.CheckIn) -> DailyCheckin {
-  DailyCheckin(
-    date: WireCalendarDate(checkIn.date),
-    giSymptoms: checkIn.giSymptoms,
-    kneePain: checkIn.kneePain,
-    illness: checkIn.illness
-  )
-}
-
-func wireStrengthTest(_ test: DomainModels.StrengthTest) -> WireModels.StrengthTest {
-  WireModels.StrengthTest(
-    date: WireCalendarDate(test.date),
-    maxPushups: test.maxPushups,
-    maxPullups: test.maxPullups
-  )
-}
-
 /// Assemble the `SyncRequest` from a HealthKit delta set + the optional check-in / strength test. An
-/// empty set + nil inputs yields a valid minimal request (empty arrays, nil singletons).
+/// empty set + nil inputs yields a valid minimal request (empty arrays, nil singletons). `checkin`/
+/// `strengthTest` pass through unchanged — they are the shared `DomainModels` types `SyncRequest`
+/// embeds directly (Phase 11.3 fold).
 func buildSyncRequest(
   samples: HealthSampleSet,
   checkin: DomainModels.CheckIn?,
@@ -76,7 +61,7 @@ func buildSyncRequest(
     records: samples.records.map(wireHealthRecord),
     workouts: samples.workouts.map(wireWorkout),
     activitySummary: samples.activity.map(wireActivitySummary),
-    checkin: checkin.map(wireDailyCheckin),
-    strengthTest: strengthTest.map(wireStrengthTest)
+    checkin: checkin,
+    strengthTest: strengthTest
   )
 }
