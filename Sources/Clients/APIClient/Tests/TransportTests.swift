@@ -67,8 +67,8 @@ extension URLProtocolStubSerialized {
 
     @Test func test_success_decodesDTO_withWireCoder() async throws {
       URLProtocolStub.box.setResponses([.init(status: 200, data: Data(#"{"ok":true}"#.utf8))])
-      let ok = try await makeClient().probe()
-      #expect(ok)
+      let reachable = try await makeClient().probe()
+      #expect(reachable)
     }
 
     // MARK: - Envelope decode
