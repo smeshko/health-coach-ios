@@ -9,11 +9,11 @@ import WireModels
 // the orchestration (TASK-003).
 
 /// Map a HealthKit record payload to the wire `HealthRecord`. Reuses the `RecordType` tag the payload
-/// already carries (wrapped in the forward-compatible `WireEnum`).
+/// already carries (now a bare wire-local `RecordType`, decoded/encoded strictly).
 func wireHealthRecord(_ payload: HealthRecordPayload) -> HealthRecord {
   HealthRecord(
     uuid: payload.uuid,
-    type: WireEnum(payload.type),
+    type: payload.type,
     start: payload.start,
     end: payload.end,
     value: payload.value,

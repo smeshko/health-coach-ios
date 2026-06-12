@@ -158,26 +158,8 @@ struct WeeklyCachePolicyTests {
     #expect(stub.weeklyCallCount == 1, "the first open of a new ISO week regenerates")
   }
 
-  // NOTE: `domainWeeklyPlan` is a TOTAL mapping — it has no required *singular* closed enum, so unlike
-  // the daily path it never throws `MappingError` (core/extras sessions are collection elements that
-  // are DROPPED when out-of-set). The `.mappingFailed` wrapper is still present in `weeklyPlanPolicy`
-  // (defensive, and proven by the daily mapping-error test); here we document the real behavior: an
-  // out-of-set core session is dropped, not surfaced as an error.
-  @Test(.enabled("fixture needs a core session to exercise the drop path") {
-    try !SampleData.weeklyPlan(.weeklyPlanDeload).dto.data.core.isEmpty
-  })
-  func test_weeklyBrief_outOfSetCoreSession_isDropped() async throws {
-    let (dto, domain) = try deloadFixture()
-    var badDTO = dto
-    badDTO.data.core[0].card = WireEnum(rawValue: "bogus_card") // out-of-set collection element
-    let db = try TestDatabase.makeInMemory()
-    try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(weeklyResult: .success(badDTO))
-
-    let result = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
-      try await BriefRepository.live.weeklyBrief(nil, false)
-    }
-
-    #expect(result.core.count == domain.core.count - 1, "the out-of-set core session is dropped")
-  }
+  // NOTE: the former `test_weeklyBrief_outOfSetCoreSession_isDropped` is removed — an out-of-set
+  // closed-enum card is no longer constructible in a typed DTO (the closed enums are shared
+  // wire↔domain and decode strictly, Phase 11.3), so the collection-element drop path can never be
+  // reached. Strict decode is covered by the WireModels decode tests.
 }

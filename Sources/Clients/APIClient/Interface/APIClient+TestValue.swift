@@ -37,16 +37,16 @@ enum CannedResponses {
   static let dailyBrief = DailyBrief(
     data: DailyBriefData(
       date: calendarDay,
-      readiness: Readiness(score: 80, band: .known(.green), penalties: []),
+      readiness: Readiness(score: 80, band: .green, penalties: []),
       safetyGate: SafetyGate(triggered: false, reasons: []),
       session: SessionBlock(
-        card: .known(.easyRun), intensity: .known(.easy),
+        card: .easyRun, intensity: .easy,
         durationMinLow: 40, durationMinHigh: 55, flags: []
       ),
       alternatives: [],
       skipOk: true,
       macroFocus: MacroFocus(
-        dayType: .known(.moderate), caloriesKcal: 2600, proteinG: 170, carbsG: 300,
+        dayType: .moderate, caloriesKcal: 2600, proteinG: 170, carbsG: 300,
         fatGLow: 60, fatGHigh: 80, hydrationLLow: 2.5, hydrationLHigh: 3.5
       ),
       generatedAt: day,

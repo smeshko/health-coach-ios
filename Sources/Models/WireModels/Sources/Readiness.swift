@@ -1,12 +1,13 @@
+import DomainModels
 import Foundation
 
 /// Readiness scoring for the daily brief (`openapi.yaml` `Readiness`).
 public struct Readiness: Codable, Sendable, Equatable {
   public var score: Int
-  public var band: WireEnum<ReadinessBand>
+  public var band: ReadinessBand
   public var penalties: [ReadinessPenalty]
 
-  public init(score: Int, band: WireEnum<ReadinessBand>, penalties: [ReadinessPenalty]) {
+  public init(score: Int, band: ReadinessBand, penalties: [ReadinessPenalty]) {
     self.score = score
     self.band = band
     self.penalties = penalties

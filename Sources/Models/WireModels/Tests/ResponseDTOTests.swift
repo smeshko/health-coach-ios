@@ -3,6 +3,8 @@ import Testing
 
 @testable import WireModels
 
+// Note: `DomainModels` is intentionally NOT imported — the shared closed-enum cases resolve via the
+// DTO field's inferred type, and importing it would collide DTO struct names across the two modules.
 struct ResponseDTOTests {
   private func decode<T: Decodable>(_ type: T.Type, from json: String) throws -> T {
     try WireCoder.decoder.decode(type, from: Data(json.utf8))
@@ -10,15 +12,15 @@ struct ResponseDTOTests {
 
   @Test func test_dailyBrief_decodes() throws {
     let brief = try decode(DailyBrief.self, from: Fixtures.dailyBrief)
-    #expect(brief.data.readiness.band == .known(.green))
-    #expect(brief.data.session.card == .known(.easyRun))
+    #expect(brief.data.readiness.band == .green)
+    #expect(brief.data.session.card == .easyRun)
     #expect(!brief.narrative.isEmpty)
   }
 
   @Test func test_weeklyPlan_decodes() throws {
     let plan = try decode(WeeklyPlan.self, from: Fixtures.weeklyPlan)
     #expect(plan.data.isoWeek == "2026-W24")
-    #expect(plan.data.core.first?.card == .known(.longRun))
+    #expect(plan.data.core.first?.card == .longRun)
   }
 
   @Test func test_profileResponse_decodes() throws {
@@ -36,7 +38,7 @@ struct ResponseDTOTests {
 
   @Test func test_errorResponse_decodes() throws {
     let envelope = try decode(ErrorResponse.self, from: Fixtures.errorResponse)
-    #expect(envelope.error.code == .known(.validationError))
+    #expect(envelope.error.code == .validationError)
     #expect(envelope.error.detail == "date must be yyyy-MM-dd")
   }
 

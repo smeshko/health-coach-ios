@@ -172,11 +172,13 @@ let package = Package(
       ]
     ),
     // Wire-contract DTOs (Codable mirror of openapi.yaml). Bottom-of-graph: depends only on
-    // CoachCore (+ Foundation). Must NOT import TCA / GRDB / DomainModels (ARCHITECTURE §4.1).
+    // CoachCore (+ Foundation) + DomainModels (shared closed enums, Phase 11.3). Must NOT import
+    // TCA / GRDB (ARCHITECTURE §4.1). No cycle: DomainModels depends only on CoachCore.
     .target(
       name: "WireModels",
       dependencies: [
         "CoachCore",
+        "DomainModels",
       ],
       path: "Sources/Models/WireModels/Sources",
       swiftSettings: [

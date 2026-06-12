@@ -15,11 +15,11 @@ public struct ErrorResponse: Codable, Sendable, Equatable {
 /// key stays `error` (owned by ``ErrorResponse``). Decoding non-2xx bodies into an `APIError` is
 /// Epic 03; this phase only *defines* the envelope.
 public struct WireError: Codable, Sendable, Equatable {
-  public var code: WireEnum<ErrorCode>
+  public var code: ErrorCode
   public var message: String
   public var detail: String?
 
-  public init(code: WireEnum<ErrorCode>, message: String, detail: String? = nil) {
+  public init(code: ErrorCode, message: String, detail: String? = nil) {
     self.code = code
     self.message = message
     self.detail = detail

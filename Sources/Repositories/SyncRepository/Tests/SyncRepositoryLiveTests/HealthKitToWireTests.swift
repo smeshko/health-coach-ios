@@ -21,7 +21,7 @@ struct HealthKitToWireTests {
     )
     let wire = wireHealthRecord(payload)
     #expect(wire.uuid == "u1")
-    #expect(wire.type == WireEnum(.heartRate))
+    #expect(wire.type == .heartRate)
     #expect(wire.start == payload.start)
     #expect(wire.end == payload.end)
     #expect(wire.value == 62)

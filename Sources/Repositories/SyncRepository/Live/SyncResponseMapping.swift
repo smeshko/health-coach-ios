@@ -21,12 +21,12 @@ func syncResult(_ response: SyncResponse) -> SyncResult {
 func syncError(_ error: APIError) -> SyncError {
   switch error {
   case let .envelope(code, _, _, _):
-    switch code.known {
+    switch code {
     case .validationError: .validationFailed
     case .internalError: .serverError
     // 502/504 reach the repo (/sync is not transport-retried, 3.1) → retry-friendly transient.
     case .briefGenerationFailed, .upstreamTimeout: .transient
-    // notFound / unauthorized (intercepted upstream) / unknown → transient default.
+    // notFound / unauthorized (intercepted upstream) → transient default.
     default: .transient
     }
   case .transport:
@@ -48,7 +48,7 @@ func isUnauthorized(_ error: APIError) -> Bool {
   case .unauthorized:
     true
   case let .envelope(code, _, _, _):
-    code.known == .unauthorized
+    code == .unauthorized
   default:
     false
   }

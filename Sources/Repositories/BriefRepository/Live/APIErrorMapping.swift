@@ -11,7 +11,7 @@ import WireModels
 func briefError(from apiError: APIError, hasPriorBrief: Bool) -> BriefError {
   switch apiError {
   case let .envelope(code, _, _, _):
-    switch code.known {
+    switch code {
     case .briefGenerationFailed, .upstreamTimeout:
       .transientGenerationFailed
     case .internalError:
@@ -20,9 +20,8 @@ func briefError(from apiError: APIError, hasPriorBrief: Bool) -> BriefError {
       .validation
     case .unauthorized:
       .unauthorized
-    // `404 not_found` and any unrecognised (`.unknown` → `code.known == nil`) envelope code → the
-    // generic catch-all (§12).
-    case .notFound, .none:
+    // `404 not_found` → the generic catch-all (§12).
+    case .notFound:
       .serverError
     }
   case .unauthorized:

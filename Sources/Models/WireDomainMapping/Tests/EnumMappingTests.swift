@@ -28,28 +28,24 @@ struct EnumMappingTests {
     #expect(EnumMapping.penaltyFactor("brand_new") == .unknown("brand_new"))
   }
 
-  @Test func test_closedEnum_knownCasesRoundTrip() {
-    #expect(EnumMapping.card(.known(.easyRun)) == .easyRun)
-    #expect(EnumMapping.card(.known(.rest)) == .rest)
-    #expect(EnumMapping.zone(.known(.z3)) == .z3)
-    #expect(EnumMapping.band(.known(.amber)) == .amber)
-    #expect(EnumMapping.dayType(.known(.hard)) == .hard)
-    #expect(EnumMapping.intensity(.known(.quality)) == .quality)
-    #expect(EnumMapping.narrativeType(.known(.caution)) == .caution)
-    #expect(EnumMapping.tier(.known(.extra)) == .extra)
-    #expect(EnumMapping.weekday(.known(.sun)) == .sun)
+  @Test func test_closedEnum_identityPassThrough() {
+    // The closed enums are now shared wire↔domain (Phase 11.3); the helpers are identity
+    // pass-throughs that simply return their input.
+    #expect(EnumMapping.card(.easyRun) == .easyRun)
+    #expect(EnumMapping.card(.rest) == .rest)
+    #expect(EnumMapping.zone(.z3) == .z3)
+    #expect(EnumMapping.band(.amber) == .amber)
+    #expect(EnumMapping.dayType(.hard) == .hard)
+    #expect(EnumMapping.intensity(.quality) == .quality)
+    #expect(EnumMapping.narrativeType(.caution) == .caution)
+    #expect(EnumMapping.tier(.extra) == .extra)
+    #expect(EnumMapping.weekday(.sun) == .sun)
   }
 
-  @Test func test_closedEnum_everyWireCaseMaps() {
-    // Totality: every wire case maps to a domain case (no nil for a known value).
-    for card in WorkoutCard.allCases {
-      #expect(EnumMapping.card(.known(card)) != nil, "unmapped card: \(card)")
+  @Test func test_closedEnum_everyCaseMaps() {
+    // Totality: the identity pass-through is non-nil for every shared card case.
+    for card in Card.allCases {
+      #expect(EnumMapping.card(card) == card, "unmapped card: \(card)")
     }
-  }
-
-  @Test func test_closedEnum_unknownReturnsNil() {
-    #expect(EnumMapping.card(.unknown("new_card")) == nil)
-    #expect(EnumMapping.zone(.unknown("z9")) == nil)
-    #expect(EnumMapping.band(.unknown("teal")) == nil)
   }
 }

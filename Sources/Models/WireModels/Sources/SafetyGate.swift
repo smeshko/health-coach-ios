@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 
 /// The safety gate on a daily brief (`openapi.yaml` `SafetyGate`). A tripped gate
@@ -6,9 +7,9 @@ import Foundation
 public struct SafetyGate: Codable, Sendable, Equatable {
   public var triggered: Bool
   public var reasons: [String]
-  public var overrideTo: WireEnum<WorkoutCard>?
+  public var overrideTo: Card?
 
-  public init(triggered: Bool, reasons: [String], overrideTo: WireEnum<WorkoutCard>? = nil) {
+  public init(triggered: Bool, reasons: [String], overrideTo: Card? = nil) {
     self.triggered = triggered
     self.reasons = reasons
     self.overrideTo = overrideTo

@@ -1,13 +1,12 @@
 import Foundation
 
-// The ten closed wire enums (`openapi.yaml` `enum` schemas). Each declares explicit String
-// rawValues where the wire value is snake_case/lowercase; where the Swift case name already equals
-// the rawValue (e.g. `core`, `green`, `z1`) no explicit rawValue is given. None is used directly as
-// a DTO field type — fields wrap them in `WireEnum<…>` for unknown-tolerant decode (DECISIONS.md
-// Decision 1).
+// The two wire-only closed enums (RecordType, ErrorCode) — `openapi.yaml` `enum` schemas with no
+// domain twin. Every other closed wire enum is now shared from `DomainModels` (Phase 11.3): DTO
+// fields reference the domain types directly and decode strictly. These two have no domain
+// counterpart, so they stay declared here as plain String-backed enums.
 
 /// HealthKit record types synced to the backend (`RecordType`, 24 values).
-public enum RecordType: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
+public enum RecordType: String, CaseIterable, Codable, Sendable, Hashable {
   case heartRate = "heart_rate"
   case heartRateVariabilitySdnn = "heart_rate_variability_sdnn"
   case restingHeartRate = "resting_heart_rate"
@@ -34,68 +33,8 @@ public enum RecordType: String, CaseIterable, Codable, Sendable, Hashable, WireE
   case dietaryWater = "dietary_water"
 }
 
-/// The workout/session card catalogue (`WorkoutCard`, 20 values).
-public enum WorkoutCard: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  case easyRun = "easy_run"
-  case longRun = "long_run"
-  case progressionRun = "progression_run"
-  case activeRecovery = "active_recovery"
-  case threshold
-  case vo2
-  case strides
-  case hiit
-  case jumpRope = "jump_rope"
-  case steadyCardio = "steady_cardio"
-  case strengthPush = "strength_push"
-  case strengthPull = "strength_pull"
-  case strengthLower = "strength_lower"
-  case strengthFull = "strength_full"
-  case boxing
-  case boxingTechnique = "boxing_technique"
-  case footPrehab = "foot_prehab"
-  case glutePrehab = "glute_prehab"
-  case mobility
-  case rest
-}
-
-/// Heart-rate zones (`Zone`, z1–z5).
-public enum Zone: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  // swiftlint:disable:next identifier_name
-  case z1, z2, z3, z4, z5
-}
-
-/// Days of the week (`Weekday`, mon–sun).
-public enum Weekday: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  case mon, tue, wed, thu, fri, sat, sun
-}
-
-/// Session tier (`Tier`).
-public enum Tier: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  case core, extra
-}
-
-/// Day type (`DayType`).
-public enum DayType: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  case hard, moderate, rest
-}
-
-/// Session intensity (`Intensity`).
-public enum Intensity: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  case easy, quality, recovery
-}
-
-/// Narrative section type (`NarrativeType`).
-public enum NarrativeType: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  case summary, session, nutrition, caution, plan
-}
-
-/// Readiness band (`ReadinessBand`).
-public enum ReadinessBand: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
-  case green, amber, red
-}
-
 /// Error envelope codes (`ErrorCode`).
-public enum ErrorCode: String, CaseIterable, Codable, Sendable, Hashable, WireEnumWrapped {
+public enum ErrorCode: String, CaseIterable, Codable, Sendable, Hashable {
   case validationError = "validation_error"
   case unauthorized
   case notFound = "not_found"

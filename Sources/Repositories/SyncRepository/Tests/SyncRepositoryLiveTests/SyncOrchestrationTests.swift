@@ -81,7 +81,7 @@ struct SyncOrchestrationTests {
     let seeded = SyncWatermarkRecord(anchor: "111.0", serverTime: Date(timeIntervalSince1970: 111))
     try await db.write { dbx in try seeded.save(dbx) }
     let stubs = SyncStubs(apiResult: .failure(.envelope(
-      code: WireEnum(.internalError), message: "", detail: nil, status: 500
+      code: .internalError, message: "", detail: nil, status: 500
     )))
 
     do {
@@ -123,7 +123,7 @@ struct SyncOrchestrationTests {
     #expect(mark == nil, "a 401 must not advance the watermark")
   }
 
-  private func env(_ code: WireEnum<ErrorCode>, _ status: Int) -> APIError {
+  private func env(_ code: ErrorCode, _ status: Int) -> APIError {
     .envelope(code: code, message: "", detail: nil, status: status)
   }
 
@@ -132,7 +132,7 @@ struct SyncOrchestrationTests {
     // map it to `.transient`, silently swallowing the 401.
     let db = try DatabaseClient.makeInMemory()
     let stubs = SyncStubs(apiResult: .failure(
-      .envelope(code: WireEnum(.unauthorized), message: "", detail: nil, status: 401)
+      .envelope(code: .unauthorized, message: "", detail: nil, status: 401)
     ))
 
     do {
@@ -148,12 +148,11 @@ struct SyncOrchestrationTests {
   }
 
   @Test func test_apiError_mapsToSyncError() {
-    #expect(syncError(env(WireEnum(.validationError), 422)) == .validationFailed)
-    #expect(syncError(env(WireEnum(.internalError), 500)) == .serverError)
-    #expect(syncError(env(WireEnum(.briefGenerationFailed), 502)) == .transient)
-    #expect(syncError(env(WireEnum(.upstreamTimeout), 504)) == .transient)
-    #expect(syncError(env(WireEnum(.notFound), 404)) == .transient)
-    #expect(syncError(env(WireEnum(rawValue: "new_code"), 500)) == .transient)
+    #expect(syncError(env(.validationError, 422)) == .validationFailed)
+    #expect(syncError(env(.internalError, 500)) == .serverError)
+    #expect(syncError(env(.briefGenerationFailed, 502)) == .transient)
+    #expect(syncError(env(.upstreamTimeout, 504)) == .transient)
+    #expect(syncError(env(.notFound, 404)) == .transient)
     #expect(syncError(.transport("offline")) == .network)
     #expect(syncError(.decoding("bad")) == .mappingFailed)
     #expect(syncError(.unexpectedStatus(418)) == .transient)

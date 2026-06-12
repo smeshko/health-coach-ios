@@ -6,8 +6,8 @@ import WireModels
 struct HealthDataCategoryTests {
   @Test func test_categoryMapping_coversEveryWireRecordType_exactly() {
     let mapped = Set(HealthDataCategory.allCases.flatMap(\.recordTypes))
-    // `RecordType` here is the clean, CaseIterable wire enum (Phase 2.1 put the unknown-tolerance in
-    // the generic `WireEnum<>` box, not on `RecordType`), so its `allCases` is the source of truth.
+    // `RecordType` is the wire-local, CaseIterable enum (no tolerant wrapper — it decodes strictly),
+    // so its `allCases` is the source of truth.
     #expect(mapped == Set(RecordType.allCases))
     #expect(mapped.count == 24, "the wire RecordType set has 24 values")
   }

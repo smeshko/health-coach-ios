@@ -91,7 +91,7 @@ extension URLProtocolStubSerialized {
         URLProtocolStub.box.setResponses([.init(status: testCase.status, data: envelope(testCase.raw))])
         // `profile` has `retry: .never`, so even 502/504 decode immediately (no retry path).
         await assertThrows(
-          .envelope(code: .known(testCase.code), message: "m", detail: nil, status: testCase.status),
+          .envelope(code: testCase.code, message: "m", detail: nil, status: testCase.status),
           from: { try await self.makeClient().profile() },
           message: testCase.raw
         )
@@ -114,7 +114,7 @@ extension URLProtocolStubSerialized {
       let brief = try await withDependencies { $0.continuousClock = ImmediateClock() } operation: {
         try await client.dailyBrief(nil, false)
       }
-      #expect(brief.data.readiness.band == .known(.green))
+      #expect(brief.data.readiness.band == .green)
       #expect(URLProtocolStub.box.recordedRequests.count == 2)
     }
 
@@ -127,7 +127,7 @@ extension URLProtocolStubSerialized {
       let brief = try await withDependencies { $0.continuousClock = ImmediateClock() } operation: {
         try await client.dailyBrief(nil, false)
       }
-      #expect(brief.data.session.card == .known(.easyRun))
+      #expect(brief.data.session.card == .easyRun)
       #expect(URLProtocolStub.box.recordedRequests.count == 2)
     }
 
@@ -136,7 +136,7 @@ extension URLProtocolStubSerialized {
       let client = makeClient()
       let error = await captureError { try await client.dailyBrief(nil, false) }
       #expect(
-        error == .envelope(code: .known(.briefGenerationFailed), message: "m", detail: nil, status: 502)
+        error == .envelope(code: .briefGenerationFailed, message: "m", detail: nil, status: 502)
       )
       // 1 initial request + 6 capped retries.
       #expect(URLProtocolStub.box.recordedRequests.count == 7)
@@ -147,7 +147,7 @@ extension URLProtocolStubSerialized {
       let client = makeClient()
       let error = await captureError { try await client.profile() }
       #expect(
-        error == .envelope(code: .known(.briefGenerationFailed), message: "m", detail: nil, status: 502)
+        error == .envelope(code: .briefGenerationFailed, message: "m", detail: nil, status: 502)
       )
       #expect(URLProtocolStub.box.recordedRequests.count == 1)
     }
@@ -157,7 +157,7 @@ extension URLProtocolStubSerialized {
       let client = makeClient()
       let error = await captureError { try await client.dailyBrief(nil, false) }
       #expect(
-        error == .envelope(code: .known(.internalError), message: "m", detail: nil, status: 500)
+        error == .envelope(code: .internalError, message: "m", detail: nil, status: 500)
       )
       #expect(URLProtocolStub.box.recordedRequests.count == 1)
     }

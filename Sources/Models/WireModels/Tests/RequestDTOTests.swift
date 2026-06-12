@@ -33,7 +33,7 @@ struct RequestDTOTests {
     let request = SyncRequest(
       records: [
         HealthRecord(
-          uuid: "rec-1", type: WireEnum(.heartRate), start: day, end: day,
+          uuid: "rec-1", type: .heartRate, start: day, end: day,
           value: 142, unit: "count/min", source: "Apple Watch",
           metadata: ["context": "workout"]
         ),
