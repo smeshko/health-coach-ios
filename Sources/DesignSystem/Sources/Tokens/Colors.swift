@@ -25,7 +25,6 @@ public enum CoachColor {
   public static let accent3Soft = dynamic(light: 0xF2E1DA, dark: 0x36221D)
   public static let accent4 = dynamic(light: 0xDB7A3D, dark: 0xE99157)
   public static let accent5 = dynamic(light: 0x5E97B5, dark: 0x71AAC8)
-  public static let accent6 = dynamic(light: 0xB58A4E, dark: 0xCAA06C)
 
   // MARK: Tier 1 — Primitives · Neutrals (light · dark)
 
@@ -37,8 +36,6 @@ public enum CoachColor {
   public static let neutral60 = dynamic(light: 0x6E6E73, dark: 0x9D9CA3)
   public static let neutral90 = dynamic(light: 0x1A1A1C, dark: 0xF3F2EE)
   public static let neutralRaised = dynamic(light: 0xFFFFFF, dark: 0x3C3B42)
-  public static let neutralInk = dynamic(light: 0x1C1C1E, dark: 0x26262C)
-  public static let neutralGlass = dynamic(light: 0xFFFFFF, dark: 0x1F1E22, alpha: 242.0 / 255)
   public static let staticWhite = dynamic(light: 0xFFFFFF, dark: 0xFFFFFF)
 }
 

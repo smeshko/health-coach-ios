@@ -16,11 +16,9 @@ struct DisplayLabelTests {
       }
     }
     check(Card.self)
-    check(Zone.self)
     check(ReadinessBand.self)
     check(DayType.self)
     check(Intensity.self)
-    check(NarrativeType.self)
     check(Tier.self)
     check(Weekday.self)
   }
@@ -73,12 +71,9 @@ struct DisplayLabelTests {
     #expect(ErrorDisplay.tokenRejected.label != ErrorDisplay.unauthorized.label)
   }
 
-  @Test func test_colorCues_existForBandZoneIntensity() {
-    // Compile-proof that the color cue is paired with each band/zone/intensity (color is never sole).
+  @Test func test_colorAndIconCues_existForBandAndIntensity() {
+    // Compile-proof that the surviving cues are present (color/icon are never the sole signal).
     _ = ReadinessBand.green.color
-    _ = ReadinessBand.green.iconName
-    _ = Zone.z3.color
-    _ = Intensity.quality.color
     _ = Intensity.quality.iconName
   }
 }

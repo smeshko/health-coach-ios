@@ -43,10 +43,6 @@ public extension CoachColor {
   static let z4 = accent4
   static let z5 = accent3
   // swiftlint:enable identifier_name
-
-  static let easy = accent5 // calm / aerobic  (= info)
-  static let quality = accent3 // hard effort     (= negative)
-  static let recovery = accent1 // restorative     (= positive)
 }
 
 /// Direct `.coach…` color accessors — convenience mirrors of the Tier-2 semantic tokens so call sites can
@@ -56,7 +52,7 @@ public extension CoachColor {
 /// `some ShapeStyle` parameter contexts the components use, while `Color.coachAccent` and plain `Color`
 /// value contexts keep resolving too. These forward to the semantics above (the single source of truth)
 /// and deliberately expose **only** the semantic/domain roles, never a raw Tier-1 primitive. Mirrors the
-/// `Font.Weight.coach…` precedent in `Typography.swift`.
+/// `Font.coach…` token accessors in `Typography.swift`.
 public extension ShapeStyle where Self == Color {
   // Text.
   static var coachForeground: Color { CoachColor.foreground }
@@ -88,9 +84,6 @@ public extension ShapeStyle where Self == Color {
   static var coachZ3: Color { CoachColor.z3 }
   static var coachZ4: Color { CoachColor.z4 }
   static var coachZ5: Color { CoachColor.z5 }
-  static var coachEasy: Color { CoachColor.easy }
-  static var coachQuality: Color { CoachColor.quality }
-  static var coachRecovery: Color { CoachColor.recovery }
 }
 
 /// The semantic tone the soft-tint primitives (`Pill`) and the `Chip` flag variant key off. Each tone
