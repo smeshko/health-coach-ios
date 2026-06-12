@@ -129,6 +129,11 @@ struct DailyCachePolicyTests {
       (.unauthorized, .unauthorized),
       // An unknown error code fails envelope decode → `.unexpectedStatus` → retry-friendly (D3).
       (.unexpectedStatus(500), .transientGenerationFailed),
+      // A 2xx body whose closed enum is out-of-set (Phase 11.3 strict decode) throws `.decoding`,
+      // which maps to the retry-friendly state (DECISIONS #5 — the pre-existing decode-failure
+      // policy). On a self-owned API a new closed case is a same-sitting client+server edit (D2), so
+      // this is the accepted classification, not a contract-negotiation failure.
+      (.decoding("DailyBrief.session.card: out-of-set"), .transientGenerationFailed),
     ]
 
     for (apiError, expected) in cases {
