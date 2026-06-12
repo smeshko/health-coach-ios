@@ -1,3 +1,6 @@
+import CoachCore
+import Database
+import DatabaseLive
 import Foundation
 import GRDB
 import Testing
@@ -38,11 +41,6 @@ struct RecordConformanceTests {
     #expect(try roundTripThroughRow(record) == record)
   }
 
-  @Test func test_checkInRecord_rowRoundTrips() throws {
-    let record = CheckInRecord(date: day, giSymptoms: false, kneePain: 2, illness: false)
-    #expect(try roundTripThroughRow(record) == record)
-  }
-
   @Test func test_strengthTestRecord_rowRoundTrips() throws {
     let record = StrengthTestRecord(date: day, maxPushups: 42, maxPullups: 14)
     #expect(try roundTripThroughRow(record) == record)
@@ -53,21 +51,29 @@ struct RecordConformanceTests {
     #expect(try roundTripThroughRow(record) == record)
   }
 
-  @Test func test_records_insertAndFetchViaInMemoryDatabase() throws {
-    // End-to-end against an in-memory DB to prove the records persist and fetch (schema is created
-    // ad-hoc here; real migrations live in DatabaseLive / Epic 04).
-    let queue = try DatabaseQueue()
-    try queue.write { db in
-      try db.create(table: CheckInRecord.databaseTableName) { table in
-        table.column("date", .datetime).primaryKey()
-        table.column("giSymptoms", .boolean).notNull()
-        table.column("kneePain", .integer).notNull()
-        table.column("illness", .boolean).notNull()
-      }
-      try CheckInRecord(date: day, giSymptoms: true, kneePain: 5, illness: false).insert(db)
+  /// End-to-end against an in-memory DB built by the **production migrator** (`makeInMemory` runs the
+  /// real v1–v3 migrations), so an insert/fetch round-trip catches drift between the records and the
+  /// shipped schema — which the ad-hoc-schema variant could not. Covers the flat `CheckInRecord`
+  /// (subsuming the standalone row round-trip) and the non-nil `lastStrengthTestSyncedWeek` ISOWeek
+  /// marker, the only nontrivial GRDB column type, through the real Row/DB path.
+  @Test func test_records_insertAndFetchViaMigratedDatabase() throws {
+    let database = try DatabaseClient.makeInMemory()
+
+    let checkIn = CheckInRecord(date: day, giSymptoms: true, kneePain: 5, illness: false)
+    let week = ISOWeek(year: 2026, week: 24)
+    let watermark = SyncWatermarkRecord(anchor: "anchor-token", serverTime: day, lastStrengthTestSyncedWeek: week)
+    try database.writer().write { db in
+      try checkIn.insert(db)
+      try watermark.save(db)
     }
-    let fetched = try queue.read { db in try CheckInRecord.fetchOne(db) }
-    #expect(fetched?.kneePain == 5)
-    #expect(fetched?.giSymptoms == true)
+
+    let fetchedCheckIn = try database.reader().read { db in try CheckInRecord.fetchOne(db) }
+    #expect(fetchedCheckIn == checkIn)
+
+    let fetchedWatermark = try database.reader().read { db in try SyncWatermarkRecord.fetchOne(db) }
+    #expect(
+      fetchedWatermark?.lastStrengthTestSyncedWeek == week,
+      "the ISOWeek marker round-trips non-nil through the real schema"
+    )
   }
 }

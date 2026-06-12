@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The six macro totals are optional (`nil` = nothing logged); `vsTarget` is **non-optional** (always
 /// present even when the totals are null).
-public struct IntakeSummary: Equatable, Sendable {
+public struct IntakeSummary: Equatable, Codable, Sendable {
   public var date: Date
   public var caloriesKcal: Int?
   public var proteinG: Int?
@@ -36,7 +36,7 @@ public struct IntakeSummary: Equatable, Sendable {
 }
 
 /// Intake measured against target.
-public struct IntakeVsTarget: Equatable, Sendable {
+public struct IntakeVsTarget: Equatable, Codable, Sendable {
   public var caloriesPct: Double
   public var proteinHit: Bool
 

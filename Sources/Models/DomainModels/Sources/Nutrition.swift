@@ -1,7 +1,7 @@
 import Foundation
 
 /// The daily macro focus.
-public struct MacroFocus: Equatable, Sendable {
+public struct MacroFocus: Equatable, Codable, Sendable {
   public var dayType: DayType
   public var caloriesKcal: Int
   public var proteinG: Int
@@ -34,7 +34,7 @@ public struct MacroFocus: Equatable, Sendable {
 
 /// The weekly nutrition plan. Carries the constant targets (no per-day calories/carbs — those live
 /// on `MacroFocus` / `RestDayNutrition` / `DayTypePatternEntry`).
-public struct WeeklyNutrition: Equatable, Sendable {
+public struct WeeklyNutrition: Equatable, Codable, Sendable {
   public var proteinG: Int
   public var fatGLow: Int
   public var fatGHigh: Int
@@ -71,7 +71,7 @@ public struct WeeklyNutrition: Equatable, Sendable {
 
 /// One day-type nutrition pattern entry. `suggestedDay` is a free string here (not the `Weekday`
 /// enum) — it mirrors the wire `type: string` field.
-public struct DayTypePatternEntry: Equatable, Sendable {
+public struct DayTypePatternEntry: Equatable, Codable, Sendable {
   public var suggestedDay: String
   public var dayType: DayType
   public var caloriesKcal: Int
@@ -86,7 +86,7 @@ public struct DayTypePatternEntry: Equatable, Sendable {
 }
 
 /// Rest-day nutrition.
-public struct RestDayNutrition: Equatable, Sendable {
+public struct RestDayNutrition: Equatable, Codable, Sendable {
   public var caloriesKcal: Int
   public var carbsG: Int
 
@@ -98,7 +98,7 @@ public struct RestDayNutrition: Equatable, Sendable {
 
 /// Last week's nutrition adherence — all fields nullable (`nil` = no logged coverage; do not
 /// default to 0, the UI renders that differently).
-public struct LastWeekNutrition: Equatable, Sendable {
+public struct LastWeekNutrition: Equatable, Codable, Sendable {
   public var avgCaloriesKcal: Int?
   public var avgProteinG: Int?
   public var proteinHitDays: Int?
@@ -121,7 +121,7 @@ public struct LastWeekNutrition: Equatable, Sendable {
 }
 
 /// The weekly training budgets.
-public struct WeeklyBudgets: Equatable, Sendable {
+public struct WeeklyBudgets: Equatable, Codable, Sendable {
   public var hardDays: Int
   public var strengthSessions: Int
   public var longRunKm: Double?
@@ -136,7 +136,7 @@ public struct WeeklyBudgets: Equatable, Sendable {
 }
 
 /// The weekly training targets.
-public struct WeeklyTargets: Equatable, Sendable {
+public struct WeeklyTargets: Equatable, Codable, Sendable {
   public var totalRunKm: Double?
   public var easyRunRatio: Double
   public var strengthSessions: Int

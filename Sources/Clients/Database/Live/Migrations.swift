@@ -63,6 +63,20 @@ extension DatabaseClient {
       }
     }
 
+    // Phase 11.2: DomainModels adopt in-module Codable, replacing the hand-written body coding. The
+    // enum-bearing daily-brief and weekly-plan bodies changed shape (closed enums encode wire strings
+    // not case names; open enums encode a single raw string not a `kind`/`raw` discriminator), so
+    // clear those two once — the caches are re-fetchable, not durable data, and GRDB runs migrations
+    // at DB open before any read, so nothing ever decodes an old-format blob (DECISIONS D3). The
+    // `profile` body is NOT cleared: `Profile` is enum- and Date-free (only Int/Double/String scalars
+    // under member-name keys), so the synthesized coding reads the old blob byte-identically — clearing
+    // it would needlessly drop a usable cache and break offline profile-serving for one launch (review
+    // round-1 #1). The flat records (check-in, strength test, watermarks) store no body blob.
+    migrator.registerMigration("v3_clearDomainBodyCaches") { db in
+      try db.execute(sql: "DELETE FROM \(DailyBriefRecord.databaseTableName)")
+      try db.execute(sql: "DELETE FROM \(WeeklyPlanRecord.databaseTableName)")
+    }
+
     return migrator
   }
 }

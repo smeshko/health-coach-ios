@@ -1,7 +1,7 @@
 import Foundation
 
 /// A prescribed daily session (the daily `session` and its `alternatives`).
-public struct SessionBlock: Equatable, Sendable {
+public struct SessionBlock: Equatable, Codable, Sendable {
   public var card: Card
   public var intensity: Intensity
   public var zoneTarget: Zone?
@@ -44,7 +44,7 @@ public struct SessionBlock: Equatable, Sendable {
 }
 
 /// A planned weekly session (no `hrCapBpm`/`cadenceSpm` — those are daily-only).
-public struct PlannedSession: Equatable, Sendable {
+public struct PlannedSession: Equatable, Codable, Sendable {
   public var card: Card
   public var tier: Tier
   public var intensity: Intensity

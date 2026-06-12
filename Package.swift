@@ -777,6 +777,10 @@ let package = Package(
         "DomainModels",
         "SampleData",
         "CoachCore",
+        // Test-only: the production migrator (`DatabaseClient.makeInMemory`) so record round-trips run
+        // against the real schema, not an ad-hoc in-test one (11.2 TASK-002).
+        "Database",
+        "DatabaseLive",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Models/PersistenceModels/Tests",

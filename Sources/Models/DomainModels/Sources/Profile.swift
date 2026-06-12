@@ -1,7 +1,7 @@
 import Foundation
 
 /// The athlete profile (domain twin of wire `ProfileResponse`).
-public struct Profile: Equatable, Sendable {
+public struct Profile: Equatable, Codable, Sendable {
   public var athlete: Athlete
   public var zones: Zones
   public var thresholds: Thresholds
@@ -16,7 +16,7 @@ public struct Profile: Equatable, Sendable {
 }
 
 /// Athlete constants.
-public struct Athlete: Equatable, Sendable {
+public struct Athlete: Equatable, Codable, Sendable {
   public var age: Int
   public var sex: String
   public var heightCm: Int
@@ -33,7 +33,7 @@ public struct Athlete: Equatable, Sendable {
 // swiftlint:disable identifier_name
 
 /// The five heart-rate zones.
-public struct Zones: Equatable, Sendable {
+public struct Zones: Equatable, Codable, Sendable {
   public var z1: ZoneRange
   public var z2: ZoneRange
   public var z3: ZoneRange
@@ -52,7 +52,7 @@ public struct Zones: Equatable, Sendable {
 // swiftlint:enable identifier_name
 
 /// A heart-rate zone range.
-public struct ZoneRange: Equatable, Sendable {
+public struct ZoneRange: Equatable, Codable, Sendable {
   public var low: Int
   public var high: Int
 
@@ -63,7 +63,7 @@ public struct ZoneRange: Equatable, Sendable {
 }
 
 /// Physiological thresholds.
-public struct Thresholds: Equatable, Sendable {
+public struct Thresholds: Equatable, Codable, Sendable {
   public var maxHr: Int
   public var rhrBaseline: Int
   public var hrvBaselineMs: Int
@@ -89,7 +89,7 @@ public struct Thresholds: Equatable, Sendable {
 }
 
 /// Profile metadata.
-public struct ProfileMeta: Equatable, Sendable {
+public struct ProfileMeta: Equatable, Codable, Sendable {
   public var constitutionVersion: String
   public var constantsRecomputedWeek: String?
 

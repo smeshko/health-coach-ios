@@ -1,7 +1,7 @@
 import Foundation
 
 /// The weekly plan, with the wire `{ data, narrative }` envelope flattened.
-public struct WeeklyPlan: Equatable, Sendable {
+public struct WeeklyPlan: Equatable, Codable, Sendable {
   public var isoWeek: String
   public var weekStart: Date
   public var budgets: WeeklyBudgets

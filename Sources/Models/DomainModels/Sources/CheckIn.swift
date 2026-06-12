@@ -5,7 +5,7 @@ import Foundation
 /// Phase 2.2 builds only response-shape domain types and defers the request members; this is added
 /// in Phase 2.3 as the domain peer of `CheckInRecord`. Plain `Equatable`/`Sendable`, no
 /// `Codable`/GRDB (keeps Phase 2.2's `DomainModels` invariant).
-public struct CheckIn: Equatable, Sendable {
+public struct CheckIn: Equatable, Codable, Sendable {
   public var date: Date
   public var giSymptoms: Bool
   public var kneePain: Int

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Readiness scoring for the daily brief.
-public struct Readiness: Equatable, Sendable {
+public struct Readiness: Equatable, Codable, Sendable {
   public var score: Int
   public var band: ReadinessBand
   /// Penalties — guaranteed non-optional, defaults to empty.
@@ -15,7 +15,7 @@ public struct Readiness: Equatable, Sendable {
 }
 
 /// A single readiness penalty (typed factor).
-public struct ReadinessPenalty: Equatable, Sendable {
+public struct ReadinessPenalty: Equatable, Codable, Sendable {
   public var factor: PenaltyFactor
   public var points: Int
 
@@ -26,7 +26,7 @@ public struct ReadinessPenalty: Equatable, Sendable {
 }
 
 /// The safety gate. A tripped gate is a normal brief, not an error.
-public struct SafetyGate: Equatable, Sendable {
+public struct SafetyGate: Equatable, Codable, Sendable {
   public var triggered: Bool
   /// Typed reasons — guaranteed non-optional, defaults to empty.
   public var reasons: [SafetyReason]
