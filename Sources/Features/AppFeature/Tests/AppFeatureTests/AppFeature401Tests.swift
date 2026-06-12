@@ -29,8 +29,9 @@ struct AppFeature401Tests {
     await store.receive(\._sessionEvent, .unauthorized) {
       $0 = self.tokenInvalid
     }
-    // The 401 handler emits only `.cancel(.appWork)` (silent) — the exhaustive store would fail here on
-    // any retry / network / re-subscribe effect.
+    // The 401 handler returns `.none` (just the `.main → .onboarding` swap, whose `ifCaseLet` tears
+    // down child effects) — the exhaustive store would fail here on any retry / network / re-subscribe
+    // effect.
 
     continuation.finish()
     await store.finish()
@@ -86,8 +87,8 @@ struct AppFeature401Tests {
     }
 
     // A second 401 — now delivered while already `.onboarding` — is a NO-OP under the `.main`-only
-    // guard: no state change (the `receive` carries no mutation closure), no `.cancel(.appWork)`, no
-    // re-subscribe (the exhaustive store would catch any extra effect).
+    // guard: no state change (the `receive` carries no mutation closure), no extra effect (the
+    // exhaustive store would catch any re-subscribe / retry).
     continuation.yield(.unauthorized)
     await store.receive(\._sessionEvent, .unauthorized)
 
