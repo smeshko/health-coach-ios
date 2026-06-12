@@ -48,6 +48,18 @@ struct RecordMappingRoundTripTests {
     #expect(roundTripped == domain)
   }
 
+  /// Corrupt-body tolerance (2026-06-12 audit gap): the v3 migration only guards against
+  /// format-version skew, not an in-place corrupt row. A `body` blob that is valid JSON but not a
+  /// decodable `DailyBrief` must surface a clean `DecodingError` out of `toDomain()` (which the
+  /// repository read path turns into a typed brief error) — never a crash or a wedge.
+  @Test func test_corruptBody_throwsDecodingError() {
+    let record = DailyBriefRecord(
+      date: day, cached: true, generatedAt: day, constitutionVersion: "v3",
+      body: Data(#"{"not":"a daily brief"}"#.utf8)
+    )
+    #expect(throws: DecodingError.self) { _ = try record.toDomain() }
+  }
+
   // MARK: - Flat columnar records (literal domain values)
 
   @Test func test_checkIn_roundTrips() {
