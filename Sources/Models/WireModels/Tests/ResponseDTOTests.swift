@@ -34,11 +34,6 @@ struct ResponseDTOTests {
     #expect(response.checkinSaved)
   }
 
-  @Test func test_healthResponse_decodes() throws {
-    let response = try decode(HealthResponse.self, from: Fixtures.healthResponse)
-    #expect(response.status == "ok")
-  }
-
   @Test func test_errorResponse_decodes() throws {
     let envelope = try decode(ErrorResponse.self, from: Fixtures.errorResponse)
     #expect(envelope.error.code == .known(.validationError))

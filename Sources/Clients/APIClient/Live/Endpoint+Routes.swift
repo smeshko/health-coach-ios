@@ -1,14 +1,10 @@
 import Foundation
 import WireModels
 
-/// The six route factories (internal). Brief routes declare `.transientOnly` (502/504-retryable);
-/// the others `.never`. `/health` is unauthenticated. POST routes build their JSON body
-/// unconditionally via `WireCoder.encoder` (the openapi `requestBody` is `required: true`).
+/// The five route factories (internal). Brief routes declare `.transientOnly` (502/504-retryable);
+/// the others `.never`. POST routes build their JSON body unconditionally via `WireCoder.encoder`
+/// (the openapi `requestBody` is `required: true`).
 enum Routes {
-  static var health: Endpoint<HealthResponse> {
-    Endpoint(method: .get, path: "/health", retry: .never, requiresAuth: false)
-  }
-
   static var probe: Endpoint<[String: Bool]> {
     Endpoint(method: .get, path: "/probe", retry: .never)
   }

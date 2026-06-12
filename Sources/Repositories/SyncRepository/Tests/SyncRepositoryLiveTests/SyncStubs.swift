@@ -47,7 +47,6 @@ final class SyncStubs: @unchecked Sendable {
 
   func api() -> APIClient {
     APIClient(
-      health: { fatalError("unused") },
       probe: { fatalError("unused") },
       sync: { [self] request in
         lock.withLock { _capturedRequest = request }

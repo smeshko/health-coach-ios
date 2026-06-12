@@ -6,7 +6,6 @@ extension APIClient: TestDependencyKey {
   /// Canned `WireModels` DTOs, no network. `sessionEvents` is an immediately-finished stream.
   public static var testValue: APIClient {
     APIClient(
-      health: { CannedResponses.health },
       probe: { true },
       sync: { _ in CannedResponses.syncResponse },
       dailyBrief: { _, _ in CannedResponses.dailyBrief },
@@ -24,8 +23,6 @@ extension APIClient: TestDependencyKey {
 enum CannedResponses {
   static let day = Date(timeIntervalSince1970: 1_780_000_000)
   static let calendarDay = WireCalendarDate(day)
-
-  static let health = HealthResponse(status: "ok", serverTime: day)
 
   static let syncResponse = SyncResponse(
     recordsUpserted: 0,

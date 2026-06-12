@@ -24,8 +24,6 @@ extension URLProtocolStubSerialized {
       Data(#"{"error":{"code":"\#(code)","message":"m","detail":null}}"#.utf8)
     }
 
-    private let healthJSON = Data(#"{"status":"ok","serverTime":"2026-06-06T07:30:00+03:00"}"#.utf8)
-
     private let dailyBriefJSON = Data("""
     {
       "data": {
@@ -68,9 +66,9 @@ extension URLProtocolStubSerialized {
     // MARK: - Success
 
     @Test func test_success_decodesDTO_withWireCoder() async throws {
-      URLProtocolStub.box.setResponses([.init(status: 200, data: healthJSON)])
-      let health = try await makeClient().health()
-      #expect(health.status == "ok")
+      URLProtocolStub.box.setResponses([.init(status: 200, data: Data(#"{"ok":true}"#.utf8))])
+      let ok = try await makeClient().probe()
+      #expect(ok)
     }
 
     // MARK: - Envelope decode
@@ -195,7 +193,7 @@ extension URLProtocolStubSerialized {
 
     // MARK: - Bearer header
 
-    @Test func test_bearerHeader_presentOnAuthRoutes_absentOnHealth() async throws {
+    @Test func test_bearerHeader_presentOnAuthRoutes() async throws {
       let client = makeClient(token: "tok-123")
 
       URLProtocolStub.box.setResponses([.init(status: 200, data: profileJSON)])
@@ -204,10 +202,6 @@ extension URLProtocolStubSerialized {
         URLProtocolStub.box.recordedRequests.last?.value(forHTTPHeaderField: "Authorization") ==
           "Bearer tok-123"
       )
-
-      URLProtocolStub.box.setResponses([.init(status: 200, data: healthJSON)])
-      _ = try await client.health()
-      #expect(URLProtocolStub.box.recordedRequests.last?.value(forHTTPHeaderField: "Authorization") == nil)
     }
 
     // MARK: - Helper

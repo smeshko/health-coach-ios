@@ -140,10 +140,6 @@ enum Fixtures {
   }
   """
 
-  static let healthResponse = """
-  { "status": "ok", "serverTime": "2026-06-06T07:30:00+03:00" }
-  """
-
   static let errorResponse = """
   {
     "error": {

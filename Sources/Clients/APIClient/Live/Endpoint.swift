@@ -22,6 +22,4 @@ struct Endpoint<Response: Decodable & Sendable>: Sendable {
   /// Throwing so a body-encode failure surfaces as a thrown error, never a `try!` (§6.1).
   var body: (@Sendable () throws -> Data)?
   var retry: RetryPolicy = .transientOnly
-  var timeout: Duration = .seconds(60)
-  var requiresAuth = true
 }

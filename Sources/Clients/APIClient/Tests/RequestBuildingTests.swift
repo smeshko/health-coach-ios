@@ -22,16 +22,8 @@ struct RequestBuildingTests {
 
   @Test func test_baseURLWithPathPrefix_isPreserved() throws {
     let prefixed = URL(string: "https://api.example.com/v1")!
-    let request = try urlRequest(for: Routes.health, baseURL: prefixed, bearer: nil)
-    #expect(request.url?.absoluteString == "https://api.example.com/v1/health")
-  }
-
-  @Test func test_health_isGet_noAuthHeader() throws {
-    let request = try urlRequest(for: Routes.health, baseURL: baseURL, bearer: bearer)
-    #expect(request.url?.absoluteString == "http://localhost:8000/health")
-    #expect(request.httpMethod == "GET")
-    #expect(request.value(forHTTPHeaderField: "Authorization") == nil, "/health must not be authenticated")
-    #expect(request.httpBody == nil)
+    let request = try urlRequest(for: Routes.probe, baseURL: prefixed, bearer: nil)
+    #expect(request.url?.absoluteString == "https://api.example.com/v1/probe")
   }
 
   @Test func test_probe_isGet_withAuthHeader() throws {

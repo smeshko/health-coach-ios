@@ -40,7 +40,7 @@ struct Transport: Sendable {
 
     var retryCount = 0
     while true {
-      let bearer = endpoint.requiresAuth ? try await tokenClient.read() : nil
+      let bearer = try await tokenClient.read()
       let request = try urlRequest(for: endpoint, baseURL: baseURL, bearer: bearer)
       logRequest(request, endpoint: endpoint, log)
 
