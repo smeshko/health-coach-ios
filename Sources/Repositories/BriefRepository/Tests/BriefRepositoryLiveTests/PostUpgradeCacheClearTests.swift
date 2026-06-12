@@ -48,8 +48,8 @@ struct PostUpgradeCacheClearTests {
     try await TestDatabase.seedWatermark(database)
 
     let stub = StubAPIClient(
-      dailyResult: .failure(envelopeError(WireEnum(.internalError), 500)),
-      weeklyResult: .failure(envelopeError(WireEnum(.internalError), 500))
+      dailyResult: .failure(envelopeError(.internalError, 500)),
+      weeklyResult: .failure(envelopeError(.internalError, 500))
     )
 
     // Both routes take the first-ever path → `.insufficientData`, NOT `.serverError` (the prior row

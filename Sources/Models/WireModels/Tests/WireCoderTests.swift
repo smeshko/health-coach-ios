@@ -1,4 +1,5 @@
 import CoachCore
+import DomainModels
 import Foundation
 import Testing
 
@@ -115,26 +116,22 @@ struct WireCoderTests {
     #expect(roundTripped == present)
   }
 
-  // MARK: - Wire enums (unknown-tolerant)
+  // MARK: - Shared closed enums (strict decode)
 
   @Test func test_enum_knownRawValuesRoundTrip() throws {
-    #expect(try decode(WireEnum<WorkoutCard>.self, from: #""easy_run""#) == .known(.easyRun))
-    #expect(try decode(WireEnum<RecordType>.self, from: #""heart_rate""#) == .known(.heartRate))
-    #expect(try decode(WireEnum<Zone>.self, from: #""z1""#) == .known(.z1))
-    #expect(
-      try decode(WireEnum<ErrorCode>.self, from: #""validation_error""#)
-        == .known(.validationError)
-    )
+    #expect(try decode(Card.self, from: #""easy_run""#) == .easyRun)
+    #expect(try decode(RecordType.self, from: #""heart_rate""#) == .heartRate)
+    #expect(try decode(Zone.self, from: #""z1""#) == .z1)
+    #expect(try decode(ErrorCode.self, from: #""validation_error""#) == .validationError)
 
-    let value = WireEnum<WorkoutCard>.known(.easyRun)
-    #expect(try encodedString(value) == #""easy_run""#)
+    #expect(try encodedString(Card.easyRun) == #""easy_run""#)
   }
 
-  @Test func test_enum_unknownRawValueDecodesToFallback() throws {
-    let decoded = try decode(WireEnum<WorkoutCard>.self, from: #""warp_drive""#)
-    #expect(decoded == .unknown("warp_drive"))
-    #expect(decoded.rawValue == "warp_drive")
-    #expect(decoded.known == nil)
-    #expect(try encodedString(decoded) == #""warp_drive""#)
+  @Test func test_enum_unknownRawValueThrows() throws {
+    // The shared closed enums own the API contract → an out-of-set value is a hard decode error,
+    // never a tolerant fallback (Phase 11.3 strict decode).
+    #expect(throws: DecodingError.self) {
+      _ = try decode(Card.self, from: #""warp_drive""#)
+    }
   }
 }

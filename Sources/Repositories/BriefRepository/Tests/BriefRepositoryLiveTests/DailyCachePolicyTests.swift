@@ -121,13 +121,19 @@ struct DailyCachePolicyTests {
 
   @Test func test_apiError_mapsToBriefError() async throws {
     let cases: [(APIError, BriefError)] = [
-      (envelopeError(WireEnum(.briefGenerationFailed), 502), .transientGenerationFailed),
-      (envelopeError(WireEnum(.upstreamTimeout), 504), .transientGenerationFailed),
-      (envelopeError(WireEnum(.validationError), 422), .validation),
-      (envelopeError(WireEnum(.unauthorized), 401), .unauthorized),
-      (envelopeError(WireEnum(.notFound), 404), .serverError),
-      (envelopeError(WireEnum(rawValue: "some_new_code"), 500), .serverError),
+      (envelopeError(.briefGenerationFailed, 502), .transientGenerationFailed),
+      (envelopeError(.upstreamTimeout, 504), .transientGenerationFailed),
+      (envelopeError(.validationError, 422), .validation),
+      (envelopeError(.unauthorized, 401), .unauthorized),
+      (envelopeError(.notFound, 404), .serverError),
       (.unauthorized, .unauthorized),
+      // An unknown error code fails envelope decode → `.unexpectedStatus` → retry-friendly (D3).
+      (.unexpectedStatus(500), .transientGenerationFailed),
+      // A 2xx body whose closed enum is out-of-set (Phase 11.3 strict decode) throws `.decoding`,
+      // which maps to the retry-friendly state (DECISIONS #5 — the pre-existing decode-failure
+      // policy). On a self-owned API a new closed case is a same-sitting client+server edit (D2), so
+      // this is the accepted classification, not a contract-negotiation failure.
+      (.decoding("DailyBrief.session.card: out-of-set"), .transientGenerationFailed),
     ]
 
     for (apiError, expected) in cases {
@@ -147,7 +153,7 @@ struct DailyCachePolicyTests {
     let (_, domain) = try greenFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(dailyResult: .failure(envelopeError(WireEnum(.internalError), 500)))
+    let stub = StubAPIClient(dailyResult: .failure(envelopeError(.internalError, 500)))
 
     await expectBriefError(.insufficientData) {
       try await runWithSofia(now: domain.date, stub: stub, database: db) {
@@ -164,7 +170,7 @@ struct DailyCachePolicyTests {
     var yesterday = domain
     yesterday.date = domain.date.addingTimeInterval(-86400)
     try await TestDatabase.seedDaily(db, yesterday)
-    let stub = StubAPIClient(dailyResult: .failure(envelopeError(WireEnum(.internalError), 500)))
+    let stub = StubAPIClient(dailyResult: .failure(envelopeError(.internalError, 500)))
 
     await expectBriefError(.serverError) {
       try await runWithSofia(now: domain.date, stub: stub, database: db) {
@@ -186,20 +192,10 @@ struct DailyCachePolicyTests {
     }
   }
 
-  @Test func test_dailyBrief_mappingError_throwsMappingFailed() async throws {
-    let (dto, domain) = try greenFixture()
-    var badDTO = dto
-    badDTO.data.session.card = WireEnum(rawValue: "bogus_card") // unknown required singular enum
-    let db = try TestDatabase.makeInMemory()
-    try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(dailyResult: .success(badDTO))
-
-    await expectBriefError(.mappingFailed) {
-      try await runWithSofia(now: domain.date, stub: stub, database: db) {
-        try await BriefRepository.live.dailyBrief(false)
-      }
-    }
-  }
+  // NOTE: the former `test_dailyBrief_mappingError_throwsMappingFailed` is removed — an out-of-set
+  // required closed enum is no longer constructible in a typed DTO (the closed enums are shared
+  // wire↔domain and decode strictly, Phase 11.3), so a `.success(badDTO)` with a bogus card cannot
+  // exist. Strict decode is covered by the WireModels decode tests.
 
   @Test func test_dailyBrief_sofiaDayBoundary_isMiss() async throws {
     let (dto, domain) = try greenFixture()

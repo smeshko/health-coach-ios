@@ -40,12 +40,7 @@ func dailyBriefPolicy(refresh: Bool) async throws -> DomainModels.DailyBrief {
     throw briefError(from: apiError, hasPriorBrief: hasPriorBrief)
   }
 
-  let domain: DomainModels.DailyBrief
-  do {
-    domain = try domainDailyBrief(dto)
-  } catch is MappingError {
-    throw BriefError.mappingFailed
-  }
+  let domain = domainDailyBrief(dto)
 
   try await database.write { db in
     try DailyBriefRecord(domain: domain).save(db)

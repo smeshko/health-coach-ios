@@ -37,16 +37,16 @@ enum CannedResponses {
   static let dailyBrief = DailyBrief(
     data: DailyBriefData(
       date: calendarDay,
-      readiness: Readiness(score: 80, band: .known(.green), penalties: []),
+      readiness: Readiness(score: 80, band: .green, penalties: []),
       safetyGate: SafetyGate(triggered: false, reasons: []),
       session: SessionBlock(
-        card: .known(.easyRun), intensity: .known(.easy),
+        card: .easyRun, intensity: .easy,
         durationMinLow: 40, durationMinHigh: 55, flags: []
       ),
       alternatives: [],
       skipOk: true,
       macroFocus: MacroFocus(
-        dayType: .known(.moderate), caloriesKcal: 2600, proteinG: 170, carbsG: 300,
+        dayType: .moderate, caloriesKcal: 2600, proteinG: 170, carbsG: 300,
         fatGLow: 60, fatGHigh: 80, hydrationLLow: 2.5, hydrationLHigh: 3.5
       ),
       generatedAt: day,
@@ -74,21 +74,5 @@ enum CannedResponses {
       cached: false
     ),
     narrative: []
-  )
-
-  static let profile = ProfileResponse(
-    athlete: AthleteOut(age: 34, sex: "male", heightCm: 182, goalWeightKg: 75),
-    zones: ZonesOut(
-      z1: ZoneRange(low: 100, high: 130),
-      z2: ZoneRange(low: 131, high: 145),
-      z3: ZoneRange(low: 146, high: 160),
-      z4: ZoneRange(low: 161, high: 175),
-      z5: ZoneRange(low: 176, high: 190)
-    ),
-    thresholds: ThresholdsOut(
-      maxHr: 190, rhrBaseline: 48, hrvBaselineMs: 65, easyHrCap: 150,
-      cadenceCurrentSpm: 172, cadenceTargetSpm: 180
-    ),
-    meta: MetaOut(constitutionVersion: "v3")
   )
 }

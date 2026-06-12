@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 import Testing
 
@@ -33,7 +34,7 @@ struct RequestDTOTests {
     let request = SyncRequest(
       records: [
         HealthRecord(
-          uuid: "rec-1", type: WireEnum(.heartRate), start: day, end: day,
+          uuid: "rec-1", type: .heartRate, start: day, end: day,
           value: 142, unit: "count/min", source: "Apple Watch",
           metadata: ["context": "workout"]
         ),
@@ -50,8 +51,8 @@ struct RequestDTOTests {
           standHours: 11, steps: 9123
         ),
       ],
-      checkin: DailyCheckin(date: WireCalendarDate(day), giSymptoms: false, kneePain: 1, illness: false),
-      strengthTest: StrengthTest(date: WireCalendarDate(day), maxPushups: 42, maxPullups: 14)
+      checkin: CheckIn(date: day, giSymptoms: false, kneePain: 1, illness: false),
+      strengthTest: StrengthTest(date: day, maxPushups: 42, maxPullups: 14)
     )
     let data = try WireCoder.encoder.encode(request)
     let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])

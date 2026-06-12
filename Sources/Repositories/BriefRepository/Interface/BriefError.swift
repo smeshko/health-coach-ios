@@ -19,7 +19,4 @@ public enum BriefError: Error, Equatable, Sendable {
   /// A `401 unauthorized` — handled upstream via the session-event stream, mapped here for
   /// completeness (§12).
   case unauthorized
-  /// A `WireDomainMapping.MappingError` — a malformed required closed enum surfaced as a domain error,
-  /// never a crash (ARCHITECTURE §5).
-  case mappingFailed
 }

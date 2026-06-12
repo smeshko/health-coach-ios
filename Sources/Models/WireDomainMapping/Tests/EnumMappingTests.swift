@@ -28,28 +28,7 @@ struct EnumMappingTests {
     #expect(EnumMapping.penaltyFactor("brand_new") == .unknown("brand_new"))
   }
 
-  @Test func test_closedEnum_knownCasesRoundTrip() {
-    #expect(EnumMapping.card(.known(.easyRun)) == .easyRun)
-    #expect(EnumMapping.card(.known(.rest)) == .rest)
-    #expect(EnumMapping.zone(.known(.z3)) == .z3)
-    #expect(EnumMapping.band(.known(.amber)) == .amber)
-    #expect(EnumMapping.dayType(.known(.hard)) == .hard)
-    #expect(EnumMapping.intensity(.known(.quality)) == .quality)
-    #expect(EnumMapping.narrativeType(.known(.caution)) == .caution)
-    #expect(EnumMapping.tier(.known(.extra)) == .extra)
-    #expect(EnumMapping.weekday(.known(.sun)) == .sun)
-  }
-
-  @Test func test_closedEnum_everyWireCaseMaps() {
-    // Totality: every wire case maps to a domain case (no nil for a known value).
-    for card in WorkoutCard.allCases {
-      #expect(EnumMapping.card(.known(card)) != nil, "unmapped card: \(card)")
-    }
-  }
-
-  @Test func test_closedEnum_unknownReturnsNil() {
-    #expect(EnumMapping.card(.unknown("new_card")) == nil)
-    #expect(EnumMapping.zone(.unknown("z9")) == nil)
-    #expect(EnumMapping.band(.unknown("teal")) == nil)
-  }
+  // NOTE: the closed enums are now shared wire↔domain (Phase 11.3) — no `EnumMapping` helper exists
+  // for them, so there are no closed-enum mapping assertions here. Their strictness lives at the
+  // `WireModels` decode boundary (DecodeRoundTripTests).
 }

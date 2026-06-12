@@ -1,12 +1,12 @@
-// The domain's closed enums — its own twins of the wire's closed enums (it does NOT re-use the
-// `WireModels` types, so the two layers can diverge; ARCHITECTURE §4.1). These stay strictly closed
-// (no `.unknown` case): an out-of-set wire value is handled positionally by `WireDomainMapping`
-// (drop / nil / throw — DECISIONS Decision 2), never by a domain `.unknown`. UX labels live in
-// `DesignSystem`. The `String` raw values are the **wire strings** (copied from `WireModels`'
-// closed-enum twins): the persistence body format equals the wire format, so Phase 11.3's enum
-// sharing changes no persisted shape (11.2's v3 cache clear is the epic's only format break).
+// The package's closed enums. As of Phase 11.3 these are the SINGLE declaration shared by both the
+// domain and the wire layers — `WireModels` DTO fields reference these types directly (an out-of-set
+// closed-enum string now decodes strictly, i.e. throws `DecodingError`, the correct failure for a
+// self-owned API). They stay strictly closed (no `.unknown` case). UX labels live in `DesignSystem`.
+// The `String` raw values are the **wire strings**: the persistence body format equals the wire
+// format, so the enum sharing changes no persisted shape (11.2's v3 cache clear is the epic's only
+// format break).
 
-/// The workout/session card catalogue — domain twin of wire `WorkoutCard` (PRD §12).
+/// The workout/session card catalogue (PRD §12).
 public enum Card: String, Sendable, Hashable, CaseIterable, Codable {
   case easyRun = "easy_run"
   case longRun = "long_run"

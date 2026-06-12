@@ -65,4 +65,47 @@ struct CodableTests {
     try #expect(roundTrip(SafetyReason.unknown("gi_flare")) == .giFlare)
     try #expect(roundTrip(PenaltyFactor.unknown("sleep_below_7h")) == .sleepBelow7h)
   }
+
+  // MARK: - CheckIn/StrengthTest calendar-date coding (D5)
+
+  /// The shared `CheckIn`/`StrengthTest` encode `date` as a wire `yyyy-MM-dd` calendar date in
+  /// **Europe/Sofia** — NOT UTC. A `Date` at Sofia midnight is 21:00 or 22:00 UTC the *previous* day
+  /// (DST-dependent), so a UTC formatter would emit the wrong day. This pins the Sofia time zone +
+  /// calendar (the regression ordinary fixture epochs miss).
+  @Test func test_checkIn_encodesSofiaCalendarDate_notUTCShifted() throws {
+    var sofia = Calendar(identifier: .gregorian)
+    sofia.timeZone = try #require(TimeZone(identifier: "Europe/Sofia"))
+    // Summer (DST, +03:00): Sofia-midnight 2026-07-15 == 21:00 UTC on 2026-07-14.
+    let sofiaMidnight = try #require(
+      sofia.date(from: DateComponents(year: 2026, month: 7, day: 15))
+    )
+    let checkIn = CheckIn(date: sofiaMidnight, giSymptoms: false, kneePain: 0, illness: false)
+    let object = try #require(
+      JSONSerialization.jsonObject(with: encoder.encode(checkIn)) as? [String: Any]
+    )
+    #expect(object["date"] as? String == "2026-07-15", "Sofia-midnight must encode as its own day")
+
+    // Winter (no DST, +02:00) for StrengthTest: Sofia-midnight 2026-01-15 == 22:00 UTC on 2026-01-14.
+    let winterMidnight = try #require(
+      sofia.date(from: DateComponents(year: 2026, month: 1, day: 15))
+    )
+    let strengthTest = StrengthTest(date: winterMidnight, maxPushups: 40, maxPullups: 12)
+    let stObject = try #require(
+      JSONSerialization.jsonObject(with: encoder.encode(strengthTest)) as? [String: Any]
+    )
+    #expect(stObject["date"] as? String == "2026-01-15")
+  }
+
+  /// The calendar-date coding round-trips day-stable: decode the `yyyy-MM-dd` string back to the same
+  /// Sofia-midnight instant it encodes from.
+  @Test func test_checkIn_calendarDate_roundTripsDayStable() throws {
+    let json = Data(#"{"date":"2026-07-15","giSymptoms":true,"kneePain":3,"illness":false}"#.utf8)
+    let decoded = try decoder.decode(CheckIn.self, from: json)
+    let reencoded = try #require(
+      JSONSerialization.jsonObject(with: encoder.encode(decoded)) as? [String: Any]
+    )
+    #expect(reencoded["date"] as? String == "2026-07-15")
+    #expect(decoded.kneePain == 3)
+    #expect(decoded.giSymptoms)
+  }
 }

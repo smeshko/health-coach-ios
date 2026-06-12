@@ -7,7 +7,7 @@ import Foundation
 /// `date-time`; `metadata` is a free `additionalProperties` map of string values.
 public struct HealthRecord: Codable, Sendable, Equatable {
   public var uuid: String
-  public var type: WireEnum<RecordType>
+  public var type: RecordType
   public var start: Date
   public var end: Date
   public var value: Double?
@@ -18,7 +18,7 @@ public struct HealthRecord: Codable, Sendable, Equatable {
 
   public init(
     uuid: String,
-    type: WireEnum<RecordType>,
+    type: RecordType,
     start: Date,
     end: Date,
     value: Double? = nil,

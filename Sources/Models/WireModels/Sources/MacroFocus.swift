@@ -1,8 +1,9 @@
+import DomainModels
 import Foundation
 
 /// The daily macro focus (`openapi.yaml` `MacroFocus`). Hydration is a `Double` litre range.
 public struct MacroFocus: Codable, Sendable, Equatable {
-  public var dayType: WireEnum<DayType>
+  public var dayType: DayType
   public var caloriesKcal: Int
   public var proteinG: Int
   public var carbsG: Int
@@ -12,7 +13,7 @@ public struct MacroFocus: Codable, Sendable, Equatable {
   public var hydrationLHigh: Double
 
   public init(
-    dayType: WireEnum<DayType>,
+    dayType: DayType,
     caloriesKcal: Int,
     proteinG: Int,
     carbsG: Int,

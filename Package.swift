@@ -172,11 +172,13 @@ let package = Package(
       ]
     ),
     // Wire-contract DTOs (Codable mirror of openapi.yaml). Bottom-of-graph: depends only on
-    // CoachCore (+ Foundation). Must NOT import TCA / GRDB / DomainModels (ARCHITECTURE §4.1).
+    // CoachCore (+ Foundation) + DomainModels (shared closed enums, Phase 11.3). Must NOT import
+    // TCA / GRDB (ARCHITECTURE §4.1). No cycle: DomainModels depends only on CoachCore.
     .target(
       name: "WireModels",
       dependencies: [
         "CoachCore",
+        "DomainModels",
       ],
       path: "Sources/Models/WireModels/Sources",
       swiftSettings: [
@@ -306,6 +308,8 @@ let package = Package(
       dependencies: [
         "CoachCore",
         "WireModels",
+        // The canned `/profile` testValue builds `DomainModels` profile types (Phase 11.3 fold).
+        "DomainModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/APIClient/Interface",
@@ -650,9 +654,12 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // Pure DTO→domain mapping functions (the read path). Sits at/above the repository-live tier
-    // (ARCHITECTURE §3: a repo *Live may depend on all model layers), below features. Depends on
-    // BOTH model layers; DomainModels itself never imports WireModels (DECISIONS Decision 1).
+    // Pure DTO→domain mapping functions (the read path). After Phase 11.3 shared the closed enums and
+    // folded the Profile/CheckIn/StrengthTest twins, only the REAL shape changes remain here — the
+    // brief `{data,narrative}` envelope flattening, intake mapping, date conversions, and the
+    // free-string open-enum maps. Sits at/above the repository-live tier (ARCHITECTURE §3: a repo
+    // *Live may depend on all model layers), below features. Depends on BOTH model layers;
+    // DomainModels itself never imports WireModels (DECISIONS Decision 1).
     .target(
       name: "WireDomainMapping",
       dependencies: [
@@ -670,6 +677,9 @@ let package = Package(
       name: "WireModelsTests",
       dependencies: [
         "WireModels",
+        // Request/coder tests build the shared `DomainModels` types directly (Phase 11.3 fold);
+        // SwiftPM doesn't re-export the transitive import, so list it directly.
+        "DomainModels",
         "CoachCore",
       ],
       path: "Sources/Models/WireModels/Tests",
@@ -685,6 +695,9 @@ let package = Package(
         "APIClientLive",
         "TokenClient",
         "WireModels",
+        // RequestBuildingTests builds the shared `DomainModels.CheckIn` directly (Phase 11.3 fold);
+        // SwiftPM doesn't re-export the transitive import, so list it directly.
+        "DomainModels",
         // The transport-logging test builds a recorder `LogClient`; SwiftPM doesn't re-export the
         // transitive import, so the test target lists it directly.
         "LogClient",
@@ -760,6 +773,9 @@ let package = Package(
         "DatabaseLive",
         "Database",
         "PersistenceModels",
+        "DomainModels",
+        // Test-only: a real profile fixture for the v3 cache-clear migration test (11.2).
+        "SampleData",
         "CoachCore",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],

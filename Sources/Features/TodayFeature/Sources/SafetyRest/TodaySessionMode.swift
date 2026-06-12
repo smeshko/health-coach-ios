@@ -12,7 +12,7 @@ public enum TodaySessionMode: Equatable {
   ///
   /// **Type note (load-bearing):** `override` is the fully-expanded `brief.session` (a `SessionBlock`) —
   /// the rendered form of the gate's `overrideTo` card on a trip. It is **not** `gate.overrideTo`, which
-  /// is a `Card?` (openapi `WorkoutCard?`) that merely *names* the forced card. `SessionCard` takes a
+  /// is a `Card?` (openapi card enum) that merely *names* the forced card. `SessionCard` takes a
   /// `SessionBlock`, never a `Card`.
   case forcedRest(gate: DomainModels.SafetyGate, override: DomainModels.SessionBlock)
   /// An untripped day (`triggered == false`) — the ordinary session path (coach-easy or otherwise),

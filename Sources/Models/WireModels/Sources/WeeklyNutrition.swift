@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 
 /// The weekly nutrition plan (`openapi.yaml` `WeeklyNutrition`).
@@ -39,11 +40,11 @@ public struct WeeklyNutrition: Codable, Sendable, Equatable {
 /// here is a **free** string (unlike `PlannedSession.suggestedDay`).
 public struct DayTypePatternEntry: Codable, Sendable, Equatable {
   public var suggestedDay: String
-  public var dayType: WireEnum<DayType>
+  public var dayType: DayType
   public var caloriesKcal: Int
   public var carbsG: Int
 
-  public init(suggestedDay: String, dayType: WireEnum<DayType>, caloriesKcal: Int, carbsG: Int) {
+  public init(suggestedDay: String, dayType: DayType, caloriesKcal: Int, carbsG: Int) {
     self.suggestedDay = suggestedDay
     self.dayType = dayType
     self.caloriesKcal = caloriesKcal

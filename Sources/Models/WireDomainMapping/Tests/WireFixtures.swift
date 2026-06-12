@@ -1,3 +1,4 @@
+import DomainModels
 import Foundation
 import WireModels
 
@@ -13,8 +14,8 @@ enum WireFixtures {
   static let generatedAt = Date(timeIntervalSince1970: 1_780_000_000)
 
   static func session(
-    card: WireEnum<WorkoutCard> = .known(.easyRun),
-    intensity: WireEnum<WireModels.Intensity> = .known(.easy),
+    card: Card = .easyRun,
+    intensity: Intensity = .easy,
     flags: [String] = ["impact", "totally_new_flag"]
   ) -> WireModels.SessionBlock {
     WireModels.SessionBlock(
@@ -23,17 +24,17 @@ enum WireFixtures {
       durationMinLow: 40,
       durationMinHigh: 55,
       flags: flags,
-      zoneTarget: .known(.z2),
+      zoneTarget: .z2,
       hrCapBpm: 150,
       cadenceSpm: 180
     )
   }
 
   static func dailyBrief(
-    sessionCard: WireEnum<WorkoutCard> = .known(.easyRun),
-    alternatives: [WireModels.SessionBlock] = [session(card: .known(.activeRecovery))],
+    sessionCard: Card = .easyRun,
+    alternatives: [WireModels.SessionBlock] = [session(card: .activeRecovery)],
     intakeYesterday: WireModels.IntakeSummary? = intake(),
-    band: WireEnum<WireModels.ReadinessBand> = .known(.green)
+    band: ReadinessBand = .green
   ) -> WireModels.DailyBrief {
     WireModels.DailyBrief(
       data: WireModels.DailyBriefData(
@@ -56,7 +57,7 @@ enum WireFixtures {
         constitutionVersion: "v3"
       ),
       narrative: [
-        WireModels.NarrativeSection(type: .known(.summary), heading: "Go", body: "Green."),
+        WireModels.NarrativeSection(type: .summary, heading: "Go", body: "Green."),
       ]
     )
   }
@@ -70,7 +71,7 @@ enum WireFixtures {
     )
   }
 
-  static func macroFocus(dayType: WireEnum<WireModels.DayType> = .known(.moderate)) -> WireModels.MacroFocus {
+  static func macroFocus(dayType: DayType = .moderate) -> WireModels.MacroFocus {
     WireModels.MacroFocus(
       dayType: dayType,
       caloriesKcal: 2600,
@@ -98,8 +99,8 @@ enum WireFixtures {
         ),
         core: [
           WireModels.PlannedSession(
-            card: .known(.longRun), tier: .known(.core), intensity: .known(.easy),
-            isHardDay: false, flags: ["impact"], suggestedDay: .known(.sun),
+            card: .longRun, tier: .core, intensity: .easy,
+            isHardDay: false, flags: ["impact"], suggestedDay: .sun,
             durationMinLow: 80, durationMinHigh: 100
           ),
         ],
@@ -112,7 +113,7 @@ enum WireFixtures {
           avgCaloriesKcal: 2600,
           dayTypePattern: [
             WireModels.DayTypePatternEntry(
-              suggestedDay: "mon", dayType: .known(.moderate), caloriesKcal: 2600, carbsG: 300
+              suggestedDay: "mon", dayType: .moderate, caloriesKcal: 2600, carbsG: 300
             ),
           ],
           restDay: restDay,
@@ -123,30 +124,8 @@ enum WireFixtures {
         cached: false
       ),
       narrative: [
-        WireModels.NarrativeSection(type: .known(.plan), heading: "Week 24", body: "Build."),
+        WireModels.NarrativeSection(type: .plan, heading: "Week 24", body: "Build."),
       ]
-    )
-  }
-
-  static func profile(
-    constantsRecomputedWeek: String? = "2026-W22"
-  ) -> WireModels.ProfileResponse {
-    WireModels.ProfileResponse(
-      athlete: WireModels.AthleteOut(age: 34, sex: "male", heightCm: 182, goalWeightKg: 75.0),
-      zones: WireModels.ZonesOut(
-        z1: WireModels.ZoneRange(low: 100, high: 130),
-        z2: WireModels.ZoneRange(low: 131, high: 145),
-        z3: WireModels.ZoneRange(low: 146, high: 160),
-        z4: WireModels.ZoneRange(low: 161, high: 175),
-        z5: WireModels.ZoneRange(low: 176, high: 190)
-      ),
-      thresholds: WireModels.ThresholdsOut(
-        maxHr: 190, rhrBaseline: 48, hrvBaselineMs: 65, easyHrCap: 150,
-        cadenceCurrentSpm: 172, cadenceTargetSpm: 180
-      ),
-      meta: WireModels.MetaOut(
-        constitutionVersion: "v3", constantsRecomputedWeek: constantsRecomputedWeek
-      )
     )
   }
 }

@@ -50,12 +50,7 @@ func weeklyPlanPolicy(isoWeek: ISOWeek?, refresh: Bool) async throws -> DomainMo
     throw briefError(from: apiError, hasPriorBrief: hasPriorBrief)
   }
 
-  let domain: DomainModels.WeeklyPlan
-  do {
-    domain = try domainWeeklyPlan(dto)
-  } catch is MappingError {
-    throw BriefError.mappingFailed
-  }
+  let domain = domainWeeklyPlan(dto)
 
   try await database.write { db in
     try WeeklyPlanRecord(domain: domain).save(db)

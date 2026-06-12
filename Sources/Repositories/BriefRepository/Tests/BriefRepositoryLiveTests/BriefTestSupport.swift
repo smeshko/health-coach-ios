@@ -26,7 +26,7 @@ func runWithSofia<T>(
 }
 
 /// Build an envelope `APIError` with an empty message — shortens the mapping cases.
-func envelopeError(_ code: WireEnum<ErrorCode>, _ status: Int) -> APIError {
+func envelopeError(_ code: ErrorCode, _ status: Int) -> APIError {
   .envelope(code: code, message: "", detail: nil, status: status)
 }
 

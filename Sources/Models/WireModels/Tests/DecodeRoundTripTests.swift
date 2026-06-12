@@ -4,6 +4,9 @@ import Testing
 
 @testable import WireModels
 
+// Note: `DomainModels` is intentionally NOT imported — the shared closed-enum cases (`.green`,
+// `.rest`, …) resolve via the DTO field's inferred type, and importing it would collide DTO struct
+// names (both modules export `DailyBrief`, `WeeklyPlan`, …).
 struct DecodeRoundTripTests {
   // MARK: - Helpers
 
@@ -108,37 +111,31 @@ struct DecodeRoundTripTests {
     #expect(withNull == withAbsent)
   }
 
-  // MARK: - Unknown enum / unknown flag do not crash
+  // MARK: - Unknown closed-enum value is a hard decode error (strict, self-owned API)
 
-  @Test func test_unknownEnumRawValue_doesNotCrash() throws {
+  @Test func test_unknownEnumRawValue_throws() throws {
+    // The closed enums are now shared wire↔domain and decode strictly — an out-of-set `card`
+    // value must reject the whole brief with a `DecodingError` (Phase 11.3), not fall back.
     let json = Fixtures.dailyBrief.replacingOccurrences(of: #""easy_run""#, with: #""warp_drive""#)
-    let brief = try decode(DailyBrief.self, from: json)
-    #expect(brief.data.session.card == .unknown("warp_drive"))
-    // The rest of the brief is intact.
-    #expect(brief.data.readiness.band == .known(.green))
-    #expect(brief.data.session.intensity == .known(.easy))
-    // Re-encode preserves the raw string.
-    let reencoded = try encodedString(brief)
-    #expect(reencoded.contains("warp_drive"), "unknown card must round-trip its raw value")
+    #expect(throws: DecodingError.self) {
+      _ = try decode(DailyBrief.self, from: json)
+    }
   }
 
-  @Test func test_unknownEnum_optionalAndArrayNestedDoNotCrash() throws {
-    // Optional enum field (SafetyGate.overrideTo).
-    let gate = try decode(
-      SafetyGate.self, from: #"{"triggered":true,"reasons":[],"overrideTo":"warp_drive"}"#
-    )
-    #expect(gate.overrideTo == .unknown("warp_drive"))
+  @Test func test_unknownEnum_optionalAndArrayNestedThrow() throws {
+    // Optional enum field (SafetyGate.overrideTo) — strict decode throws on an out-of-set value.
+    #expect(throws: DecodingError.self) {
+      _ = try decode(
+        SafetyGate.self, from: #"{"triggered":true,"reasons":[],"overrideTo":"warp_drive"}"#
+      )
+    }
 
-    // Array-nested enums (narrative[].type, core[].card) + an optional enum nested in an array
-    // (core[].suggestedDay) — all must decode to `.unknown`, never throw.
+    // Array-nested closed enum (core[].card) likewise rejects the whole payload.
     let json = Fixtures.weeklyPlan
-      .replacingOccurrences(of: #""type": "plan""#, with: #""type": "moon_calendar""#)
       .replacingOccurrences(of: #""card": "long_run""#, with: #""card": "warp_drive""#)
-      .replacingOccurrences(of: #""suggestedDay": "sun""#, with: #""suggestedDay": "someday""#)
-    let plan = try decode(WeeklyPlan.self, from: json)
-    #expect(plan.narrative.first?.type == .unknown("moon_calendar"))
-    #expect(plan.data.core.first?.card == .unknown("warp_drive"))
-    #expect(plan.data.core.first?.suggestedDay == .unknown("someday"))
+    #expect(throws: DecodingError.self) {
+      _ = try decode(WeeklyPlan.self, from: json)
+    }
   }
 
   @Test func test_unknownFlagString_doesNotCrash() throws {
@@ -149,14 +146,58 @@ struct DecodeRoundTripTests {
     #expect(brief.data.session.flags == ["taper", "moon_phase"])
   }
 
+  // MARK: - Missing required field is a hard decode error
+
+  @Test func test_dailyBrief_missingReadiness_throws() throws {
+    // A daily brief with the required `readiness` object absent must reject with a `DecodingError`.
+    let json = """
+    {
+      "data": {
+        "date": "2026-06-06",
+        "safetyGate": { "triggered": false, "reasons": [] },
+        "session": {
+          "card": "easy_run", "intensity": "easy",
+          "durationMinLow": 40, "durationMinHigh": 55, "flags": []
+        },
+        "alternatives": [],
+        "skipOk": true,
+        "macroFocus": {
+          "dayType": "moderate", "caloriesKcal": 2600, "proteinG": 170, "carbsG": 300,
+          "fatGLow": 60, "fatGHigh": 80, "hydrationLLow": 2.5, "hydrationLHigh": 3.5
+        },
+        "generatedAt": "2026-06-06T07:30:00+03:00",
+        "cached": false
+      },
+      "narrative": []
+    }
+    """
+    #expect(throws: DecodingError.self) {
+      _ = try decode(DailyBrief.self, from: json)
+    }
+  }
+
+  @Test func test_intakeSummary_missingVsTarget_throws() throws {
+    // `vsTarget` is required on `IntakeSummary`; an absent key must reject the payload.
+    let json = """
+    {
+      "date": "2026-06-06",
+      "caloriesKcal": null,
+      "proteinG": null
+    }
+    """
+    #expect(throws: DecodingError.self) {
+      _ = try decode(IntakeSummary.self, from: json)
+    }
+  }
+
   // MARK: - A tripped safety gate is a normal 200 brief
 
   @Test func test_forcedRest_safetyGateIsNormal200() throws {
     let brief = try decode(DailyBrief.self, from: Fixtures.dailyBriefForcedRest)
     #expect(brief.data.safetyGate.triggered)
     #expect(brief.data.safetyGate.reasons == ["illness", "knee_pain"])
-    #expect(brief.data.safetyGate.overrideTo == .known(.rest))
-    #expect(brief.data.session.card == .known(.rest))
+    #expect(brief.data.safetyGate.overrideTo == .rest)
+    #expect(brief.data.session.card == .rest)
     #expect(brief.data.alternatives.isEmpty)
     try assertRoundTrips(DailyBrief.self, from: Fixtures.dailyBriefForcedRest)
   }

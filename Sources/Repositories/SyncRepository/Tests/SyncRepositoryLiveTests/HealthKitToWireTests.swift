@@ -21,7 +21,7 @@ struct HealthKitToWireTests {
     )
     let wire = wireHealthRecord(payload)
     #expect(wire.uuid == "u1")
-    #expect(wire.type == WireEnum(.heartRate))
+    #expect(wire.type == .heartRate)
     #expect(wire.start == payload.start)
     #expect(wire.end == payload.end)
     #expect(wire.value == 62)
@@ -73,24 +73,10 @@ struct HealthKitToWireTests {
     #expect(wire.steps == 8000)
   }
 
-  @Test func test_wireDailyCheckin_maps() {
-    let checkIn = DomainModels.CheckIn(
-      date: Date(timeIntervalSince1970: 100), giSymptoms: true, kneePain: 4, illness: false
-    )
-    let wire = wireDailyCheckin(checkIn)
-    #expect(wire.date == WireCalendarDate(checkIn.date))
-    #expect(wire.giSymptoms)
-    #expect(wire.kneePain == 4)
-    #expect(!wire.illness)
-  }
-
-  @Test func test_wireStrengthTest_maps() {
-    let test = DomainModels.StrengthTest(date: Date(timeIntervalSince1970: 100), maxPushups: 35, maxPullups: 10)
-    let wire = wireStrengthTest(test)
-    #expect(wire.date == WireCalendarDate(test.date))
-    #expect(wire.maxPushups == 35)
-    #expect(wire.maxPullups == 10)
-  }
+  // NOTE: the wire check-in / strength-test request twins were folded into the shared `DomainModels`
+  // types (Phase 11.3) — `buildSyncRequest` passes them through, there is no mapping function left to
+  // test. Their `yyyy-MM-dd` calendar-date encoding is covered by the sync-request encode tests
+  // (RequestDTOTests / RequestBuildingTests) and DomainModels' CodableTests.
 
   @Test func test_buildSyncRequest_emptySet_isMinimalValidRequest() throws {
     let request = buildSyncRequest(samples: HealthSampleSet(), checkin: nil, strengthTest: nil)
