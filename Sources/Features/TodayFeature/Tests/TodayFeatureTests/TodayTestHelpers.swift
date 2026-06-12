@@ -2,6 +2,7 @@ import CoachCore
 import DomainModels
 import Foundation
 import SampleData
+import SessionFeature
 import SyncRepository
 
 // Shared test helpers for the TodayFeature orchestration + refresh suites. Free functions / actors (not
@@ -47,6 +48,31 @@ func sampleBrief(cached: Bool) -> DomainModels.DailyBrief {
   var brief = SampleData.dailyBriefGreen
   brief.cached = cached
   return brief
+}
+
+/// A deterministic five-zone bpm map for the orchestration's `profileRepository.zones()` stub, so the
+/// session child (Phase 8.4) hydrates with a known `zones` the exhaustive `TestStore` can assert on.
+func sampleZones() -> DomainModels.Zones {
+  DomainModels.Zones(
+    z1: DomainModels.ZoneRange(low: 95, high: 114),
+    z2: DomainModels.ZoneRange(low: 114, high: 133),
+    z3: DomainModels.ZoneRange(low: 133, high: 152),
+    z4: DomainModels.ZoneRange(low: 152, high: 171),
+    z5: DomainModels.ZoneRange(low: 171, high: 190)
+  )
+}
+
+/// The daily-session child state the parent hydrates on an untripped `._briefResolved` (Phase 8.4) — the
+/// brief's session + alternatives + `skipOk` + the `.session` narrative slice + the fetched zones. Mirrors
+/// `TodayFeature`'s hydration so the exhaustive `TestStore` asserts the child appears under `ready`.
+func expectedSessionState(_ brief: DomainModels.DailyBrief, zones: DomainModels.Zones) -> SessionFeature.State {
+  SessionFeature.State(
+    session: brief.session,
+    alternatives: brief.alternatives,
+    skipOk: brief.skipOk,
+    narrative: brief.narrative.filter { $0.type == .session },
+    zones: zones
+  )
 }
 
 /// A canned successful, zero-upsert sync result.

@@ -3,6 +3,7 @@ import CoachCore
 import ComposableArchitecture
 import DomainModels
 import SampleData
+import SessionFeature
 import SyncRepository
 import Testing
 
@@ -36,6 +37,7 @@ struct TodayFeatureNutritionWiringTests {
       $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     await store.send(.onAppOpen)
@@ -44,9 +46,11 @@ struct TodayFeatureNutritionWiringTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+      $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
 
     // The nutrition area derives from the `.ready` brief: the target panel + the logged yesterday recap.
@@ -71,6 +75,7 @@ struct TodayFeatureNutritionWiringTests {
       $0.checkInRepository.current = { _ in sampleCheckIn() }
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in noFood }
+      $0.profileRepository.zones = { sampleZones() }
     }
 
     await store.send(.onAppOpen)
@@ -79,9 +84,11 @@ struct TodayFeatureNutritionWiringTests {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
+    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(noFood, .fresh)
       $0.readiness = ReadinessComponent.State(readiness: noFood.readiness)
+      $0.session = expectedSessionState(noFood, zones: sampleZones())
     }
 
     guard case let .ready(readyBrief, _) = store.state.briefState else {

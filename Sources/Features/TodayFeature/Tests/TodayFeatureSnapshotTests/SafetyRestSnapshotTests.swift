@@ -16,6 +16,7 @@
   import DesignSystem
   import DomainModels
   import SampleData
+  import SessionFeature
   import SnapshotTesting
   import SwiftUI
   import Testing
@@ -58,28 +59,22 @@
     @Test func test_forcedRest_illness() { assertCoachSnapshot(of: forcedRest(.dailyBriefRestIllness)) }
     @Test func test_forcedRest_knee() { assertCoachSnapshot(of: forcedRest(.dailyBriefRestKnee)) }
 
-    /// The coach-easy contrast — the untripped `.normal` amber session with swap/skip affordances + an
-    /// alternatives hint, visibly distinct from the forced-REST screen (which has none). A thin stand-in
-    /// for Phase 8.4's `SessionFeature` view.
+    /// The coach-easy contrast — the untripped `.normal` amber session rendered through the **real**
+    /// Phase 8.4 `SessionFeatureView` (swap/skip affordances + the inline SWAP-TO list seam), visibly
+    /// distinct from the forced-REST screen (which has none). The swap interaction's own states are
+    /// snapshotted in `SessionFeatureSnapshotTests`; this is the supplementary forced-REST contrast.
     @Test func test_coachEasy_contrast() {
       let brief = brief(.dailyBriefAmber)
-      let view = VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
-        SessionCard(
-          brief.session,
-          zoneRange: SampleData.sampleProfile.zones.z2,
-          narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution },
-          onSwap: {},
-          onSkip: brief.skipOk ? {} : nil
+      let store = Store(
+        initialState: SessionFeature.State(
+          session: brief.session,
+          alternatives: brief.alternatives,
+          skipOk: brief.skipOk,
+          narrative: brief.narrative.filter { $0.type == .session },
+          zones: SampleData.sampleProfile.zones
         )
-        // TODO(8.4): the real SessionFeature renders the inline SWAP-TO list; the stand-in shows the count.
-        if !brief.alternatives.isEmpty {
-          let count = brief.alternatives.count
-          Text("\(count) alternative\(count == 1 ? "" : "s") · Swap to change")
-            .font(.coachTextSm)
-            .foregroundStyle(.coachForegroundMuted)
-        }
-      }
-      assertCoachSnapshot(of: framed(view))
+      ) { SessionFeature() }
+      assertCoachSnapshot(of: framed(SessionFeatureView(store: store)))
     }
   }
 #endif

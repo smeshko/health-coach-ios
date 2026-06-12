@@ -3,6 +3,7 @@ import ComposableArchitecture
 import DesignSystem
 import DomainModels
 import Foundation
+import SessionFeature
 import SwiftUI
 import SyncRepository
 
@@ -270,13 +271,13 @@ private struct TodayReadyContent: View {
             ) { SafetyRestComponent() },
             narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
           )
-        case let .normal(session):
-          // TODO(8.4): the promoted `SessionFeature` renders this with the inline SWAP-TO list + skipOk.
-          // Until it merges, a thin read-only `SessionCard` stand-in renders the displayed session.
-          SessionCard(
-            session,
-            narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
-          )
+        case .normal:
+          // The promoted `SessionFeature` (Phase 8.4) renders the displayed session through the
+          // `SessionCard` with the inline SWAP-TO list + the warm skip affordance. The parent hydrates
+          // `state.session` exactly on the untripped (`.normal`) path, so the scope is non-nil here.
+          if let sessionStore = store.scope(state: \.session, action: \.session) {
+            SessionFeatureView(store: sessionStore)
+          }
         }
 
         CheckInSection(store: store.scope(state: \.checkIn, action: \.checkIn))
