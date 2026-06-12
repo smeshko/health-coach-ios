@@ -23,19 +23,15 @@ struct RecordMappingRoundTripTests {
       let roundTripped = try DailyBriefRecord(domain: domain).toDomain()
       #expect(roundTripped == domain, "\(scenario)")
     }
-  }
 
-  @Test func test_unknownFlag_survivesRoundTrip() throws {
-    let domain = try SampleData.dailyBrief(.dailyBriefNoFood).domain
-    let roundTripped = try DailyBriefRecord(domain: domain).toDomain()
-    #expect(roundTripped.session.flags.contains(.unknown("moon_phase")))
-  }
-
-  @Test func test_nilIntake_survivesRoundTrip() throws {
-    let domain = try SampleData.dailyBrief(.dailyBriefNoFood).domain
-    #expect(domain.intakeYesterday == nil)
-    let roundTripped = try DailyBriefRecord(domain: domain).toDomain()
-    #expect(roundTripped.intakeYesterday == nil)
+    // `.dailyBriefNoFood` is the scenario carrying an `.unknown` flag and a nil yesterday-intake;
+    // the full-equality round-trip above already proves both survive, but assert the fixture content
+    // explicitly so a future fixture edit that drops them can't silently weaken this coverage.
+    let noFood = try SampleData.dailyBrief(.dailyBriefNoFood).domain
+    #expect(noFood.intakeYesterday == nil)
+    let noFoodRoundTripped = try DailyBriefRecord(domain: noFood).toDomain()
+    #expect(noFoodRoundTripped.session.flags.contains(.unknown("moon_phase")))
+    #expect(noFoodRoundTripped.intakeYesterday == nil)
   }
 
   @Test func test_weeklyPlan_roundTrips() throws {
