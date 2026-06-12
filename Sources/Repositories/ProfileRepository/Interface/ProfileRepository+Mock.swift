@@ -10,15 +10,7 @@ public extension ProfileRepository {
   static func mock(scenario _: SampleScenario) -> ProfileRepository {
     ProfileRepository(
       profile: { try SampleData.profile().domain },
-      refresh: { try SampleData.profile().domain },
-      zones: { try SampleData.profile().domain.zones },
-      recomputeNotices: {
-        AsyncStream { continuation in
-          continuation.yield(RecomputeNotice(week: "2026-W04"))
-          continuation.finish()
-        }
-      },
-      noteRecompute: { _ in }
+      zones: { try SampleData.profile().domain.zones }
     )
   }
 }

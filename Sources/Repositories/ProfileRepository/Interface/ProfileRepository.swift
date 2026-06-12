@@ -2,15 +2,6 @@ import Dependencies
 import DomainModels
 import SampleData
 
-/// A monthly-recompute notice — the ISO week the server recomputed profile constants in. Emitted on
-/// `recomputeNotices()` so a feature can refetch without polling (resolves OPEN-1, §17.1).
-public struct RecomputeNotice: Equatable, Sendable {
-  public let week: String
-  public init(week: String) {
-    self.week = week
-  }
-}
-
 /// The domain error a profile fetch surfaces. The interface never imports `APIError`/`WireModels`, so
 /// the wire error is carried as a domain-safe `reason` string (mapped in `ProfileRepositoryLive`).
 public enum ProfileRepositoryError: Error, Equatable, Sendable {
@@ -18,38 +9,23 @@ public enum ProfileRepositoryError: Error, Equatable, Sendable {
 }
 
 /// The profile-constants repository (ARCHITECTURE §7, §4.3). Cache-first: `profile()` serves the
-/// cached profile (refetch is event-driven on a recompute, not a TTL — Decision 1); `refresh()` forces
-/// a fetch + overwrite; `zones()` exposes the five HR zone bpm ranges the `ZoneChip` consumes.
-///
-/// `recomputeNotices()` is a **single-subscriber** stream (like `APIClientLive`'s `SessionEvent`
-/// stream) that emits when a fetch brings a *changed* `constantsRecomputedWeek` (the initial load does
-/// not fire). `noteRecompute(_:)` lets a feature **emit** a recompute caught elsewhere (e.g. a weekly
-/// brief) onto that stream; it does not itself refetch — the consumer reacts by calling `refresh()`
-/// (the refetch wiring is an Epic 06/07 concern).
+/// cached profile (refetch is event-driven on a recompute, not a TTL — Decision 1); `zones()` exposes
+/// the five HR zone bpm ranges the `ZoneChip` consumes.
 public struct ProfileRepository: Sendable {
   public var profile: @Sendable () async throws -> DomainModels.Profile
-  public var refresh: @Sendable () async throws -> DomainModels.Profile
   public var zones: @Sendable () async throws -> DomainModels.Zones
-  public var recomputeNotices: @Sendable () -> AsyncStream<RecomputeNotice>
-  public var noteRecompute: @Sendable (_ week: String) async -> Void
 
   public init(
     profile: @escaping @Sendable () async throws -> DomainModels.Profile,
-    refresh: @escaping @Sendable () async throws -> DomainModels.Profile,
-    zones: @escaping @Sendable () async throws -> DomainModels.Zones,
-    recomputeNotices: @escaping @Sendable () -> AsyncStream<RecomputeNotice>,
-    noteRecompute: @escaping @Sendable (_ week: String) async -> Void
+    zones: @escaping @Sendable () async throws -> DomainModels.Zones
   ) {
     self.profile = profile
-    self.refresh = refresh
     self.zones = zones
-    self.recomputeNotices = recomputeNotices
-    self.noteRecompute = noteRecompute
   }
 }
 
 extension ProfileRepository: TestDependencyKey {
-  /// The canned `SampleData` profile, no live deps (yields one canned recompute notice).
+  /// The canned `SampleData` profile, no live deps.
   public static var testValue: ProfileRepository {
     .mock(scenario: .profile)
   }
