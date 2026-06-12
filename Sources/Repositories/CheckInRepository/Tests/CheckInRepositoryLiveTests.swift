@@ -83,13 +83,4 @@ struct CheckInRepositoryLiveTests {
     let current = try await run(database: db) { try await CheckInRepository.live.current(Self.now) }
     #expect(current?.kneePain == 7)
   }
-
-  @Test func test_mock_returnsCannedValue() async throws {
-    let logged = try await CheckInRepository.mock(scenario: .logged).current(Self.now)
-    #expect(logged != nil)
-    #expect(logged?.kneePain == 2)
-
-    let empty = try await CheckInRepository.mock(scenario: .empty).current(Self.now)
-    #expect(empty == nil)
-  }
 }

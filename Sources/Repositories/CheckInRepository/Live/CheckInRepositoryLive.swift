@@ -7,14 +7,6 @@ import Foundation
 import GRDB
 import PersistenceModels
 
-/// A canned `.mock(scenario:)` selection. The check-in repo has no `SampleData` fixture (Phase 2.3
-/// ships none), so the mock builds small local literals — `.logged` returns a canned check-in for the
-/// requested day, `.empty` returns `nil` (no check-in logged yet).
-public enum CheckInMockScenario: Sendable {
-  case logged
-  case empty
-}
-
 extension CheckInRepository: DependencyKey {
   public static let liveValue: CheckInRepository = .live
 
@@ -39,21 +31,6 @@ extension CheckInRepository: DependencyKey {
           try CheckInRecord.fetchOne(db, key: day)
         }
         return record?.toDomain()
-      }
-    )
-  }
-
-  /// Canned values, no live deps — `save` is a no-op; `current` returns the scenario's value.
-  public static func mock(scenario: CheckInMockScenario) -> CheckInRepository {
-    CheckInRepository(
-      save: { _ in },
-      current: { date in
-        switch scenario {
-        case .logged:
-          DomainModels.CheckIn(date: date, giSymptoms: false, kneePain: 2, illness: false)
-        case .empty:
-          nil
-        }
       }
     )
   }

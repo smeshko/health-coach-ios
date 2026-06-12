@@ -91,12 +91,4 @@ struct StrengthTestRepositoryLiveTests {
     let current = try await run(database: db) { try await StrengthTestRepository.live.current(Self.now) }
     #expect(current == nil)
   }
-
-  @Test func test_mock_returnsCannedValue() async throws {
-    let logged = try await StrengthTestRepository.mock(scenario: .logged).current(Self.now)
-    #expect(logged?.maxPushups == 30)
-
-    let empty = try await StrengthTestRepository.mock(scenario: .empty).current(Self.now)
-    #expect(empty == nil)
-  }
 }

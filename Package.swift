@@ -56,8 +56,6 @@ let package = Package(
     // round-2 #B, verified). Depending on ComposableArchitecture here would pull all of TCA into the
     // bottom-of-graph CoachCore target.
     .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.4.0"),
-    // swift-tagged is pre-1.0; `from: "0.10.0"` is the floor.
-    .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
     // GRDB — SQLite record protocols for the PersistenceModels cache layer (§18: GRDB pinned
     // directly; SharingGRDB wraps it in Epic 04, but only the GRDB record protocols are used here).
     .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
@@ -167,7 +165,6 @@ let package = Package(
       name: "CoachCore",
       dependencies: [
         .product(name: "Dependencies", package: "swift-dependencies"),
-        .product(name: "Tagged", package: "swift-tagged"),
       ],
       path: "Sources/Core/CoachCore/Sources",
       swiftSettings: [
