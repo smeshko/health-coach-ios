@@ -677,6 +677,9 @@ let package = Package(
       name: "WireModelsTests",
       dependencies: [
         "WireModels",
+        // Request/coder tests build the shared `DomainModels` types directly (Phase 11.3 fold);
+        // SwiftPM doesn't re-export the transitive import, so list it directly.
+        "DomainModels",
         "CoachCore",
       ],
       path: "Sources/Models/WireModels/Tests",
@@ -692,6 +695,9 @@ let package = Package(
         "APIClientLive",
         "TokenClient",
         "WireModels",
+        // RequestBuildingTests builds the shared `DomainModels.CheckIn` directly (Phase 11.3 fold);
+        // SwiftPM doesn't re-export the transitive import, so list it directly.
+        "DomainModels",
         // The transport-logging test builds a recorder `LogClient`; SwiftPM doesn't re-export the
         // transitive import, so the test target lists it directly.
         "LogClient",
