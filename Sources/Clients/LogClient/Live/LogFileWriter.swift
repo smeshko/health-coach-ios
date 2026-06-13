@@ -25,9 +25,9 @@ public actor LogFileWriter {
     return base.appendingPathComponent("Logs", isDirectory: true)
   }
 
-  /// The process-wide writer the live `LogClient` and the swift-log bootstrap share, so every emitter
-  /// appends to one file with one rotation counter (separate writers over the same path would corrupt
-  /// each other).
+  /// The process-wide writer the live `LogClient` shares across emitters, so every entry appends to
+  /// one file with one rotation counter (separate writers over the same path would corrupt each
+  /// other).
   public static let shared = LogFileWriter(directory: defaultDirectory)
 
   private enum Command: Sendable {

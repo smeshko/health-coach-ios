@@ -146,8 +146,8 @@ let package = Package(
         // The DEBUG dev menu surfaces the design-system gallery (component/token browser) as a sheet.
         // Used only behind `#if DEBUG`; absent from RELEASE behaviour.
         "DesignSystemGallery",
-        // The log viewer parses log timestamps back into `Date`s using the app's canonical Europe/Sofia
-        // frame (`Calendar.europeSofia`) — the same frame the live `CoachLogHandler` wrote them in.
+        // The log viewer parses log timestamps back into `Date`s via the shared `LogTimestamp` helper,
+        // using the app's canonical Europe/Sofia frame — the same frame the live `LogClient` renders in.
         "CoachCore",
       ],
       path: "Sources/Features/SettingsFeature/Sources",
