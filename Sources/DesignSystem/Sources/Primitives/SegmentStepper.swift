@@ -4,9 +4,16 @@ import SwiftUI
 /// flank a row of short rounded dashes filled up to `value` in the warning accent. `−`/`+` clamp within
 /// `range` — this clamp is UI convenience only; the authoritative 0–10 clamp lives in `CheckInComponent`
 /// (DECISIONS #2), which remains the single writer of stored `kneePain`.
+///
+/// **Haptic contract (Phase 12.3, DECISIONS D4):** fires `.selection` on every `−`/`+` tap that changes the
+/// value (the at-bound button is `.disabled`, so an enabled tap always moves `value`); the tick keys on a
+/// private tap counter, so **programmatic** binding writes never tick. Consumers don't add their own.
 public struct SegmentStepper: View {
   @Binding var value: Int
   let range: ClosedRange<Int>
+  /// Increments on each value-changing `−`/`+` tap — the `.selection` haptic trigger, so programmatic
+  /// writes to `value` stay silent.
+  @State private var tapCount = 0
 
   public init(value: Binding<Int>, range: ClosedRange<Int> = 0 ... 10) {
     _value = value
@@ -18,6 +25,7 @@ public struct SegmentStepper: View {
     HStack(spacing: CoachSpacing.spaceSm) {
       StepButton(symbol: "minus", isEnabled: value > range.lowerBound) {
         value = max(range.lowerBound, value - 1)
+        tapCount += 1
       }
       HStack(spacing: CoachSpacing.space2xs) {
         ForEach(segments, id: \.self) { segment in
@@ -30,8 +38,10 @@ public struct SegmentStepper: View {
       .frame(maxWidth: .infinity)
       StepButton(symbol: "plus", isEnabled: value < range.upperBound) {
         value = min(range.upperBound, value + 1)
+        tapCount += 1
       }
     }
+    .sensoryFeedback(.selection, trigger: tapCount)
   }
 
   /// A round `−`/`+` control — a sunken-surface circle; dims to a subtle glyph when at the bound.

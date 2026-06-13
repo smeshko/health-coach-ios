@@ -12,6 +12,10 @@ import SwiftUI
 /// expansion flag, the list, and the toggle select/revert live here.
 public struct SessionFeatureView: View {
   @Bindable var store: StoreOf<SessionFeature>
+  /// Ticks on every swap-row tap — select AND tap-again-revert are both user selections (Phase 12.3, D4).
+  /// Keyed on the tap, not `selectedAlternativeIndex` (which a fresh-brief re-seed also resets), so a
+  /// programmatic re-seed stays silent.
+  @State private var swapTapCount = 0
 
   public init(store: StoreOf<SessionFeature>) {
     self.store = store
@@ -29,17 +33,39 @@ public struct SessionFeatureView: View {
         onSwap: store.alternatives.isEmpty ? nil : { store.send(.swapToggled) },
         onSkip: store.skipOk ? { store.send(.skipTapped) } : nil
       )
+      // Identity-keyed crossfade of the card's content (Phase 12.3, TASK-004): `SessionCard` is
+      // non-animatable `Text`s + conditional rest/zone/effort branches, so a bare animation transaction
+      // would snap them. Re-`.id` on the content discriminant + `.transition(.opacity)` crossfades the whole
+      // card on a swap tap AND on a 12.1 background re-seed that changes the session. `.opacity` stays valid
+      // under Reduce Motion's snap fallback (a same-card/zone sub-field-only change leaves `.id` unchanged →
+      // a documented accepted snap).
+      .id(store.displayedCardID)
+      .transition(.opacity)
 
       // The inline swap panel — SWAP TO, or SWAPPED TO once an alternative is selected; collapsing keeps
-      // the swap (the reducer's independent expansion/selection state).
+      // the swap (the reducer's independent expansion/selection state). Enters/leaves with a slide-from-top
+      // crossfade under the `disclosure` animation below.
       if store.isSwapExpanded {
         SwapList(
-          alternatives: store.alternatives,
+          rows: store.alternativeRows,
           selectedIndex: store.selectedAlternativeIndex,
-          onTap: { store.send(.alternativeTapped(index: $0)) }
+          onTap: {
+            store.send(.alternativeTapped(index: $0))
+            swapTapCount += 1
+          }
         )
+        .transition(.opacity.combined(with: .move(edge: .top)))
       }
     }
+    // Both animations attach to this surviving ancestor VStack, not the conditional `SwapList` (on which a
+    // collapse would silently snap): `disclosure` drives the panel expand/collapse; `selection` drives the
+    // in-place row highlight + the card's identity crossfade, keyed on the SAME `displayedCardID` as the
+    // card's `.id` so a swap tap, a tap-again-revert, and a 12.1 re-seed all carry a transaction (Phase
+    // 12.3, view-scoped per D2; positional tokens → snap under Reduce Motion).
+    .coachAnimation(.disclosure, value: store.isSwapExpanded)
+    .coachAnimation(.selection, value: store.displayedCardID)
+    // Selection tick on every swap-row tap (select + revert) — user-action-scoped (D4).
+    .sensoryFeedback(.selection, trigger: swapTapCount)
   }
 }
 
@@ -47,7 +73,9 @@ public struct SessionFeatureView: View {
 /// selected, then one tappable `SwapRow` per alternative. The container + header derivation live here (the
 /// feature), not in the pure card.
 private struct SwapList: View {
-  let alternatives: [SessionBlock]
+  /// The identity-stable row projection (Phase 12.3, DECISIONS D3) — `ForEach(rows)` reads declaratively;
+  /// selection changes a row's content, never its identity, so the highlight animates in place.
+  let rows: [SessionFeature.AlternativeRow]
   let selectedIndex: Int?
   let onTap: (Int) -> Void
 
@@ -58,9 +86,9 @@ private struct SwapList: View {
         .tracking(Metrics.eyebrowTracking)
         .foregroundStyle(.coachForegroundMuted)
 
-      ForEach(Array(alternatives.enumerated()), id: \.offset) { offset, block in
-        Button { onTap(offset) } label: {
-          SwapRow(block: block, isSelected: offset == selectedIndex)
+      ForEach(rows) { row in
+        Button { onTap(row.id) } label: {
+          SwapRow(block: row.block, isSelected: row.id == selectedIndex)
         }
         .buttonStyle(.coachPressable)
       }

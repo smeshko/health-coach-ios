@@ -18,6 +18,32 @@ import DomainModels
 /// `.weekly` input or initializer here or later.
 @Reducer
 public struct SessionFeature {
+  /// A swap-list row with **explicit, stable identity** for `ForEach` (Phase 12.3, DECISIONS D3): the
+  /// `SessionBlock` plus its per-brief `alternatives` index as `id`. Produced by `State.alternativeRows`,
+  /// a *computed projection* — stored state, `Equatable`, and every TestStore stay byte-identical.
+  /// Selection changes a row's *content* (highlight/checkmark) but never its *identity*, so the highlight
+  /// animates in place rather than the row re-mounting. Honest note (D3): for today's fixed array this is
+  /// identity-equivalent to `id: \.offset`; the value is explicitness + safety if the list ever mutates
+  /// (Epic 09 reuse).
+  public struct AlternativeRow: Identifiable, Equatable {
+    public let id: Int
+    public let block: SessionBlock
+  }
+
+  /// A small `Hashable` discriminant of the **displayed** card's content (Phase 12.3, TASK-004): the
+  /// selection index plus the displayed session's `card` and `zoneTarget`. Drives BOTH the card's `.id`
+  /// (an identity-keyed crossfade on a swap tap or a Phase 12.1 background re-seed that changes the
+  /// session) AND the selection animation transaction — one definition so they stay in lock-step.
+  /// `SessionBlock` itself isn't `Hashable`; `card`+`zoneTarget` are the fields that flip the rendered card
+  /// branch. The index alone goes `nil → nil` on a re-seed, so it can't carry the transaction by itself.
+  /// Accepted limit (documented): a background swap changing only sub-fields with the same card/zone (e.g.
+  /// the duration text) leaves this unchanged → the card snaps, a consistent accepted limit.
+  public struct DisplayedCardID: Hashable {
+    public let index: Int?
+    public let card: Card
+    public let zone: Zone?
+  }
+
   @ObservableState
   public struct State: Equatable {
     /// The **primary** (server-recommended) daily session — never lost (revert returns to it).
@@ -66,6 +92,24 @@ public struct SessionFeature {
         return alternatives[index]
       }
       return session
+    }
+
+    /// The swap alternatives as identity-stable rows (Phase 12.3, DECISIONS D3) — a computed projection
+    /// over the stored `alternatives`; reading it never mutates state, so `Equatable`/TestStores are
+    /// untouched. `ForEach(alternativeRows)` reads declaratively in the view.
+    public var alternativeRows: [AlternativeRow] {
+      alternatives.enumerated().map { AlternativeRow(id: $0.offset, block: $0.element) }
+    }
+
+    /// The displayed card's content discriminant (Phase 12.3, TASK-004) — see `DisplayedCardID`. Drives the
+    /// card's `.id` crossfade and the selection animation transaction together. Computed, so stored state
+    /// stays byte-identical.
+    public var displayedCardID: DisplayedCardID {
+      DisplayedCardID(
+        index: selectedAlternativeIndex,
+        card: displayedSession.card,
+        zone: displayedSession.zoneTarget
+      )
     }
 
     /// The bpm range for the **displayed** session's `zoneTarget`, resolved from the full `zones` map
