@@ -6,11 +6,12 @@ import Testing
 
 @testable import TodayFeature
 
-/// `TodaySessionMode` detection + `SafetyRestComponent` derivation tests (ARCHITECTURE D18). This is the
+/// `TodaySessionMode` detection + `SafetyRestView` derivation tests (ARCHITECTURE D18). This is the
 /// **primary** distinct-states proof (PRD §8 / §1 principle #6): a tripped gate resolves to `.forcedRest`
 /// (override session = `brief.session`, empty `alternatives`) and an untripped easy day to `.normal`, so
 /// the two never collapse. Also covers the §7.4.2 calm-copy switch per case + the `.unknown`/empty-reasons
-/// graceful fallback.
+/// graceful fallback. `SafetyRestView` is render-only (a plain value-init view, no reducer), so the
+/// `reasonHeadlines` assertions drive its static derivation helper directly.
 @MainActor
 struct SafetyRestComponentTests {
   /// The mapped domain brief for a canned scenario (force-try: an in-bundle fixture decode failure is a
@@ -21,11 +22,21 @@ struct SafetyRestComponentTests {
 
   // MARK: - Distinct-states detection (the load-bearing proof)
 
+  /// A tripped gate resolves to `.forcedRest` (override = `brief.session`, empty alternatives by
+  /// contract), and **all three** forced-REST fixtures (gi_flare / illness / knee) do so identically.
   @Test func test_forcedRest_detectedFromTriggeredGate() throws {
     let brief = try brief(.dailyBriefRestGIFlare)
     #expect(brief.safetyGate.triggered)
     #expect(brief.alternatives.isEmpty) // a tripped gate carries empty alternatives by contract
     #expect(TodaySessionMode.from(brief) == .forcedRest(gate: brief.safetyGate, override: brief.session))
+
+    for scenario in [SampleScenario.dailyBriefRestGIFlare, .dailyBriefRestIllness, .dailyBriefRestKnee] {
+      let restBrief = try self.brief(scenario)
+      #expect(
+        TodaySessionMode.from(restBrief)
+          == .forcedRest(gate: restBrief.safetyGate, override: restBrief.session)
+      )
+    }
   }
 
   @Test func test_coachEasy_untrippedGate_isNormal() throws {
@@ -35,16 +46,9 @@ struct SafetyRestComponentTests {
     #expect(TodaySessionMode.from(brief) == .normal(brief.session))
   }
 
-  /// All three forced-REST fixtures (gi_flare / illness / knee) trip the gate to `.forcedRest`.
-  @Test func test_allForcedRestFixtures_resolveToForcedRest() throws {
-    for scenario in [SampleScenario.dailyBriefRestGIFlare, .dailyBriefRestIllness, .dailyBriefRestKnee] {
-      let brief = try brief(scenario)
-      #expect(TodaySessionMode.from(brief) == .forcedRest(gate: brief.safetyGate, override: brief.session))
-    }
-  }
-
   // MARK: - Calm reason copy (§7.4.2, per case)
 
+  /// Each known reason maps to its §7.4.2 calm line; an `.unknown` reason falls back to the generic line.
   @Test func test_calmCopy_perKnownReason() {
     #expect(SafetyReasonCopy.calmCopy(for: .giFlare) == "Your gut needs a break today.")
     #expect(SafetyReasonCopy.calmCopy(for: .illness) == "You flagged feeling unwell — recover first.")
@@ -52,25 +56,18 @@ struct SafetyRestComponentTests {
     #expect(SafetyReasonCopy.calmCopy(for: .sleepBelow4h) == "Very little sleep — today is for recovery.")
     #expect(SafetyReasonCopy.calmCopy(for: .rhrSpike) == "Your resting heart rate spiked — back off today.")
     #expect(SafetyReasonCopy.calmCopy(for: .hrvCrash) == "Your HRV dropped sharply — recover today.")
-  }
-
-  @Test func test_calmCopy_unknownReason_genericLine() {
     #expect(SafetyReasonCopy.calmCopy(for: .unknown("foo")) == "Today is for recovery.")
   }
 
-  // MARK: - reasonHeadlines
+  // MARK: - reasonHeadlines (SafetyRestView's render-only derivation)
 
+  /// `SafetyRestView.reasonHeadlines(for:)` maps a tripped gate's reasons through the calm-copy switch, and
+  /// a tripped gate with **empty** `reasons` still yields a non-blank, non-raw headline (the generic line).
   @Test func test_reasonHeadlines_mapsGateReasons() throws {
     let brief = try brief(.dailyBriefRestGIFlare)
-    let state = SafetyRestComponent.State(gate: brief.safetyGate, overrideSession: brief.session)
-    #expect(state.reasonHeadlines == ["Your gut needs a break today."])
-  }
+    #expect(SafetyRestView.reasonHeadlines(for: brief.safetyGate) == ["Your gut needs a break today."])
 
-  /// A tripped gate with empty `reasons` still yields a non-blank, non-raw headline (the generic line).
-  @Test func test_reasonHeadlines_emptyReasons_genericFallback() {
-    let gate = DomainModels.SafetyGate(triggered: true, reasons: [], overrideTo: .rest)
-    let session = DomainModels.SessionBlock(card: .rest, intensity: .recovery, durationMinLow: 0, durationMinHigh: 0)
-    let state = SafetyRestComponent.State(gate: gate, overrideSession: session)
-    #expect(state.reasonHeadlines == ["Today is for recovery."])
+    let emptyGate = DomainModels.SafetyGate(triggered: true, reasons: [], overrideTo: .rest)
+    #expect(SafetyRestView.reasonHeadlines(for: emptyGate) == ["Today is for recovery."])
   }
 }

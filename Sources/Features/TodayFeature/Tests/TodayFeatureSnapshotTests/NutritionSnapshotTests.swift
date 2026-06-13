@@ -6,7 +6,6 @@
 
 #if canImport(UIKit)
   import CoachTestSupport
-  import ComposableArchitecture
   import DesignSystem
   import DomainModels
   import SampleData
@@ -22,14 +21,8 @@
     /// COACH NOTE above the yesterday recap / empty state, framed on the page background.
     private func framed(_ brief: DomainModels.DailyBrief) -> some View {
       VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
-        NutritionView(
-          store: Store(initialState: NutritionComponent.State(brief: brief)) { NutritionComponent() }
-        )
-        YesterdayIntakeView(
-          store: Store(
-            initialState: YesterdayIntakeComponent.State(intakeYesterday: brief.intakeYesterday)
-          ) { YesterdayIntakeComponent() }
-        )
+        NutritionView(brief: brief)
+        YesterdayIntakeView(intake: brief.intakeYesterday)
       }
       .padding(CoachSpacing.spaceLg)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

@@ -2,7 +2,10 @@ import BriefRepository
 import Clocks
 import CoachCore
 import ComposableArchitecture
-import SessionFeature
+import DomainModels
+import Foundation
+import LogClient
+import SampleData
 import SyncRepository
 import Testing
 
@@ -12,11 +15,17 @@ import Testing
 /// gate** (no check-in today → `.checkInRequired`, sync never called), **sync strictly before the
 /// brief** (D15/§11), a sync failure **blocking** the brief (the brief stub is invoked 0 times,
 /// D23/§8.2), the cache-hit `.ready(.cached)` resolve, the brief-error terminal, the load-bearing
-/// **non-typed-throw** catch-all (a 401 from `sync()` is not a `SyncError`), and retry from a blocked
-/// state. The save-triggered re-entry + cancellation suite is `TodayFeatureSaveTests`.
+/// **non-typed-throw** catch-all (a 401 from `sync()` is not a `SyncError`), retry from a blocked
+/// state, the `.lifecycle` observability line, and the single-`_briefResolved`-payload reducer arm
+/// (forced-REST gate, zones-failure degrade, swap-reset on re-hydration). The save-triggered re-entry
+/// + cancellation suite is `TodayFeatureSaveTests`. The success-chain `receive` walk is the shared
+/// `receiveSuccessChain` helper (Phase 11.4 D4 — one walk, parameterized variants).
 @MainActor
 struct TodayFeatureOrchestrationTests {
-  @Test func test_onAppOpen_success_syncThenBrief_readyFresh() async {
+  /// The success chain reaches `.ready(.fresh)` AND emits the `.lifecycle` `onAppOpen` log line (the
+  /// `.lifecycle` emission regressed once — keep it asserted, folded from the former log test).
+  @Test func test_onAppOpen_success_syncThenBrief_readyFresh_emitsLifecycleLog() async {
+    let recorder = LogRecorder()
     let now = sofiaInstant()
     let fresh = sampleBrief(cached: false)
     let store = TestStore(initialState: TodayFeature.State()) {
@@ -29,20 +38,13 @@ struct TodayFeatureOrchestrationTests {
       $0.syncRepository.sync = { sampleSyncResult() }
       $0.briefRepository.dailyBrief = { _ in fresh }
       $0.profileRepository.zones = { sampleZones() }
+      $0.log = .recording(into: recorder)
     }
 
     await store.send(.onAppOpen)
-    await store.receive(\._syncStarted) { $0.briefState = .syncing }
-    await store.receive(\._generating) {
-      $0.lastSyncedAt = now
-      $0.briefState = .generating
-    }
-    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
-    await store.receive(\._briefResolved) {
-      $0.briefState = .ready(fresh, .fresh)
-      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
-      $0.session = expectedSessionState(fresh, zones: sampleZones())
-    }
+    await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
+
+    #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("morning orchestration") })
   }
 
   @Test func test_syncFailure_blocksBrief_setsSyncFailed_briefNeverCalled() async {
@@ -86,17 +88,7 @@ struct TodayFeatureOrchestrationTests {
     }
 
     await store.send(.onAppOpen)
-    await store.receive(\._syncStarted) { $0.briefState = .syncing }
-    await store.receive(\._generating) {
-      $0.lastSyncedAt = now
-      $0.briefState = .generating
-    }
-    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
-    await store.receive(\._briefResolved) {
-      $0.briefState = .ready(cached, .cached)
-      $0.readiness = ReadinessComponent.State(readiness: cached.readiness)
-      $0.session = expectedSessionState(cached, zones: sampleZones())
-    }
+    await receiveSuccessChain(store, brief: cached, freshness: .cached, now: now, zones: sampleZones())
   }
 
   @Test func test_briefError_setsErrorCase_notSyncFailed() async {
@@ -208,16 +200,100 @@ struct TodayFeatureOrchestrationTests {
     }
 
     await store.send(.retryTapped)
+    await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
+  }
+
+  // MARK: - The single `_briefResolved` payload reducer arm (Phase 11.4 D2)
+
+  /// A zones failure (`profileRepository.zones()` → nil) degrades silently: the brief still resolves to
+  /// `.ready` and the session child hydrates, but `state.zones == nil` (no zone chip). The single
+  /// `_briefResolved(brief, freshness, nil)` payload carries the nil through.
+  @Test func test_zonesFailure_briefStillResolves_zonesNil() async {
+    let now = sofiaInstant()
+    let fresh = sampleBrief(cached: false)
+    let store = TestStore(initialState: TodayFeature.State()) {
+      TodayFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.current = { _ in sampleCheckIn() }
+      $0.syncRepository.sync = { sampleSyncResult() }
+      $0.briefRepository.dailyBrief = { _ in fresh }
+      $0.profileRepository.zones = { throw BriefError.serverError } // fetch fails → try? → nil
+    }
+
+    await store.send(.onAppOpen)
     await store.receive(\._syncStarted) { $0.briefState = .syncing }
     await store.receive(\._generating) {
       $0.lastSyncedAt = now
       $0.briefState = .generating
     }
-    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
+      $0.zones = nil
+      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
+      // Untripped day → the session child still hydrates, just with nil zones (no chip).
+      $0.session = SessionFeature.State(
+        session: fresh.session,
+        alternatives: fresh.alternatives,
+        skipOk: fresh.skipOk,
+        narrative: fresh.narrative.filter { $0.type == .session },
+        zones: nil
+      )
+    }
+    #expect(store.state.zones == nil)
+  }
+
+  /// A tripped (forced-REST) brief through `_briefResolved`: readiness still hydrates, but the session
+  /// child is `nil` (the forced-REST screen renders the inline `SafetyRestView` instead). Exercises the
+  /// `safetyGate.triggered` arm that the success tests never hit.
+  @Test func test_forcedRestBrief_resolved_sessionNil_readinessHydrated() async throws {
+    let forced = try SampleData.dailyBrief(.dailyBriefRestGIFlare).domain
+    #expect(forced.safetyGate.triggered)
+    let store = TestStore(initialState: TodayFeature.State()) { TodayFeature() }
+
+    await store.send(._briefResolved(forced, .fresh, sampleZones())) {
+      $0.briefState = .ready(forced, .fresh)
+      $0.zones = sampleZones()
+      $0.readiness = ReadinessComponent.State(readiness: forced.readiness)
+      // A tripped gate renders the forced-REST screen, so the session child stays nil.
+      $0.session = nil
+    }
+  }
+
+  /// Re-hydration resets the swap selection: a second `_briefResolved` re-seeds the session child, so a
+  /// stale `selectedAlternativeIndex` is cleared (the doc-comment claims it; this asserts it).
+  @Test func test_reHydration_resetsSwapSelection() async {
+    let fresh = sampleBrief(cached: false)
+    let store = TestStore(initialState: TodayFeature.State()) { TodayFeature() }
+
+    await store.send(._briefResolved(fresh, .fresh, sampleZones())) {
+      $0.briefState = .ready(fresh, .fresh)
+      $0.zones = sampleZones()
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
       $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
+    // The athlete swaps to the first alternative via the child reducer.
+    await store.send(.session(.alternativeTapped(index: 0))) {
+      $0.session?.selectedAlternativeIndex = 0
+    }
+    // A second resolve (e.g. a re-save) re-seeds the child from the brief, clearing the selection.
+    await store.send(._briefResolved(fresh, .fresh, sampleZones())) {
+      $0.session = expectedSessionState(fresh, zones: sampleZones())
+    }
+    #expect(store.state.session?.selectedAlternativeIndex == nil)
+  }
+
+  /// The Exercise/Nutrition segmented toggle (`sectionSelected`) is a pure-UI reducer arm — the one
+  /// arm with no other coverage after the 11.4 consolidation. Initial state is idle + Exercise; the
+  /// toggle flips `selectedSection` with no effect.
+  @Test func test_initialState_idleExercise_andSectionToggle() async {
+    let store = TestStore(initialState: TodayFeature.State()) { TodayFeature() }
+    #expect(store.state.briefState == .idle)
+    #expect(store.state.selectedSection == .exercise)
+
+    await store.send(.sectionSelected(.nutrition)) { $0.selectedSection = .nutrition }
+    await store.send(.sectionSelected(.exercise)) { $0.selectedSection = .exercise }
   }
 }

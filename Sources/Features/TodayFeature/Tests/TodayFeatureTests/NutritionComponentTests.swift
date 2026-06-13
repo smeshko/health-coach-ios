@@ -5,11 +5,11 @@ import Testing
 
 @testable import TodayFeature
 
-/// Exhaustive coverage (ARCHITECTURE D18) for `NutritionComponent.State` — the pure derivation from the
-/// loaded brief: the `macroFocus` target and the **order-preserving** `type == .nutrition` narrative slice
-/// (principle #1 / §9.1 — the component selects, the renderer renders verbatim). The component has no
-/// actions (render-only, like `SafetyRestComponent`), so these are state-init assertions, not a `TestStore`
-/// drive — matching `ReadinessComponentTests`' derived-state style.
+/// Exhaustive coverage (ARCHITECTURE D18) for `NutritionView`'s pure derivation from the loaded brief — the
+/// `macroFocus` target and the **order-preserving** `type == .nutrition` narrative slice (principle #1 /
+/// §9.1 — the view selects, the renderer renders verbatim). `NutritionView` is render-only (a plain
+/// value-init view, no reducer, like `SafetyRestView`), so these are init-derivation assertions on the
+/// view's stored `macroFocus`/`nutritionNarrative`.
 @MainActor
 struct NutritionComponentTests {
   /// The mapped domain brief for a canned scenario (force-try: an in-bundle fixture decode failure is a
@@ -24,13 +24,8 @@ struct NutritionComponentTests {
     DomainModels.NarrativeSection(type: type, heading: heading, body: "\(heading) body")
   }
 
-  @Test func test_init_fromLoggedBrief_setsMacroFocusAndNutritionNarrativeSlice() throws {
-    let loaded = try brief(.dailyBriefGreen)
-    let state = NutritionComponent.State(brief: loaded)
-    #expect(state.macroFocus == loaded.macroFocus)
-    #expect(state.nutritionNarrative == loaded.narrative.filter { $0.type == .nutrition })
-  }
-
+  /// The slice is **order-preserving** and excludes other types: a hand-built `narrative[]` with two
+  /// `.nutrition` sections interleaved with other types yields exactly those two, in their original order.
   @Test func test_nutritionNarrativeSlice_preservesOrder_andExcludesOtherTypes() throws {
     var loaded = try brief(.dailyBriefGreen)
     let firstNutrition = section(.nutrition, "Coach note")
@@ -41,10 +36,11 @@ struct NutritionComponentTests {
       section(.session, "Today's session"),
       secondNutrition,
     ]
-    let state = NutritionComponent.State(brief: loaded)
-    // Exactly the two `.nutrition` sections, in their original relative order, nothing else.
-    #expect(state.nutritionNarrative == [firstNutrition, secondNutrition])
-    #expect(state.nutritionNarrative.allSatisfy { $0.type == .nutrition })
+    let view = NutritionView(brief: loaded)
+    // The target rides through verbatim, and exactly the two `.nutrition` sections in original order.
+    #expect(view.macroFocus == loaded.macroFocus)
+    #expect(view.nutritionNarrative == [firstNutrition, secondNutrition])
+    #expect(view.nutritionNarrative.allSatisfy { $0.type == .nutrition })
   }
 
   @Test func test_nutritionNarrativeSlice_empty_whenNoNutritionSection() throws {
@@ -54,8 +50,8 @@ struct NutritionComponentTests {
       section(.session, "Today's session"),
       section(.caution, "A gentle note"),
     ]
-    let state = NutritionComponent.State(brief: loaded)
+    let view = NutritionView(brief: loaded)
     // The panel-only path: no `.nutrition` slice ⇒ the view renders `NutritionGauge` alone, no narrative.
-    #expect(state.nutritionNarrative.isEmpty)
+    #expect(view.nutritionNarrative.isEmpty)
   }
 }

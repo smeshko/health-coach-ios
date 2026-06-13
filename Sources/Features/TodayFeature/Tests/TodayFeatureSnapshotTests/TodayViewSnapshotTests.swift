@@ -18,7 +18,6 @@
   import DomainModels
   import Foundation
   import SampleData
-  import SessionFeature
   import SnapshotTesting
   import Testing
 

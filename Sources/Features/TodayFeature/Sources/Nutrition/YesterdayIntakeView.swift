@@ -1,4 +1,3 @@
-import ComposableArchitecture
 import DesignSystem
 import DomainModels
 import SwiftUI
@@ -8,14 +7,32 @@ import SwiftUI
 /// with the logged kcal, a **protein hit/missed** marker (from `vsTarget.proteinHit`, the "✓ Floor hit"
 /// chip), and water/fiber — or the calm **"No food logged yesterday"** empty state (`.empty`).
 ///
+/// A **render-only** value-init view (no `@Reducer` ceremony): the parent constructs it from the loaded
+/// brief's `intakeYesterday`. The only "logic" is a **pure presence check** in `init(intake:)`: a
+/// whole-null intake maps to `.empty` (the first-class no-food state, §7.4.5/§8.5/§14); a present
+/// `IntakeSummary` (even one whose macro totals are all nil) maps to `.logged` — the §5 distinction
+/// (`IntakeSummary.required: [date, vsTarget]` — every total nullable, `vsTarget` not).
+///
 /// The calories % and the protein marker are read **verbatim from `vsTarget`** — no client nutrition math
 /// (D4/principle #4). Nil macro totals are simply omitted (never `0`, never force-unwrapped). The empty
 /// branch is a first-class state, not zeros and not an error (§7.4.5/§8.5/§14).
 public struct YesterdayIntakeView: View {
-  let store: StoreOf<YesterdayIntakeComponent>
+  /// The recap vs the no-food empty state — 1-level nested (the type-nesting lint rule).
+  enum DisplayState: Equatable, Sendable {
+    case logged(DomainModels.IntakeSummary)
+    case empty
+  }
 
-  public init(store: StoreOf<YesterdayIntakeComponent>) {
-    self.store = store
+  /// `.logged(summary)` vs the no-food `.empty` — derived **once** from the optional in `init(intake:)` so
+  /// the critical empty branch is a single typed value (tests assert it directly), never a view-only `nil`
+  /// unwrap that could fall through to zeros.
+  let display: DisplayState
+
+  /// Map the optional to the display state: `nil → .empty`, `.some(summary) → .logged(summary)`. A pure
+  /// presence check (no numeric math) — the §5 distinction: a present summary with all-nil totals is still
+  /// `.logged` (its `vsTarget` recap renders; nil totals are simply omitted).
+  public init(intake: DomainModels.IntakeSummary?) {
+    display = intake.map(DisplayState.logged) ?? .empty
   }
 
   public var body: some View {
@@ -26,14 +43,14 @@ public struct YesterdayIntakeView: View {
           .tracking(Metrics.eyebrowTracking)
           .foregroundStyle(.coachForegroundMuted)
         Spacer(minLength: CoachSpacing.spaceSm)
-        if case .logged = store.display {
+        if case .logged = display {
           Text("vs target")
             .font(.coachText2xs)
             .foregroundStyle(.coachForegroundSubtle)
         }
       }
 
-      switch store.display {
+      switch display {
       case let .logged(summary):
         LoggedRecap(summary: summary)
       case .empty:

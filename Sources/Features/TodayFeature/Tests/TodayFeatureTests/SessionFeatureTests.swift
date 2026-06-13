@@ -3,7 +3,7 @@ import DomainModels
 import Foundation
 import Testing
 
-@testable import SessionFeature
+@testable import TodayFeature
 
 /// Exhaustive `TestStore` coverage (ARCHITECTURE D18) for `SessionFeature` — the inline swap expand/collapse
 /// (`swapToggled`), the **toggle-semantics** alternative selection (`alternativeTapped`: select /
@@ -99,6 +99,9 @@ struct SessionFeatureTests {
     let store = swapStore()
     // Out-of-range index: no mutation (no trailing closure), no crash.
     await store.send(.alternativeTapped(index: 99))
+    // A negative index is equally out-of-range — `Array.indices.contains` rejects it, no crash, no mutation.
+    await store.send(.alternativeTapped(index: -1))
+    #expect(store.state.selectedAlternativeIndex == nil)
   }
 
   // MARK: - Expansion / selection independence

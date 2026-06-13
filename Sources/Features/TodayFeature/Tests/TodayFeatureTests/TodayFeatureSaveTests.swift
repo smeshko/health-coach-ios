@@ -1,7 +1,6 @@
 import Clocks
 import CoachCore
 import ComposableArchitecture
-import SessionFeature
 import SyncRepository
 import Testing
 
@@ -42,17 +41,7 @@ struct TodayFeatureSaveTests {
     }
     // The delegate re-enters the chain: gate (now unlocked) → sync → brief.
     await store.receive(\.checkIn.delegate)
-    await store.receive(\._syncStarted) { $0.briefState = .syncing }
-    await store.receive(\._generating) {
-      $0.lastSyncedAt = now
-      $0.briefState = .generating
-    }
-    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
-    await store.receive(\._briefResolved) {
-      $0.briefState = .ready(fresh, .fresh)
-      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
-      $0.session = expectedSessionState(fresh, zones: sampleZones())
-    }
+    await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
 
     let flags = await recorder.flags
     #expect(flags == [true], "the save path regenerates via dailyBrief(refresh: true)")
@@ -85,17 +74,7 @@ struct TodayFeatureSaveTests {
       $0.checkIn.lastSavedAt = now
     }
     await store.receive(\.checkIn.delegate)
-    await store.receive(\._syncStarted) { $0.briefState = .syncing }
-    await store.receive(\._generating) {
-      $0.lastSyncedAt = now
-      $0.briefState = .generating
-    }
-    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
-    await store.receive(\._briefResolved) {
-      $0.briefState = .ready(fresh, .fresh)
-      $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
-      $0.session = expectedSessionState(fresh, zones: sampleZones())
-    }
+    await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
 
     let flags = await recorder.flags
     #expect(flags == [true], "a re-save regenerates via dailyBrief(refresh: true)")
@@ -141,9 +120,9 @@ struct TodayFeatureSaveTests {
       $0.briefState = .generating
     }
     await clock.advance(by: TodayFeature.loadingPhaseMinDuration)
-    await store.receive(\._zonesResolved) { $0.zones = sampleZones() }
     await store.receive(\._briefResolved) {
       $0.briefState = .ready(fresh, .fresh)
+      $0.zones = sampleZones()
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
       $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
