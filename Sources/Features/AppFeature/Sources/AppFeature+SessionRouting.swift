@@ -30,8 +30,8 @@ extension AppFeature {
       // `.onboarding` (an active connect attempt) the event is a NO-OP: the Connect screen surfaces probe
       // failures inline, and reconstructing state here would wipe the typed token + flash the reason
       // banner mid-connect (the 7.2 double-bounce; DECISIONS 5).
-      guard case .main = state else { return .none }
-      state = .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
+      guard case .main = state.route else { return .none }
+      state.route = .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
       return .none
 
     case ._restoreSession, ._tokenChecked, .onboarding, .main:

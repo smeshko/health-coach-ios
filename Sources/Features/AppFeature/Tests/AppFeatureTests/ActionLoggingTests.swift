@@ -13,7 +13,7 @@ import Testing
 struct ActionLoggingTests {
   @Test func test_actionLabel_loggedUnderTca_payloadFree() async {
     let recorder = LogRecorder()
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State(route: .main(MainTabs.State()))) {
       AppFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
@@ -36,7 +36,7 @@ struct ActionLoggingTests {
 
   @Test func test_nestedAction_logsCaseLabelPath() async {
     let recorder = LogRecorder()
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State(route: .main(MainTabs.State()))) {
       AppFeature()
     } withDependencies: {
       $0.log = .recording(into: recorder)
@@ -45,7 +45,7 @@ struct ActionLoggingTests {
     var expected = MainTabs.State()
     expected.selectedTab = .weekly
     await store.send(.main(.tabSelected(.weekly))) {
-      $0 = .main(expected)
+      $0.route = .main(expected)
     }
 
     // The nested case-label path descends through enum associated values (all enums here).

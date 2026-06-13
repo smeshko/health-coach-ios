@@ -19,7 +19,10 @@ struct AppFeatureSwitchTests {
   /// check swaps to onboarding only when no token is stored — a returning user lands straight on the
   /// app). If this default flips, a stored-token launch would wrongly stick on Connect (review #2.2).
   @Test func test_defaultState_isMain() {
-    #expect(AppFeature.State() == .main(MainTabs.State()))
+    // Phase 12.4: the launch default is route `.main` AND `isRestoringSession == true` (the restore overlay
+    // is up until the token check resolves).
+    #expect(AppFeature.State().route == .main(MainTabs.State()))
+    #expect(AppFeature.State().isRestoringSession)
   }
 
   /// A nil OR empty stored token both fall back to onboarding (parameterized — the two cases share the
@@ -29,7 +32,7 @@ struct AppFeatureSwitchTests {
   @Test(arguments: [String?.none, ""])
   func test_restoreSession_missingToken_swapsToOnboarding(token: String?) async {
     let recorder = LogRecorder()
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State()) {
       AppFeature()
     } withDependencies: {
       $0.tokenClient.read = { token }
@@ -38,7 +41,9 @@ struct AppFeatureSwitchTests {
 
     await store.send(._restoreSession)
     await store.receive(\._tokenChecked, false) {
-      $0 = .onboarding(OnboardingFeature.State())
+      // Token-less arm: route swaps to onboarding AND the restore overlay lifts (Phase 12.4, D1).
+      $0.route = .onboarding(OnboardingFeature.State())
+      $0.isRestoringSession = false
     }
 
     #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("Restoring session") })
@@ -50,7 +55,7 @@ struct AppFeatureSwitchTests {
     // cache-first open (Phase 12.1, DECISIONS D8). `current` returns nil so the open lands at the check-in
     // gate (no sync/network), keeping this an enum-routing test.
     let now = sofiaInstant()
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State()) {
       AppFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
@@ -60,11 +65,14 @@ struct AppFeatureSwitchTests {
     }
 
     await store.send(._restoreSession)
-    await store.receive(\._tokenChecked, true)
+    await store.receive(\._tokenChecked, true) {
+      // Token-bearing arm: the route stays `.main` but the restore overlay lifts (Phase 12.4, D1).
+      $0.isRestoringSession = false
+    }
     // D8: the token-bearing staying-put branch dispatches the Today open.
     await store.receive(\.main.todayRoot.onAppOpen)
     await store.receive(\.main.todayRoot._checkInRequired) {
-      $0 = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
+      $0.route = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
     }
   }
 
@@ -73,7 +81,7 @@ struct AppFeatureSwitchTests {
   /// `cachedDailyBrief` stub would return a brief if the open ran — its absence from the walk (exhaustive
   /// store) proves the open was never triggered.
   @Test func test_restoreSession_missingToken_neverDispatchesOnAppOpen() async {
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State()) {
       AppFeature()
     } withDependencies: {
       $0.tokenClient.read = { nil }
@@ -85,7 +93,8 @@ struct AppFeatureSwitchTests {
 
     await store.send(._restoreSession)
     await store.receive(\._tokenChecked, false) {
-      $0 = .onboarding(OnboardingFeature.State())
+      $0.route = .onboarding(OnboardingFeature.State())
+      $0.isRestoringSession = false
     }
     // No `.main.todayRoot.onAppOpen` (or any Today action) in the exhaustive walk → the open never ran.
     await store.finish()
@@ -97,7 +106,7 @@ struct AppFeatureSwitchTests {
     // the Today cache-first open (the connected branch is token-bearing).
     let now = sofiaInstant()
     let recorder = LogRecorder()
-    let store = TestStore(initialState: AppFeature.State.onboarding(OnboardingFeature.State())) {
+    let store = TestStore(initialState: AppFeature.State(route: .onboarding(OnboardingFeature.State()))) {
       AppFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
@@ -107,11 +116,11 @@ struct AppFeatureSwitchTests {
     }
 
     await store.send(.onboarding(.delegate(.connected))) {
-      $0 = .main(MainTabs.State())
+      $0.route = .main(MainTabs.State())
     }
     await store.receive(\.main.todayRoot.onAppOpen)
     await store.receive(\.main.todayRoot._checkInRequired) {
-      $0 = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
+      $0.route = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
     }
 
     #expect(recorder.entries.contains { $0.category == .app && $0.message.contains("Connected") })
@@ -124,7 +133,7 @@ struct AppFeatureSwitchTests {
     // strictly-stronger walk.) Also folds AppFeatureLogTests.test_tokenReset_emitsAppLog: the `.app`
     // "Token reset" line is asserted on this same delegate walk.
     let recorder = LogRecorder()
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State(route: .main(MainTabs.State()))) {
       AppFeature()
     } withDependencies: {
       $0.log = .recording(into: recorder)
@@ -132,7 +141,7 @@ struct AppFeatureSwitchTests {
 
     await store.send(.main(.settingsRoot(.delegate(.tokenReset))))
     await store.receive(\.main.delegate, .tokenReset) {
-      $0 = .onboarding(OnboardingFeature.State())
+      $0.route = .onboarding(OnboardingFeature.State())
     }
 
     #expect(recorder.entries.contains { $0.category == .app && $0.message.contains("Token reset") })

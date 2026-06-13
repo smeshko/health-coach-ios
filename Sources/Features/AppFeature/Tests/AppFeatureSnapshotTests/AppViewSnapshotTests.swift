@@ -20,7 +20,11 @@
   struct AppViewSnapshotTests {
     @Test func test_onboardingShell_neutral() {
       let view = AppView(
-        store: Store(initialState: .onboarding(OnboardingFeature.State(step: .connect(reason: nil)))) {
+        // Phase 12.4: seed `isRestoringSession: false` (the explicit init default) so the launch overlay
+        // doesn't blank the reference — the six AppView PNGs stay byte-identical across the struct wrap.
+        store: Store(initialState: AppFeature.State(
+          route: .onboarding(OnboardingFeature.State(step: .connect(reason: nil)))
+        )) {
           AppFeature()
         }
       )
@@ -30,7 +34,9 @@
     @Test func test_onboardingShell_tokenInvalid() {
       let view = AppView(
         store: Store(
-          initialState: .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
+          initialState: AppFeature.State(
+            route: .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
+          )
         ) {
           AppFeature()
         }
@@ -68,7 +74,7 @@
           return nil // unreachable; keeps Today parked on `.syncing` for the capture
         }
       } operation: {
-        let view = AppView(store: Store(initialState: .main(mainState)) { AppFeature() })
+        let view = AppView(store: Store(initialState: AppFeature.State(route: .main(mainState))) { AppFeature() })
         assertCoachSnapshot(of: view)
       }
     }

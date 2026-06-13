@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Phase 12.4: an app-colored launch screen. `UIColorName` references the `LaunchBackground` color asset
+	  (App/Assets.xcassets), which mirrors `.coachBackground` (neutral10: light 0xF2F1EC / dark 0x121214) —
+	  so cold launch shows the app's background instead of a white frame. The rest of the Info.plist is still
+	  generated from the target's INFOPLIST_KEY_* build settings (GENERATE_INFOPLIST_FILE = YES merges them).
+	-->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+</dict>
+</plist>
