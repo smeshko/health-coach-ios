@@ -67,11 +67,15 @@ public struct SyncProgressView: View {
           .trim(from: 0, to: progress.map { max(0, min(1, $0)) } ?? Metrics.indeterminateTrim)
           .stroke(.coachAccent, style: StrokeStyle(lineWidth: Metrics.ringWidth, lineCap: .round))
           .rotationEffect(.degrees(isSpinning ? 270 : -90))
+          // EXEMPT from the `CoachMotion`-only rule (Phase 12.2): a `repeatForever` spinner is a
+          // continuous **activity indicator**, which by platform convention keeps animating under
+          // Reduce Motion (system `ProgressView` does too) — it is not a discrete state change, so it
+          // doesn't fit a `CoachMotion` interaction class. The former determinate `progressTweenDuration`
+          // ease is gone (Phase 12.1's indeterminate-ring change made `progress` honestly `nil`).
           .animation(
             .linear(duration: Metrics.ringSpinDuration).repeatForever(autoreverses: false),
             value: isSpinning
           )
-          .animation(.easeInOut(duration: Metrics.progressTweenDuration), value: progress)
         Image(systemName: Icon.heartPulse.systemName)
           .font(.system(size: Metrics.iconSize, weight: .regular))
           .foregroundStyle(.coachAccent)
@@ -154,11 +158,11 @@ private enum Metrics {
   static let ringWidth: CGFloat = 5
   static let iconSize: CGFloat = 30
   static let stepIndicator: CGFloat = 24
-  /// One full turn of the big ring / the active step arc — slow enough to read as "working".
+  /// One full turn of the big ring / the active step arc — slow enough to read as "working". These are
+  /// the **activity-indicator** spin durations, intentionally outside `CoachMotion` (see the body's
+  /// doc comment): continuous indicators are not a `CoachMotion` interaction class.
   static let ringSpinDuration: TimeInterval = 1.8
   static let stepSpinDuration: TimeInterval = 1.2
-  /// The ring's trim tween when `progress` moves (e.g. a determinate gallery demo).
-  static let progressTweenDuration: TimeInterval = 0.45
   /// The fixed partial arc of the **indeterminate** ring (`progress == nil`) — long enough to read as a
   /// working spinner, short enough not to look like a determinate near-full ring (Phase 12.1, D5).
   static let indeterminateTrim: CGFloat = 0.25

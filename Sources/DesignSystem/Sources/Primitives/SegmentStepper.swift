@@ -48,7 +48,7 @@ public struct SegmentStepper: View {
           .frame(width: Metrics.buttonSize, height: Metrics.buttonSize)
           .background(Circle().fill(.coachBorder))
       }
-      .buttonStyle(.plain)
+      .buttonStyle(.coachPressable)
       .disabled(!isEnabled)
     }
   }
