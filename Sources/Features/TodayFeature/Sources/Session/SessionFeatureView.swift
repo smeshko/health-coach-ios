@@ -12,6 +12,10 @@ import SwiftUI
 /// expansion flag, the list, and the toggle select/revert live here.
 public struct SessionFeatureView: View {
   @Bindable var store: StoreOf<SessionFeature>
+  /// Ticks on every swap-row tap — select AND tap-again-revert are both user selections (Phase 12.3, D4).
+  /// Keyed on the tap, not `selectedAlternativeIndex` (which a fresh-brief re-seed also resets), so a
+  /// programmatic re-seed stays silent.
+  @State private var swapTapCount = 0
 
   public init(store: StoreOf<SessionFeature>) {
     self.store = store
@@ -45,7 +49,10 @@ public struct SessionFeatureView: View {
         SwapList(
           rows: store.alternativeRows,
           selectedIndex: store.selectedAlternativeIndex,
-          onTap: { store.send(.alternativeTapped(index: $0)) }
+          onTap: {
+            store.send(.alternativeTapped(index: $0))
+            swapTapCount += 1
+          }
         )
         .transition(.opacity.combined(with: .move(edge: .top)))
       }
@@ -57,6 +64,8 @@ public struct SessionFeatureView: View {
     // 12.3, view-scoped per D2; positional tokens → snap under Reduce Motion).
     .coachAnimation(.disclosure, value: store.isSwapExpanded)
     .coachAnimation(.selection, value: store.displayedCardID)
+    // Selection tick on every swap-row tap (select + revert) — user-action-scoped (D4).
+    .sensoryFeedback(.selection, trigger: swapTapCount)
   }
 }
 
