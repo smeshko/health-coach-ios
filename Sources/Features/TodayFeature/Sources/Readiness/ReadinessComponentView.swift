@@ -50,6 +50,14 @@ public struct ReadinessComponentView: View {
         Text("\(store.readiness.score)")
           .font(.coachText3xl)
           .foregroundStyle(.coachForeground)
+          // Roll the digits when the score changes (Phase 12.3) — the only path that changes a mounted
+          // gauge's score is a 12.1 `.ready`→`.ready` background swap, which deliberately leaves TASK-001's
+          // `caseID` unchanged and (D2) carries no animated send; so without this *value-scoped* transaction
+          // `numericText` would never animate. Borrowing `disclosure` is deliberate (TASK-003): a digit roll
+          // is a positional change, so the token's spring + `nil`-under-Reduce-Motion fallback is exactly
+          // right even though its doc-comment names expand/collapse.
+          .contentTransition(.numericText(value: Double(store.readiness.score)))
+          .coachAnimation(.disclosure, value: store.readiness.score)
         Text(store.readiness.band.label)
           .font(.coachText2xl)
           .foregroundStyle(store.readiness.band.color)
@@ -58,9 +66,11 @@ public struct ReadinessComponentView: View {
       SegmentedBar.readiness(score: store.readiness.score)
         .frame(maxWidth: .infinity, alignment: .leading)
 
-      // The itemized "why" breakdown (inline, when expanded) — matches `… — Why open.png`.
+      // The itemized "why" breakdown (inline, when expanded) — matches `… — Why open.png`. Enters/leaves
+      // with an opacity+slide-from-top transition under the card's `disclosure` animation (Phase 12.3).
       if store.isWhyExpanded {
         WhyBreakdown(rows: store.penaltyRows, total: store.readiness.score)
+          .transition(.opacity.combined(with: .move(edge: .top)))
       }
 
       // The day's lead narrative ("Good morning …") — rendered verbatim by the DS renderer.
@@ -78,6 +88,10 @@ public struct ReadinessComponentView: View {
             .stroke(.coachBorder, lineWidth: 1)
         )
     )
+    // One `disclosure` transaction drives the whole "Why" toggle (Phase 12.3, view-scoped per D2): the
+    // card's height change, the breakdown's slide-in transition, and the chevron's `rotationEffect` all
+    // ride it. Reduce Motion → `disclosure` resolves to `nil`, so the breakdown snaps (no height tween).
+    .coachAnimation(.disclosure, value: store.isWhyExpanded)
   }
 }
 
