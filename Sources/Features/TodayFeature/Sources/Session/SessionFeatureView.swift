@@ -115,9 +115,12 @@ private struct SwapRow: View {
   /// "40 min · Low Impact" — the duration window (collapsing when bounds match) + the session's flag
   /// `DisplayLabel`s, falling back to the intensity label when there are no flags. Model-backed, no raw key.
   private var subtitle: String {
-    let duration = block.durationMinLow == block.durationMinHigh
-      ? "\(block.durationMinLow) min"
-      : "\(block.durationMinLow)–\(block.durationMinHigh) min"
+    // Derived from `durationRange` (clamped) so inverted server bounds render a normalized window,
+    // never a backwards `55–40 min` (Phase 11.6 audit production finding 3).
+    let range = block.durationRange
+    let duration = range.lowerBound == range.upperBound
+      ? "\(range.lowerBound) min"
+      : "\(range.lowerBound)–\(range.upperBound) min"
     let descriptor = block.flags.isEmpty
       ? block.intensity.label
       : block.flags.map(\.label).joined(separator: " · ")
