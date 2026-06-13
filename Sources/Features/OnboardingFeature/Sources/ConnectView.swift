@@ -18,6 +18,10 @@ import SwiftUI
 /// iOS-only modifiers; the 401-bounce reason banner is the parent `OnboardingView`'s concern.
 struct ConnectView: View {
   @Bindable var store: StoreOf<ConnectComponent>
+  /// Focus for the single token field (Phase 12.4, TASK-003): drives submit-to-connect, tap-away
+  /// dismissal, and keyboard cleanup after a complete paste. View-layer only — no reducer focus state
+  /// (none is needed). `@FocusState` is cross-platform, so the file stays host-buildable.
+  @FocusState private var tokenFieldFocused: Bool
 
   init(store: StoreOf<ConnectComponent>) {
     self.store = store
@@ -57,6 +61,15 @@ struct ConnectView: View {
             .font(.coachTextMd)
             .foregroundStyle(.coachForeground)
             .autocorrectionDisabled()
+            .focused($tokenFieldFocused)
+            // The keyboard's Go submits exactly when the Connect button would be enabled (validation gate);
+            // when it isn't, it's a harmless no-op (no half-submit) (Phase 12.4, TASK-003).
+            .submitLabel(.go)
+            .onSubmit {
+              guard store.canSubmit else { return }
+              tokenFieldFocused = false
+              store.send(.connectTapped)
+            }
 
           // Paste affordance: a bordered pill with a clipboard glyph (the design). Reads the clipboard
           // in the view and feeds `.tokenPasted` — `UIPasteboard` stays confined to the view (DECISIONS
@@ -65,6 +78,8 @@ struct ConnectView: View {
             #if canImport(UIKit)
               if let value = UIPasteboard.general.string {
                 store.send(.tokenPasted(value))
+                // A paste is a complete token entry — don't leave a stale keyboard hovering (TASK-003).
+                tokenFieldFocused = false
               }
             #endif
           } label: {
@@ -121,6 +136,12 @@ struct ConnectView: View {
     .padding(CoachSpacing.spaceLg)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     .background(.coachBackground)
+    // Tap-away dismissal: a tap on the empty chrome clears focus. Buttons and the TextField consume their
+    // own hits first, so this only fires in the empty regions — the Paste button stays unaffected (TASK-003).
+    // No `ScrollView` exists here (fixed VStack), so `.scrollDismissesKeyboard` has nothing to attach to
+    // and is deliberately omitted (D2 / round-1 #2).
+    .contentShape(Rectangle())
+    .onTapGesture { tokenFieldFocused = false }
   }
 }
 
