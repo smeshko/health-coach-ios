@@ -8,12 +8,15 @@ import ProfileRepository
 import SyncRepository
 
 /// The Today tab's root reducer (ARCHITECTURE §4.5, PRD §6/§8.1) — the hero "daily brief" screen. It owns
-/// the universal `BriefViewState` lifecycle (the single source of truth, DECISIONS #1) and the morning
-/// orchestration effect (check-in → sync → daily brief, **sync strictly before the brief**, D15/§11).
-/// The check-in **gates** the chain (the 2026-06-10 design iteration, superseding PRD §7.2's
-/// never-blocks rule): no check-in saved today → `.checkInRequired` (the check-in screen, no sync);
-/// "Save & build today's brief" re-enters the chain with `refresh: true`. The 8.2/8.3/8.4 sub-sections
-/// plug into stable seams under `ready` without restructuring this parent.
+/// the universal `BriefViewState` lifecycle (the single source of truth, DECISIONS #1) and the app-open
+/// orchestration. **Cache-first on open (Phase 12.1, revised D15/§11):** a same-day **cached** brief
+/// renders immediately (the `cachedDailyBrief` peek) with a quiet background sync → `dailyBrief(refresh:)`
+/// that swaps in only if the content changed; the blocking sync → generate chain (**sync strictly before
+/// a *generated* brief**) runs only on a cache miss / post-save / explicit retry. The check-in **gates**
+/// the chain in every branch (the 2026-06-10 design iteration, superseding PRD §7.2's never-blocks rule):
+/// no check-in saved today → `.checkInRequired` (the check-in screen, no sync); "Save & build today's
+/// brief" re-enters the blocking chain with `refresh: true`. The orchestration effects + reducer helpers
+/// live in `TodayOrchestration.swift`. The 8.2/8.3/8.4 sub-sections plug into stable seams under `ready`.
 ///
 /// **Feature dependency rule (§3):** imports only the repo **interfaces** (`BriefRepository`/
 /// `SyncRepository`/`CheckInRepository`, via `BriefViewState` + `@Dependency` later) + `DesignSystem` +
@@ -50,6 +53,15 @@ public struct TodayFeature {
     /// Set by the orchestration on a successful `sync()` — drives the header's relative "Synced 2m ago"
     /// pill via the CoachCore date dependency.
     public var lastSyncedAt: Date?
+    /// True while a **quiet background refresh** (the cache-first open's post-hit pass, pull-to-refresh, or
+    /// the scene-staleness pass) is in flight (Phase 12.1). Drives the header's "Updating…" pill; never a
+    /// loading wall over visible content.
+    public var isBackgroundRefreshing: Bool
+    /// The instant the most recent background refresh **started** (Phase 12.1, DECISIONS D6). The second
+    /// leg of the staleness throttle: a cache-hit open whose background `sync()` fails leaves `lastSyncedAt`
+    /// nil, so the scene-staleness gate compares `max(lastSyncedAt, lastRefreshAttemptAt)` — without this a
+    /// failed refresh would re-fire on every activation (flap-prone).
+    public var lastRefreshAttemptAt: Date?
 
     public init(
       briefState: BriefViewState = .idle,
@@ -58,7 +70,9 @@ public struct TodayFeature {
       session: SessionFeature.State? = nil,
       zones: Zones? = nil,
       selectedSection: TodaySection = .exercise,
-      lastSyncedAt: Date? = nil
+      lastSyncedAt: Date? = nil,
+      isBackgroundRefreshing: Bool = false,
+      lastRefreshAttemptAt: Date? = nil
     ) {
       self.briefState = briefState
       self.checkIn = checkIn
@@ -67,14 +81,26 @@ public struct TodayFeature {
       self.zones = zones
       self.selectedSection = selectedSection
       self.lastSyncedAt = lastSyncedAt
+      self.isBackgroundRefreshing = isBackgroundRefreshing
+      self.lastRefreshAttemptAt = lastRefreshAttemptAt
     }
   }
 
   public enum Action {
-    /// Sent by the host on app-open — drives the morning orchestration.
+    /// Sent by the host on app-open — drives the cache-first orchestration (Phase 12.1): a same-day
+    /// cached brief renders immediately with a quiet background refresh; a miss runs the blocking chain.
     case onAppOpen
-    /// Retry from a `.syncFailed`/`.error` terminal — re-runs the full sync-first chain.
+    /// Retry from a `.syncFailed`/`.error` terminal — re-runs the full **blocking** sync-first chain.
     case retryTapped
+    /// Pull-to-refresh from `.ready` (Phase 12.1) — runs the quiet background-refresh pass; a no-op in any
+    /// other state.
+    case pullToRefresh
+    /// Scene re-activation (Phase 12.1, DECISIONS D6) — from `.ready` only: day rollover re-orchestrates,
+    /// a stale same-day brief background-refreshes, otherwise nothing.
+    case sceneBecameActive
+    /// Cancel the (now-rare) blocking sync/generate screen (Phase 12.1, DECISIONS D4) — cancels the
+    /// orchestration and falls back to the cached brief when one exists, else `.syncFailed(.transient)`.
+    case cancelSyncTapped
     /// The segmented toggle — pure UI, flips `selectedSection`.
     case sectionSelected(TodaySection)
     /// The morning check-in child's actions.
@@ -98,6 +124,21 @@ public struct TodayFeature {
     /// silent degrade (no zone chip).
     case _briefResolved(DomainModels.DailyBrief, Freshness, Zones?)
     case _briefFailed(BriefError)
+    // Phase 12.1 cache-first open actions (DECISIONS D3).
+    /// A same-day cache **hit**: render `.ready(brief, .cached)` and hydrate the readiness/session children
+    /// (exactly as `._briefResolved` does). `startBackgroundRefresh` splits "hydrate + start refresh" (the
+    /// app-open hit) from "hydrate only" (the cancel fallback, D4) without duplicating the hydration.
+    case _cachedBriefLoaded(DomainModels.DailyBrief, startBackgroundRefresh: Bool)
+    /// The background `sync()` succeeded — record `lastSyncedAt` immediately (mirrors the blocking path's
+    /// record-on-sync-success), so a later brief-refresh failure can't hide a truthful "Synced X ago" pill.
+    case _backgroundSyncCompleted
+    /// The background `dailyBrief(refresh: true)` resolved. Merge any non-nil zones, then **content-equality**
+    /// (D3): unchanged → children untouched (flag cleared, freshness/cached-label metadata may update);
+    /// changed → full `._briefResolved`-style re-hydration to `.ready(brief, .fresh)`.
+    case _backgroundRefreshResolved(DomainModels.DailyBrief, Zones?)
+    /// The background pass threw — quiet degrade: merge any already-fetched zones, clear the flag, stay
+    /// `.ready` with the prior truthful sync status. `lastSyncedAt` keeps whatever the sync step recorded.
+    case _backgroundRefreshFailed(Zones?)
     // swiftlint:enable identifier_name
   }
 
@@ -113,6 +154,12 @@ public struct TodayFeature {
   /// surface immediately). A named constant so tests advance a `TestClock` exactly past it.
   static let loadingPhaseMinDuration: Duration = .seconds(1)
 
+  /// How old the freshness reference (`max(lastSyncedAt, lastRefreshAttemptAt)`) may be before a scene
+  /// re-activation triggers a quiet background refresh (Phase 12.1, DECISIONS D6). 15 minutes balances
+  /// HealthKit data drift against API cost; a named constant so product can tune it and tests advance a
+  /// `TestClock`/`\.date` deterministically.
+  static let backgroundRefreshStaleness: Duration = .seconds(15 * 60)
+
   @Dependency(\.checkInRepository) var checkInRepository
   @Dependency(\.syncRepository) var syncRepository
   @Dependency(\.briefRepository) var briefRepository
@@ -126,7 +173,7 @@ public struct TodayFeature {
 
   /// Today in the Europe/Sofia frame (the pinned `\.calendar`/`\.date`, CoachCore) — the key the
   /// orchestration reads the check-in for.
-  private var today: Date { calendar.startOfDay(for: date.now) }
+  var today: Date { calendar.startOfDay(for: date.now) }
 
   public var body: some ReducerOf<Self> {
     Scope(state: \.checkIn, action: \.checkIn) {
@@ -139,13 +186,65 @@ public struct TodayFeature {
         return .none
 
       case .onAppOpen:
-        // The morning orchestration (sync strictly before the brief) — the open path, `refresh: false`.
-        log.info("App-open — starting morning orchestration", category: .lifecycle)
-        return orchestrationEffect(refresh: false)
+        // Cache-first open (Phase 12.1, revised D15): check-in gate → cache peek → on a HIT render the
+        // cached brief immediately and refresh quietly in the background; on a MISS the blocking
+        // sync→generate chain runs unchanged.
+        log.info("App-open — starting cache-first orchestration", category: .lifecycle)
+        return cacheFirstOpenEffect()
 
       case .retryTapped:
-        // Retry from a terminal — re-runs the same sync-first chain (open path, `refresh: false`).
+        // Retry from a terminal — re-runs the **blocking** sync-first chain (open path, `refresh: false`).
+        // An explicit retry is an honest loading moment, so it never peeks the cache.
         return orchestrationEffect(refresh: false)
+
+      case .pullToRefresh:
+        // Manual refresh (Phase 12.1) — only meaningful over a rendered brief; a no-op otherwise so the
+        // gesture can't enter a loading state. Shares the background-refresh effect with the open path.
+        guard case .ready = state.briefState else { return .none }
+        log.info("Pull-to-refresh — starting background refresh", category: .lifecycle)
+        state.isBackgroundRefreshing = true
+        state.lastRefreshAttemptAt = date.now
+        return backgroundRefreshEffect()
+
+      case .sceneBecameActive:
+        // Scene re-activation (Phase 12.1, DECISIONS D6) — only acts over `.ready`; non-ready states are
+        // already showing the right thing (an in-flight chain / a terminal).
+        guard case let .ready(brief, _) = state.briefState else { return .none }
+        if calendar.startOfDay(for: brief.date) != today {
+          // Day rollover: yesterday's brief is stale content → re-run the full cache-first orchestration
+          // (the explicit no-loading-over-content exemption — the new day's gate/loading are honest).
+          log.info("Scene active — day rollover, re-orchestrating", category: .lifecycle)
+          return cacheFirstOpenEffect()
+        }
+        // Same day: refresh only when the freshness reference is past the staleness threshold (both
+        // timestamps nil ⇒ stale). `lastRefreshAttemptAt` (recorded below) throttles a failed refresh.
+        guard Self.isStale(
+          now: date.now, threshold: Self.backgroundRefreshStaleness,
+          lastSyncedAt: state.lastSyncedAt, lastRefreshAttemptAt: state.lastRefreshAttemptAt
+        ) else { return .none }
+        log.info("Scene active — stale, starting background refresh", category: .lifecycle)
+        state.isBackgroundRefreshing = true
+        state.lastRefreshAttemptAt = date.now
+        return backgroundRefreshEffect()
+
+      case .cancelSyncTapped:
+        // Cancel the blocking sync/generate screen (Phase 12.1, DECISIONS D4) — only meaningful while a
+        // loading screen is up. Cancel the in-flight orchestration, THEN peek the cache (`.concatenate`
+        // so the peek can't race the dying chain's sends): a hit → hydrate-only `.ready(cached, .cached)`,
+        // a miss → `.syncFailed(.transient)` + Retry. The fallbacks are state-gated in their handlers so a
+        // brief that landed just before the cancel isn't stomped.
+        guard state.briefState == .syncing || state.briefState == .generating else { return .none }
+        log.info("Cancel tapped — stopping blocking sync", category: .lifecycle)
+        return .concatenate(
+          .cancel(id: CancelID.orchestration),
+          .run { [briefRepository] send in
+            if let cached = try? await briefRepository.cachedDailyBrief() {
+              await send(._cachedBriefLoaded(cached, startBackgroundRefresh: false))
+            } else {
+              await send(._syncFailed(.transient))
+            }
+          }
+        )
 
       case ._checkInRequired:
         state.briefState = .checkInRequired
@@ -156,7 +255,10 @@ public struct TodayFeature {
         return .none
 
       case let ._syncFailed(error):
-        // Block-and-retry: the brief was never requested (D23/§11).
+        // Block-and-retry: the brief was never requested (D23/§11). State-gated (Phase 12.1, D4): only a
+        // loading screen transitions to the terminal — so the cancel-path `.syncFailed` can't stomp a
+        // brief that landed just before the cancel (it would already be `.ready`).
+        guard state.briefState == .syncing || state.briefState == .generating else { return .none }
         state.briefState = .syncFailed(error)
         return .none
 
@@ -168,31 +270,70 @@ public struct TodayFeature {
         return .none
 
       case let ._briefResolved(brief, freshness, zones):
-        state.briefState = .ready(brief, freshness)
-        // Hydrate `state.zones` FIRST, from this single payload, so the session child below reads it while
+        // Hydrate `state.zones` FIRST, from this single payload, so the session child reads it while
         // hydrating (DECISIONS #4 / Phase 11.4 D2 — one resolved payload, no cross-action ordering). A
         // `nil` fetch degrades silently (no zone chip).
         state.zones = zones
-        // Hydrate the readiness child from the resolved brief (Phase 8.3) so the gauge + its persisted
-        // "why" toggle render under `ready`. A fresh brief resets the toggle to collapsed.
-        state.readiness = ReadinessComponent.State(readiness: brief.readiness)
-        // Hydrate the daily-session child (Phase 8.4) — **only on an untripped day** (`.normal` mode);
-        // a tripped gate renders the inline `SafetyRestView` instead, so leave `session` nil there. The
-        // `.session` narrative slice is pre-filtered for the in-card slot (DECISIONS #3); a fresh brief
-        // re-seeds the child, resetting any swap selection/expansion.
-        state.session = brief.safetyGate.triggered
-          ? nil
-          : SessionFeature.State(
-            session: brief.session,
-            alternatives: brief.alternatives,
-            skipOk: brief.skipOk,
-            narrative: brief.narrative.filter { $0.type == .session },
-            zones: state.zones
-          )
+        hydrate(&state, from: brief, freshness: freshness)
         return .none
 
       case let ._briefFailed(error):
         state.briefState = .error(error)
+        return .none
+
+      case let ._cachedBriefLoaded(brief, startBackgroundRefresh):
+        // State-gated (Phase 12.1, D4): the cancel fallback's hydrate-only variant must not stomp a brief
+        // that landed just before the cancel. The app-open hit (where this runs over `.idle`) and the
+        // cancel fallback (over a loading screen) are both allowed; a `.ready` already shows a brief.
+        if !startBackgroundRefresh {
+          guard state.briefState == .syncing || state.briefState == .generating else { return .none }
+        }
+        // Render the cached same-day brief immediately (no loading wall) — `.cached` keeps the
+        // "Cached — as of HH:MM" label honest until a background refresh swaps in a fresh brief. Zones are
+        // still nil on a cold open; the background pass's zone merge fills the HR chip in place.
+        hydrate(&state, from: brief, freshness: .cached)
+        // `startBackgroundRefresh` only flips the status flags — the background pass itself runs INSIDE the
+        // same `cacheFirstOpenEffect` that sent this action (one `CancelID.orchestration` chain, D7), so we
+        // must NOT return a second `backgroundRefreshEffect()` here (it would cancel the in-flight pass via
+        // `cancelInFlight`). The cancel fallback uses `startBackgroundRefresh: false` (hydrate only).
+        if startBackgroundRefresh {
+          state.isBackgroundRefreshing = true
+          state.lastRefreshAttemptAt = date.now
+        }
+        return .none
+
+      case ._backgroundSyncCompleted:
+        // The background `sync()` succeeded → record the sync time immediately (mirrors `._generating`),
+        // so a later brief-refresh failure still shows a truthful "Synced X ago" pill (DECISIONS D6).
+        state.lastSyncedAt = date.now
+        return .none
+
+      case let ._backgroundRefreshResolved(brief, zones):
+        state.isBackgroundRefreshing = false
+        // Always merge a non-nil zones into the parent + the live session child IN PLACE (DECISIONS D3,
+        // round-2 #1): the cold cache-hit open hydrated the child before any zones existed, so this is
+        // what makes the HR chip appear — and it preserves the child's swap/expansion UI state. A nil
+        // fetch keeps previously held zones.
+        mergeZones(&state, zones)
+        // Content equality (DECISIONS D3): an unchanged brief leaves the children untouched (only the
+        // freshness/cached-label metadata may shift); a changed brief re-seeds them via the full
+        // hydration (same semantics as a fresh generation).
+        guard case let .ready(current, _) = state.briefState, contentEquals(current, brief) else {
+          hydrate(&state, from: brief, freshness: .fresh)
+          return .none
+        }
+        // Unchanged content: keep children, but reflect the regenerated brief's freshness metadata
+        // (a forced regeneration returns `cached == false`), so the cached label clears honestly.
+        state.briefState = .ready(brief, brief.cached ? .cached : .fresh)
+        return .none
+
+      case let ._backgroundRefreshFailed(zones):
+        // Quiet degrade (DECISIONS D3/D6): merge any already-fetched zones, clear the flag, stay `.ready`
+        // with the prior truthful sync status. `lastSyncedAt` keeps whatever `._backgroundSyncCompleted`
+        // recorded (sync ok, brief failed → pill shows "Synced X ago"; sync failed → nil, pill hidden).
+        log.info("Background refresh failed — degrading quietly", category: .lifecycle)
+        state.isBackgroundRefreshing = false
+        mergeZones(&state, zones)
         return .none
 
       case .checkIn(.delegate(.checkInSaved)):
@@ -225,66 +366,6 @@ public struct TodayFeature {
     .ifLet(\.session, action: \.session) {
       SessionFeature()
     }
-  }
-
-  /// The morning orchestration as **one** chained, cancellable effect (D15/§11): the check-in **gate**
-  /// (no check-in saved today → `.checkInRequired`, **STOP** — no sync; "Save & build today's brief"
-  /// re-enters) → `sync()` (must precede the brief; on failure set `.syncFailed` and **STOP** — the
-  /// brief closure is never reached, D23/§11) → `dailyBrief(refresh:)`. A new trigger cancels the
-  /// in-flight run (`cancelInFlight: true`) so a stale brief can't land after a newer request. Each
-  /// `await` carries the typed catch **plus a catch-all**: 4.3 says a 401 propagates from `sync()` as
-  /// **not** a `SyncError` (session-stream-handled, §13/D13), so a typed-only catch would let it escape
-  /// and wedge `.syncing`/`.generating` with no Retry — the catch-all maps any unexpected throw to a
-  /// terminal retryable state instead.
-  private func orchestrationEffect(refresh: Bool) -> Effect<Action> {
-    let day = today
-    return .run { [checkInRepository, syncRepository, briefRepository, profileRepository, clock] send in
-      // 1. The check-in gates the chain (2026-06-10 design): nothing saved today → show the check-in
-      //    screen and stop. A read error degrades to the same gate (the user saves their way through).
-      let existing = await (try? checkInRepository.current(day)) ?? nil
-      guard existing != nil else {
-        await send(._checkInRequired)
-        return
-      }
-
-      // 2. Sync MUST precede the brief. The min-dwell sleep runs concurrent with the work and is only
-      //    awaited on success — a failure surfaces immediately.
-      await send(._syncStarted)
-      do {
-        async let dwell: Void = clock.sleep(for: Self.loadingPhaseMinDuration)
-        _ = try await syncRepository.sync()
-        try? await dwell
-      } catch let error as SyncError {
-        await send(._syncFailed(error))
-        return
-      } catch {
-        await send(._syncFailed(.transient))
-        return
-      }
-
-      // 3. Generate the brief (the open path uses `refresh: false`; the save path passes `true`). The HR
-      //    zones are fetched **concurrently** (`async let`) so the swap child can resolve a swapped
-      //    alternative's bpm range (DECISIONS #4) without adding latency; the fetch is non-fatal
-      //    (`try?` → `nil`) so a zones failure never blocks the brief. Both fetches are awaited and ride
-      //    on **one** `._briefResolved(brief, freshness, zones)` payload, so the reducer hydrates
-      //    `state.zones` before the session child reads it — no cross-action ordering to get wrong
-      //    (Phase 11.4 D2, replacing the old separate zones-action-before-brief-action hazard).
-      await send(._generating)
-      do {
-        async let dwell: Void = clock.sleep(for: Self.loadingPhaseMinDuration)
-        async let zonesResult = try? await profileRepository.zones()
-        let brief = try await briefRepository.dailyBrief(refresh)
-        let zones = await zonesResult
-        try? await dwell
-        await send(._briefResolved(brief, brief.cached ? .cached : .fresh, zones))
-      } catch let error as BriefError {
-        await send(._briefFailed(error))
-      } catch {
-        await send(._briefFailed(.transientGenerationFailed))
-      }
-      // new ISO week → weeklyBrief() — Epic 09 (out of scope here; a seam only).
-    }
-    .cancellable(id: CancelID.orchestration, cancelInFlight: true)
   }
 }
 

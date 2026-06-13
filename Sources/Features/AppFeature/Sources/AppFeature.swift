@@ -61,10 +61,14 @@ public struct AppFeature {
     Reduce { state, action in
       switch action {
       case .onboarding(.delegate(.connected)):
-        // Onboarding finished → swap in the tab bar.
+        // Onboarding finished → swap in the tab bar AND kick off the Today cache-first open. The open
+        // trigger is reducer-owned (Phase 12.1, DECISIONS D8): cache-first removed the old incidental
+        // auth guard (token-less launches used to die at the token-protected `sync()`), so dispatching
+        // `.onAppOpen` only from a token-bearing branch is what keeps a token-less launch from ever
+        // hydrating cached health content before the onboarding swap.
         log.info("Connected — switching onboarding → main", category: .app)
         state = .main(MainTabs.State())
-        return .none
+        return .send(.main(.todayRoot(.onAppOpen)))
       case .main(.delegate(.tokenReset)):
         // The You tab cleared the session (the DEBUG dev menu's "reset token", or Phase 10.2's
         // Disconnect row) → swap back to onboarding so the connect flow can be re-run without relaunch.
@@ -89,7 +93,12 @@ public struct AppFeature {
         // for the no-token edge case, and only if a 401 hasn't already routed us off `.main`.
         guard !hasToken, case .main = state else {
           log.info("Launch token check — staying put", category: .app, metadata: ["hasToken": "\(hasToken)"])
-          return .none
+          // Staying put. Drive the Today cache-first open from the reducer (Phase 12.1, DECISIONS D8) —
+          // but ONLY while still in `.main` (a token exists; or a 401 hasn't already routed us off it). A
+          // token-less launch falls through to the onboarding swap below and never reaches this dispatch,
+          // so it never hydrates cached health content before the swap.
+          guard case .main = state else { return .none }
+          return .send(.main(.todayRoot(.onAppOpen)))
         }
         log.info("Launch token absent — falling back to onboarding", category: .app)
         state = .onboarding(OnboardingFeature.State())

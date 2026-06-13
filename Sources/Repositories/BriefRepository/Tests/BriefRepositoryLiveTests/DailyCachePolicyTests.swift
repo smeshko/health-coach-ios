@@ -230,4 +230,53 @@ struct DailyCachePolicyTests {
 
     #expect(stub.dailyCallCount == 1, "a brief cached the day before a DST transition is not a stale hit")
   }
+
+  // MARK: - Phase 12.1: cachedDailyBrief same-day peek (DECISIONS D1)
+
+  /// A same-day cached row → the mapped domain brief, with **zero network** and **no watermark** — the
+  /// peek is a pure read (unlike `dailyBrief(refresh:)`, which would require the sync gate on a miss).
+  @Test func test_cachedDailyBrief_sameDayRow_returnsDomain_noNetwork_noWatermark() async throws {
+    let (_, domain) = try greenFixture()
+    let db = try TestDatabase.makeInMemory() // NO watermark seeded
+    try await TestDatabase.seedDaily(db, domain)
+    let stub = BriefAPIStub()
+
+    let result = try await runWithSofia(now: domain.date, stub: stub, database: db) {
+      try await BriefRepository.live.cachedDailyBrief()
+    }
+
+    #expect(result == domain)
+    #expect(stub.dailyCallCount == 0, "the peek must never hit the network")
+  }
+
+  /// An empty DB → `nil`, never `.syncRequired` (the peek has no sync precondition) and no network.
+  @Test func test_cachedDailyBrief_emptyDB_returnsNil_noThrow() async throws {
+    let (_, domain) = try greenFixture()
+    let db = try TestDatabase.makeInMemory() // empty, no watermark
+    let stub = BriefAPIStub()
+
+    let result = try await runWithSofia(now: domain.date, stub: stub, database: db) {
+      try await BriefRepository.live.cachedDailyBrief()
+    }
+
+    #expect(result == nil, "no same-day row → nil (not .syncRequired)")
+    #expect(stub.dailyCallCount == 0, "the peek must never hit the network")
+  }
+
+  /// A yesterday-only row → `nil` on today's peek (the same-day key↔PK contract; no stale hit).
+  @Test func test_cachedDailyBrief_yesterdayOnlyRow_returnsNil() async throws {
+    let (_, domain) = try greenFixture()
+    let db = try TestDatabase.makeInMemory()
+    var yesterday = domain
+    yesterday.date = domain.date.addingTimeInterval(-86400)
+    try await TestDatabase.seedDaily(db, yesterday)
+    let stub = BriefAPIStub()
+
+    let result = try await runWithSofia(now: domain.date, stub: stub, database: db) {
+      try await BriefRepository.live.cachedDailyBrief()
+    }
+
+    #expect(result == nil, "a different Sofia day is not a stale peek hit")
+    #expect(stub.dailyCallCount == 0)
+  }
 }

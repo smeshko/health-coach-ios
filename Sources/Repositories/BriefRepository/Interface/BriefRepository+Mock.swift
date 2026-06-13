@@ -13,6 +13,9 @@ public extension BriefRepository {
   static func mock(scenario: SampleScenario) -> BriefRepository {
     BriefRepository(
       dailyBrief: { _ in try SampleData.dailyBrief(dailyScenario(scenario)).domain },
+      // The mock world always "has" today's brief cached, so the cache-first open serves the scenario's
+      // daily fixture immediately (dev-menu scenarios stay coherent with the cache-first open).
+      cachedDailyBrief: { try SampleData.dailyBrief(dailyScenario(scenario)).domain },
       weeklyBrief: { _, _ in try SampleData.weeklyPlan(weeklyScenario(scenario)).domain }
     )
   }

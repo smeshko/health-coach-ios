@@ -10,6 +10,9 @@ extension BriefRepository: DependencyKey {
     dailyBrief: { refresh in
       try await dailyBriefPolicy(refresh: refresh)
     },
+    cachedDailyBrief: {
+      try await cachedDailyBriefPolicy()
+    },
     weeklyBrief: { isoWeek, refresh in
       try await weeklyPlanPolicy(isoWeek: isoWeek, refresh: refresh)
     }

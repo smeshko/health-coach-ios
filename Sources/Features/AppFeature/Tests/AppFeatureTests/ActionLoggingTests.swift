@@ -1,4 +1,6 @@
+import CoachCore
 import ComposableArchitecture
+import Foundation
 import LogClient
 import Testing
 
@@ -14,11 +16,18 @@ struct ActionLoggingTests {
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
     } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(Date(timeIntervalSince1970: 0))
+      $0.checkInRepository.current = { _ in nil } // the dispatched Today open lands at the gate
       $0.log = .recording(into: recorder)
     }
+    // `._tokenChecked(true)` now dispatches the Today cache-first open (D8); this test only cares about
+    // the `.tca` log line, so don't assert the open chain exhaustively.
+    store.exhaustivity = .off
 
     // A payload-bearing action: only the case label is logged, never `hasToken: true`.
     await store.send(._tokenChecked(hasToken: true))
+    await store.skipReceivedActions()
 
     let tca = recorder.entries.filter { $0.category == .tca }
     #expect(tca.contains { $0.level == .debug && $0.message == "_tokenChecked" })

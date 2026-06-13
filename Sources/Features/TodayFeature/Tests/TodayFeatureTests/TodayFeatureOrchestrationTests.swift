@@ -44,7 +44,7 @@ struct TodayFeatureOrchestrationTests {
     await store.send(.onAppOpen)
     await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
 
-    #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("morning orchestration") })
+    #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("cache-first orchestration") })
   }
 
   @Test func test_syncFailure_blocksBrief_setsSyncFailed_briefNeverCalled() async {

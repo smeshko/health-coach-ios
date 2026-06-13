@@ -13,6 +13,8 @@ struct SyncProgressPage: View {
       Picker("State", selection: $state) {
         Text("Syncing").tag(SyncProgressSection.State.syncing)
         Text("Generating").tag(SyncProgressSection.State.generating)
+        Text("Determinate").tag(SyncProgressSection.State.determinate)
+        Text("Cancel").tag(SyncProgressSection.State.cancellable)
       }
       .pickerStyle(.segmented)
       .padding(CoachSpacing.spaceMd)
@@ -31,13 +33,15 @@ struct SyncProgressSection: View {
   enum State {
     case syncing
     case generating
+    case determinate
+    case cancellable
   }
 
   var body: some View {
     switch state {
     case .syncing:
+      // Indeterminate (Phase 12.1, D5): no `progress` → the ring spins an honest fixed arc.
       SyncProgressView(
-        progress: 0.3,
         title: "Syncing health data…",
         subtitle: "Pulling sleep, HRV and resting heart rate from Apple Health.",
         steps: [
@@ -49,6 +53,18 @@ struct SyncProgressSection: View {
       .background(.coachBackground)
     case .generating:
       SyncProgressView(
+        title: "Building today's brief…",
+        subtitle: "Weighing your recovery, sleep and yesterday's load. This takes a few seconds.",
+        steps: [
+          .init(id: 0, label: "Health data synced", state: .done),
+          .init(id: 1, label: "Building today's brief", state: .active),
+        ]
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(.coachBackground)
+    case .determinate:
+      // The determinate trim — kept for a future real-progress source; `progress` drives the arc.
+      SyncProgressView(
         progress: 0.7,
         title: "Building today's brief…",
         subtitle: "Weighing your recovery, sleep and yesterday's load. This takes a few seconds.",
@@ -56,6 +72,19 @@ struct SyncProgressSection: View {
           .init(id: 0, label: "Health data synced", state: .done),
           .init(id: 1, label: "Building today's brief", state: .active),
         ]
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(.coachBackground)
+    case .cancellable:
+      // The blocking-sync screen with the quiet Cancel affordance (Phase 12.1, D4).
+      SyncProgressView(
+        title: "Syncing health data…",
+        subtitle: "Pulling sleep, HRV and resting heart rate from Apple Health.",
+        steps: [
+          .init(id: 0, label: "Syncing health data", state: .active),
+          .init(id: 1, label: "Building today's brief", state: .pending),
+        ],
+        cancelAction: {}
       )
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background(.coachBackground)
