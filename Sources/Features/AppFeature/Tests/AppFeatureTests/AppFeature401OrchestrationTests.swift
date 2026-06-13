@@ -29,7 +29,7 @@ struct AppFeature401OrchestrationTests {
     // `_generating` and `_briefResolved` until the test releases it.
     let (briefGate, briefGateContinuation) = AsyncStream.makeStream(of: Void.self)
 
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State(route: .main(MainTabs.State()))) {
       AppFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
@@ -62,10 +62,10 @@ struct AppFeature401OrchestrationTests {
     await store.send(._appWillAppear)
     await store.send(.main(.todayRoot(.onAppOpen)))
     await store.receive(\.main.todayRoot._syncStarted) {
-      $0 = .main(Self.main { $0.todayRoot.briefState = .syncing })
+      $0.route = .main(Self.main { $0.todayRoot.briefState = .syncing })
     }
     await store.receive(\.main.todayRoot._generating) {
-      $0 = .main(Self.main {
+      $0.route = .main(Self.main {
         $0.todayRoot.lastSyncedAt = now
         $0.todayRoot.briefState = .generating
       })
@@ -75,7 +75,7 @@ struct AppFeature401OrchestrationTests {
     // teardown cancels the in-flight Today orchestration.
     sessionContinuation.yield(.unauthorized)
     await store.receive(\._sessionEvent, .unauthorized) {
-      $0 = .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
+      $0.route = .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
     }
 
     // Release the parked brief. The orchestration effect was torn down, so its `await send(._briefResolved)`
@@ -86,7 +86,7 @@ struct AppFeature401OrchestrationTests {
     sessionContinuation.finish()
     await store.finish()
 
-    #expect(store.state.onboarding != nil, "the 401 swapped to onboarding, containing the Today chain")
+    #expect(store.state.onboardingRoute != nil, "the 401 swapped to onboarding, containing the Today chain")
   }
 
   /// A `MainTabs.State` built with a mutating closure (keeps the `receive` mutation expressions terse).

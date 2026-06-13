@@ -15,7 +15,7 @@ import Testing
 @MainActor
 struct AppFeature401Tests {
   private var tokenInvalid: AppFeature.State {
-    .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
+    AppFeature.State(route: .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid))))
   }
 
   @Test func test_appWillAppear_unauthorized_swapsToConnectTokenInvalid() async {
@@ -23,7 +23,7 @@ struct AppFeature401Tests {
     // `.lifecycle` "App will appear" line is asserted here on the same `._appWillAppear` walk.
     let recorder = LogRecorder()
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State(route: .main(MainTabs.State()))) {
       AppFeature()
     } withDependencies: {
       $0.apiClient.sessionEvents = { stream }
@@ -48,7 +48,7 @@ struct AppFeature401Tests {
   @Test func test_unauthorized_thenConnect_doesNotResubscribe() async {
     let now = Date(timeIntervalSince1970: 0)
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+    let store = TestStore(initialState: AppFeature.State(route: .main(MainTabs.State()))) {
       AppFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
@@ -69,13 +69,13 @@ struct AppFeature401Tests {
     // subscription is opened (the view's once-mounted hook is not re-fired by the TestStore). The connect
     // swap also dispatches the Today cache-first open (D8), which lands at the check-in gate here.
     await store.send(.onboarding(.delegate(.connected))) {
-      $0 = .main(MainTabs.State())
+      $0.route = .main(MainTabs.State())
     }
     await store.receive(\.main.todayRoot.onAppOpen)
     await store.receive(\.main.todayRoot._checkInRequired) {
       var main = MainTabs.State()
       main.todayRoot.briefState = .checkInRequired
-      $0 = .main(main)
+      $0.route = .main(main)
     }
 
     // Proof the ORIGINAL subscription survived the swap-back: a second 401 on the same stream is still
@@ -96,7 +96,7 @@ struct AppFeature401Tests {
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     var onboarding = OnboardingFeature.State(step: .connect(reason: nil))
     onboarding.connect.token = "typed-token-123"
-    let store = TestStore(initialState: AppFeature.State.onboarding(onboarding)) {
+    let store = TestStore(initialState: AppFeature.State(route: .onboarding(onboarding))) {
       AppFeature()
     } withDependencies: {
       $0.apiClient.sessionEvents = { stream }
@@ -110,8 +110,8 @@ struct AppFeature401Tests {
     continuation.yield(.unauthorized)
     await store.receive(\._sessionEvent, .unauthorized)
 
-    #expect(store.state.onboarding?.connect.token == "typed-token-123")
-    #expect(store.state.onboarding?.step == .connect(reason: nil))
+    #expect(store.state.onboardingRoute?.connect.token == "typed-token-123")
+    #expect(store.state.onboardingRoute?.step == .connect(reason: nil))
 
     continuation.finish()
     await store.finish()
