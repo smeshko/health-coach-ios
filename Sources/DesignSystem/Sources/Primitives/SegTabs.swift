@@ -1,8 +1,14 @@
 import SwiftUI
 
 /// A two-option segmented switcher (Exercise / Nutrition) for sibling views. Selection lives with the
-/// caller via `@Binding`; the active segment is a raised surface with an accent icon.
+/// caller via `@Binding`. The active segment is highlighted by a **single** raised-surface capsule that
+/// *slides* between segments via `matchedGeometryEffect` (the canonical segmented-control pattern) — it
+/// lives in the stack's background layer so segment frames stay fixed and only the highlight's geometry
+/// animates. Slide uses the `selection` motion token; under Reduce Motion that token resolves to `nil`
+/// so the highlight snaps (no positional motion — the pre-phase behavior). A selection haptic fires on
+/// every change regardless of Reduce Motion.
 public struct SegTabs: View {
+  @Namespace private var highlightNamespace
   public enum Tab: String, CaseIterable, Sendable {
     case exercise
     case nutrition
@@ -31,23 +37,29 @@ public struct SegTabs: View {
   public var body: some View {
     HStack(spacing: CoachSpacing.spaceXs) {
       ForEach(Tab.allCases, id: \.self) { tab in
-        Segment(tab: tab, selection: $selection)
+        Segment(tab: tab, isActive: tab == selection, namespace: highlightNamespace) {
+          selection = tab
+        }
       }
     }
+    .coachAnimation(.selection, value: selection)
     .padding(CoachSpacing.space2xs)
     .background(Capsule().fill(.coachBorder))
+    .sensoryFeedback(.selection, trigger: selection)
   }
 
-  /// One segment — an icon-over-label button; the active segment raises to a surface fill.
+  /// One segment — an icon-over-label button. Only the *active* segment draws the shared highlight
+  /// capsule (via `matchedGeometryEffect`), so the single capsule slides between segments rather than
+  /// re-mounting. Segment frames are fixed (`maxWidth: .infinity` + a fixed height) so only the
+  /// highlight's geometry animates.
   private struct Segment: View {
     let tab: Tab
-    @Binding var selection: Tab
+    let isActive: Bool
+    let namespace: Namespace.ID
+    let action: () -> Void
 
     var body: some View {
-      let isActive = tab == selection
-      Button {
-        selection = tab
-      } label: {
+      Button(action: action) {
         HStack(spacing: CoachSpacing.spaceXs) {
           Image(systemName: tab.icon).font(.system(size: 16, weight: .semibold))
           Text(tab.label).font(.coachTextSm)
@@ -55,10 +67,18 @@ public struct SegTabs: View {
         .foregroundStyle(isActive ? .coachForeground : .coachForegroundMuted)
         .frame(maxWidth: .infinity)
         .frame(height: Metrics.segmentHeight)
-        .background(Capsule().fill(isActive ? .coachSurfaceRaised : Color.clear))
+        .background {
+          if isActive {
+            Capsule()
+              .fill(.coachSurfaceRaised)
+              .matchedGeometryEffect(id: Self.highlightID, in: namespace)
+          }
+        }
       }
-      .buttonStyle(.plain)
+      .buttonStyle(.coachPressable)
     }
+
+    private static let highlightID = "segtabs-highlight"
   }
 }
 
