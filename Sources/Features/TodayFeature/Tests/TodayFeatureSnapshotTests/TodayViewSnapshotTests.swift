@@ -73,6 +73,19 @@
         $0.calendar = .europeSofia
         $0.date = .constant(fixedInstant())
       } operation: {
+        // Re-keyed `.network` → `.transient` (Phase 12.4): `.network` now renders the dedicated offline
+        // state (see `test_offline`), so this keeps proving the *generic* block-and-retry screen — which
+        // every non-network `SyncError` (incl. 12.1's `.transient` cancel fallback) still shows.
+        assertCoachSnapshot(of: view(.syncFailed(.transient)))
+      }
+    }
+
+    @Test func test_offline() {
+      withDependencies {
+        $0.calendar = .europeSofia
+        $0.date = .constant(fixedInstant())
+      } operation: {
+        // The calm offline empty state (Phase 12.4, D4): `.syncFailed(.network)` with nothing cached.
         assertCoachSnapshot(of: view(.syncFailed(.network)))
       }
     }

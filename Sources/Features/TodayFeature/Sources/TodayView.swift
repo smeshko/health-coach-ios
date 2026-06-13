@@ -65,9 +65,15 @@ public struct TodayView: View {
           )
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .transition(.opacity)
-        case .syncFailed:
+        case let .syncFailed(error):
           TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
-            TodaySyncFailedContent { store.send(.retryTapped) }
+            // A network failure with nothing cached gets the calm, specific offline state (Phase 12.4, D4);
+            // every other `SyncError` (incl. 12.1's `.transient` cancel fallback) keeps the generic screen.
+            if error == .network {
+              TodayOfflineContent { store.send(.retryTapped) }
+            } else {
+              TodaySyncFailedContent { store.send(.retryTapped) }
+            }
           }
           .transition(.opacity)
         case let .error(error):
@@ -319,6 +325,25 @@ private struct TodaySyncFailedContent: View {
         tone: .negative,
         title: "Couldn't sync",
         message: "Check your connection and try again."
+      )
+      SecondaryButton("Retry", icon: "arrow.clockwise", action: onRetry)
+    }
+  }
+}
+
+/// The calm offline empty state (Phase 12.4, D4) — shown when a blocking sync fails on the network with no
+/// cached brief to fall back to. Same Retry wiring as the generic screen (`.retryTapped`), but specific,
+/// reassuring copy in the no-food-empty-state register rather than the generic "Couldn't sync" banner.
+private struct TodayOfflineContent: View {
+  let onRetry: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+      Banner(
+        icon: "wifi.slash",
+        tone: .accent,
+        title: "You're offline",
+        message: "Your brief needs one quick sync to build. Retry when you're back online."
       )
       SecondaryButton("Retry", icon: "arrow.clockwise", action: onRetry)
     }
