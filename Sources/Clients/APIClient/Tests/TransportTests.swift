@@ -146,8 +146,8 @@ extension URLProtocolStubSerialized {
       #expect(
         error == .envelope(code: .briefGenerationFailed, message: "m", detail: nil, status: 502)
       )
-      // 1 initial request + 6 capped retries.
-      #expect(URLProtocolStub.box.recordedRequests.count == 7)
+      // 1 initial request + 3 capped retries (the new `[1,2,4]` schedule).
+      #expect(URLProtocolStub.box.recordedRequests.count == 4)
     }
 
     @Test func test_502_nonBriefRoute_isNotRetried() async throws {
@@ -168,6 +168,33 @@ extension URLProtocolStubSerialized {
         error == .envelope(code: .internalError, message: "m", detail: nil, status: 500)
       )
       #expect(URLProtocolStub.box.recordedRequests.count == 1)
+    }
+
+    // MARK: - Error branches (audit gap #3)
+
+    @Test func test_urlError_surfacesTransport_andIsNotRetried_evenOnBriefRoute() async throws {
+      // No scripted responses → the stub fails the request with a `URLError` (`session.data(for:)`
+      // throws). The `catch let error as URLError` branch must surface `.transport` and, crucially, NOT
+      // retry — even on the brief route, which is the only route that otherwise retries.
+      URLProtocolStub.box.setResponses([])
+      let client = makeClient()
+      let error = await captureError { try await client.dailyBrief(nil, false) }
+      guard case .transport = error else {
+        Issue.record("expected .transport, got \(String(describing: error))")
+        return
+      }
+      #expect(URLProtocolStub.box.recordedRequests.count == 1, "a URLError must not be retried")
+    }
+
+    @Test func test_malformed2xxBody_surfacesDecoding() async throws {
+      // A 2xx whose body isn't the expected DTO must surface `.decoding` (the 2xx decode `catch`).
+      URLProtocolStub.box.setResponses([.init(status: 200, data: Data(#"{"unexpected":true}"#.utf8))])
+      let client = makeClient()
+      let error = await captureError { try await client.profile() }
+      guard case .decoding = error else {
+        Issue.record("expected .decoding, got \(String(describing: error))")
+        return
+      }
     }
 
     // MARK: - probe (200 → true; 401 → throws via the session-stream path)
