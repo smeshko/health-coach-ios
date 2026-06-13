@@ -18,6 +18,7 @@ extension GalleryComponent {
     GalleryComponent(name: "SegmentedBar") { AnyView(SegmentedBarPage()) },
     GalleryComponent(name: "BarColumns") { AnyView(BarColumnsPage()) },
     GalleryComponent(name: "MacroDonut") { AnyView(MacroDonutPage()) },
+    GalleryComponent(name: "Check-in controls") { AnyView(CheckInControlsPage()) },
   ]
 
   @MainActor static let composites: [GalleryComponent] = [
@@ -25,5 +26,6 @@ extension GalleryComponent {
     GalleryComponent(name: "Narrative") { AnyView(NarrativePage()) },
     GalleryComponent(name: "NutritionGauge") { AnyView(NutritionGaugePage()) },
     GalleryComponent(name: "SessionCard") { AnyView(SessionCardPage()) },
+    GalleryComponent(name: "SyncProgress") { AnyView(SyncProgressPage()) },
   ]
 }

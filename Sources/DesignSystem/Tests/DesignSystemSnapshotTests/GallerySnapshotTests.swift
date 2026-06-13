@@ -1,6 +1,8 @@
-// DesignSystem gallery shell + Design-System section index snapshots (Phase 5.5 TASK-004) — light +
-// dark. The per-component states are already snapshot-covered in 5.2–5.4; these prove the shell +
-// the three index pages compose.
+// DesignSystem gallery shell + Design-System section snapshots — light + dark. Proves the gallery
+// shell composes and snapshots each Design-System page's matrix. Tall pages (Colors, Typography) are
+// snapshotted as their device-fitting sections (not the scrolling page) so nothing clips below the
+// fold; short pages (Spacing, Icons) are snapshotted whole via a `NavigationStack`. The token matrices
+// live here exactly once (the old token-catalog fixture that duplicated them has been deleted).
 
 #if canImport(UIKit)
   import CoachTestSupport
@@ -16,12 +18,28 @@
       assertCoachSnapshot(of: DesignSystemGalleryView())
     }
 
-    @Test func test_colorsPage() {
-      assertCoachSnapshot(of: NavigationStack { ColorsGalleryPage() })
+    @Test func test_colorsAccents() {
+      assertCoachSnapshot(of: ColorsAccentsSection())
     }
 
-    @Test func test_typographyPage() {
-      assertCoachSnapshot(of: NavigationStack { TypographyGalleryPage() })
+    @Test func test_colorsNeutrals() {
+      assertCoachSnapshot(of: ColorsNeutralsSection())
+    }
+
+    @Test func test_colorsSemanticNeutrals() {
+      assertCoachSnapshot(of: ColorsSemanticNeutralsSection())
+    }
+
+    @Test func test_colorsSemanticAccents() {
+      assertCoachSnapshot(of: ColorsSemanticAccentsSection())
+    }
+
+    @Test func test_typographyLarge() {
+      assertCoachSnapshot(of: TypographyLargeSection())
+    }
+
+    @Test func test_typographyBody() {
+      assertCoachSnapshot(of: TypographyBodySection())
     }
 
     @Test func test_spacingPage() {
@@ -30,6 +48,10 @@
 
     @Test func test_iconsPage() {
       assertCoachSnapshot(of: NavigationStack { IconsGalleryPage() })
+    }
+
+    @Test func test_labels() {
+      assertCoachSnapshot(of: LabelsSection())
     }
   }
 #endif
