@@ -1,11 +1,10 @@
 import CoachCore
-import Database
 import Foundation
 import GRDB
 import PersistenceModels
 import Testing
 
-@testable import DatabaseLive
+@testable import Database
 
 struct StrengthWeekMigrationTests {
   @Test func test_migration_addsStrengthWeekColumn_idempotent_preservesAnchor() throws {

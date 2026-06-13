@@ -1,7 +1,6 @@
 import APIClient
 import BriefRepository
 import CoachTestSupport
-import Database
 import Dependencies
 import DomainModels
 import Foundation
@@ -12,7 +11,7 @@ import Testing
 import WireModels
 
 @testable import BriefRepositoryLive
-@testable import DatabaseLive
+@testable import Database
 
 /// Pins DECISIONS D3's ACCEPTED post-upgrade behavior change. After `v3_clearDomainBodyCaches` empties
 /// the composite caches, the first launch behaves like a fresh install: a pre-v3 database that HELD a

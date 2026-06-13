@@ -7,7 +7,8 @@ import Foundation
 /// weekly numbers by Europe/Sofia day (latest-wins); `current(date:)` returns the **latest strength
 /// test at-or-before** the given Sofia day (not strictly that exact day) — so `SyncRepository` (4.3)
 /// can find a test logged earlier in the same week. The app is week-agnostic: it sends today's
-/// numbers and the **server** keys by ISO week. `.live` (GRDB) lives in `StrengthTestRepositoryLive`.
+/// numbers and the **server** keys by ISO week. `.live` (GRDB) lives alongside this in the
+/// `LocalRepositories` module (the two local repos were merged here in Phase 11.7).
 public struct StrengthTestRepository: Sendable {
   public var save: @Sendable (_ test: DomainModels.StrengthTest) async throws -> Void
   public var current: @Sendable (_ date: Date) async throws -> DomainModels.StrengthTest?

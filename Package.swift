@@ -8,43 +8,24 @@ let package = Package(
   // platforms line makes the host build fail to compile (validation round-2 #12, verified). The
   // .macOS line governs only host build/test; the shipped app target stays iOS-only (xcodeproj).
   platforms: [.iOS(.v26), .macOS(.v14)],
+  // Products = EXACTLY the package modules the app target (`App/CoachApp.swift`) imports — one
+  // `.library` per app-imported module, nothing speculative (Phase 11.7 / DECISIONS D3). Same-package
+  // test targets reference targets directly and need no products; anything re-needed later is a one-line
+  // `.library` addition.
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
-    .library(name: "OnboardingFeature", targets: ["OnboardingFeature"]),
-    .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
-    .library(name: "TodayFeature", targets: ["TodayFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
-    .library(name: "WireModels", targets: ["WireModels"]),
-    .library(name: "DomainModels", targets: ["DomainModels"]),
-    .library(name: "WireDomainMapping", targets: ["WireDomainMapping"]),
-    .library(name: "SampleData", targets: ["SampleData"]),
-    .library(name: "PersistenceModels", targets: ["PersistenceModels"]),
     .library(name: "TokenClient", targets: ["TokenClient"]),
-    .library(name: "TokenClientLive", targets: ["TokenClientLive"]),
     .library(name: "LogClient", targets: ["LogClient"]),
     .library(name: "LogClientLive", targets: ["LogClientLive"]),
-    .library(name: "APIClient", targets: ["APIClient"]),
     .library(name: "APIClientLive", targets: ["APIClientLive"]),
     .library(name: "Database", targets: ["Database"]),
-    .library(name: "DatabaseLive", targets: ["DatabaseLive"]),
-    .library(name: "HealthKitClient", targets: ["HealthKitClient"]),
     .library(name: "HealthKitClientLive", targets: ["HealthKitClientLive"]),
     .library(name: "DevSettings", targets: ["DevSettings"]),
-    .library(name: "DevSettingsLive", targets: ["DevSettingsLive"]),
-    .library(name: "BriefRepository", targets: ["BriefRepository"]),
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
-    .library(name: "CheckInRepository", targets: ["CheckInRepository"]),
-    .library(name: "CheckInRepositoryLive", targets: ["CheckInRepositoryLive"]),
-    .library(name: "StrengthTestRepository", targets: ["StrengthTestRepository"]),
-    .library(name: "StrengthTestRepositoryLive", targets: ["StrengthTestRepositoryLive"]),
-    .library(name: "SyncRepository", targets: ["SyncRepository"]),
+    .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
-    .library(name: "ProfileRepository", targets: ["ProfileRepository"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
-    .library(name: "DesignSystem", targets: ["DesignSystem"]),
-    // The design-system gallery — a permanent DEBUG dev-menu tool (reachable from Settings) for
-    // browsing tokens + components.
-    .library(name: "DesignSystemGallery", targets: ["DesignSystemGallery"]),
   ],
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
@@ -188,10 +169,9 @@ let package = Package(
       dependencies: [
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         // Host-compiling helpers (outside the UIKit guard): the shared APIClient stub factory needs
-        // the APIClient interface; the in-memory-DB convenience re-exports DatabaseLive.makeInMemory.
+        // the APIClient interface; the in-memory-DB convenience re-exports Database.makeInMemory.
         "APIClient",
         "Database",
-        "DatabaseLive",
       ],
       path: "Sources/Core/CoachTestSupport/Sources",
       swiftSettings: [
@@ -242,25 +222,15 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // Bearer-token store interface (read/write/clear). Interface target — only Dependencies.
+    // Bearer-token store: the read/write/clear interface + the Keychain-backed `liveValue` (links
+    // Security, a host-safe system framework — its round-trip test runs on host, so the split bought no
+    // isolation; merged into one module in Phase 11.7).
     .target(
       name: "TokenClient",
       dependencies: [
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
-      path: "Sources/Clients/TokenClient/Interface",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // Keychain-backed TokenClient.liveValue. Links Security (system framework, imported directly).
-    .target(
-      name: "TokenClientLive",
-      dependencies: [
-        "TokenClient",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-      ],
-      path: "Sources/Clients/TokenClient/Live",
+      path: "Sources/Clients/TokenClient/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -364,61 +334,35 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // The dumb persistence data-source interface — generic read/write/observe over a GRDB
-    // transaction block (Decision #2 puts `GRDB.Database` on the closure signatures, so the
-    // interface imports GRDB). No domain methods, no PersistenceModels, no cache policy (§6/D9).
+    // The persistence data-source: the generic read/write/observe interface over a GRDB transaction
+    // block (Decision #2 puts `GRDB.Database` on the closure signatures, so it imports GRDB) PLUS the
+    // live DB — a single DatabaseQueue, the DatabaseMigrator, and the implementations. The interface
+    // already imported GRDB, so the split bought no isolation; merged into one module in Phase 11.7.
     .target(
       name: "Database",
       dependencies: [
         "CoachCore",
+        "PersistenceModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
-      path: "Sources/Clients/Database/Interface",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // The live DB: a single DatabaseQueue, the DatabaseMigrator (definitions live here per
-    // Decision #1), and the read/write/observe implementations. Depends on Database + the record
-    // types + GRDB.
-    .target(
-      name: "DatabaseLive",
-      dependencies: [
-        "Database",
-        "PersistenceModels",
-        .product(name: "GRDB", package: "GRDB.swift"),
-      ],
-      path: "Sources/Clients/Database/Live",
+      path: "Sources/Clients/Database/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
     ),
     // DEBUG mock/live routing control: a persisted `useMockData` flag + per-endpoint `SampleScenario`
-    // selection. Interface target — depends only on swift-dependencies + SampleData (for the scenario
-    // vocabulary). Inert in RELEASE (DevSettingsLive collapses it; see §4.2/§7.1).
+    // selection, PLUS the UserDefaults-backed `liveValue` + the launch-arg/env override seed. DEBUG-only
+    // behaviour; in RELEASE `useMockData()` is hard-`false`, the override body is empty, and the writers
+    // are no-ops (`#if DEBUG` guards). A tiny pure-Foundation store — the split bought no isolation;
+    // merged into one module in Phase 11.7. Depends only on swift-dependencies + SampleData.
     .target(
       name: "DevSettings",
       dependencies: [
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
-      path: "Sources/Clients/DevSettings/Interface",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // UserDefaults-backed DevSettings.liveValue + the launch-arg/env override seed. DEBUG-only
-    // behaviour; in RELEASE `useMockData()` is hard-`false`, the override body is empty, and the
-    // writers are no-ops (`#if DEBUG` guards). Depends only on DevSettings + SampleData + Foundation.
-    .target(
-      name: "DevSettingsLive",
-      dependencies: [
-        "DevSettings",
-        "SampleData",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-      ],
-      path: "Sources/Clients/DevSettings/Live",
+      path: "Sources/Clients/DevSettings/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -464,65 +408,24 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // CheckInRepository interface — local upsert-by-Sofia-day of the daily check-in. Interface deps:
-    // DomainModels + CoachCore + Dependencies only (no Database/PersistenceModels/network).
+    // The two local-only GRDB repositories — `CheckInRepository` (upsert-by-Sofia-day of the daily
+    // check-in) and `StrengthTestRepository` (upsert + at-or-before-latest read of the weekly strength
+    // numbers). Structurally identical local `save`/`current` shapes with no routing and no network, so
+    // they merged into ONE module in Phase 11.7 (DECISIONS D2); the public type names and `@Dependency`
+    // keys are preserved verbatim. Interface-less local module → features that consume these now link
+    // the GRDB-backed live code (the "features depend only on the interface" rule no longer holds here;
+    // ARCHITECTURE §4.3 records the exception). GRDB persistence via the Database interface.
     .target(
-      name: "CheckInRepository",
+      name: "LocalRepositories",
       dependencies: [
-        "DomainModels",
         "CoachCore",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-      ],
-      path: "Sources/Repositories/CheckInRepository/Interface",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // CheckInRepository.live — GRDB upsert via the Database interface. No network.
-    .target(
-      name: "CheckInRepositoryLive",
-      dependencies: [
-        "CheckInRepository",
         "Database",
-        "PersistenceModels",
         "DomainModels",
-        "CoachCore",
+        "PersistenceModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
-      path: "Sources/Repositories/CheckInRepository/Live",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // StrengthTestRepository interface — local upsert-by-Sofia-day of the two weekly strength numbers.
-    // Interface deps: DomainModels + CoachCore + Dependencies only.
-    .target(
-      name: "StrengthTestRepository",
-      dependencies: [
-        "DomainModels",
-        "CoachCore",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-      ],
-      path: "Sources/Repositories/StrengthTestRepository/Interface",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // StrengthTestRepository.live — GRDB upsert + an at-or-before-latest read via the Database
-    // interface. No network.
-    .target(
-      name: "StrengthTestRepositoryLive",
-      dependencies: [
-        "StrengthTestRepository",
-        "Database",
-        "PersistenceModels",
-        "DomainModels",
-        "CoachCore",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-        .product(name: "GRDB", package: "GRDB.swift"),
-      ],
-      path: "Sources/Repositories/StrengthTestRepository/Live",
+      path: "Sources/Repositories/LocalRepositories/Sources",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -550,8 +453,8 @@ let package = Package(
         "HealthKitClient",
         "APIClient",
         "Database",
-        "CheckInRepository",
-        "StrengthTestRepository",
+        // The two local-only repos (CheckIn/StrengthTest) now live in `LocalRepositories` (Phase 11.7).
+        "LocalRepositories",
         "WireModels",
         "DomainModels",
         "PersistenceModels",
@@ -711,10 +614,9 @@ let package = Package(
     ),
     // TokenClient tests — in-memory round-trip + guarded live Keychain round-trip.
     .testTarget(
-      name: "TokenClientLiveTests",
+      name: "TokenClientTests",
       dependencies: [
         "TokenClient",
-        "TokenClientLive",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/TokenClient/Tests",
@@ -770,9 +672,8 @@ let package = Package(
     ),
     // Database migrate / read / write / observe tests — host, on an in-memory queue.
     .testTarget(
-      name: "DatabaseLiveTests",
+      name: "DatabaseTests",
       dependencies: [
-        "DatabaseLive",
         "Database",
         "PersistenceModels",
         "DomainModels",
@@ -798,7 +699,6 @@ let package = Package(
         // Test-only: the production migrator (`DatabaseClient.makeInMemory`) so record round-trips run
         // against the real schema, not an ad-hoc in-test one (11.2 TASK-002).
         "Database",
-        "DatabaseLive",
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Models/PersistenceModels/Tests",
@@ -843,13 +743,12 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // DevSettings interface + DevSettingsLive persistence/override/routing tests — pure Foundation,
-    // run on the macOS host via `swift test` (no simulator needed).
+    // DevSettings persistence/override/routing tests — pure Foundation, run on the macOS host via
+    // `swift test` (no simulator needed).
     .testTarget(
       name: "DevSettingsTests",
       dependencies: [
         "DevSettings",
-        "DevSettingsLive",
         "SampleData",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
@@ -859,8 +758,7 @@ let package = Package(
       ]
     ),
     // BriefRepositoryLive cache-policy + APIError-mapping tests — host, with a migrated in-memory
-    // Database (DatabaseLive.makeInMemory) and a stubbed APIClient. DatabaseLive is a test-only dep
-    // here (the live target itself depends only on the Database interface).
+    // Database (Database.makeInMemory) and a stubbed APIClient.
     .testTarget(
       name: "BriefRepositoryLiveTests",
       dependencies: [
@@ -868,7 +766,6 @@ let package = Package(
         "BriefRepository",
         "APIClient",
         "Database",
-        "DatabaseLive",
         "PersistenceModels",
         "WireModels",
         "DomainModels",
@@ -885,40 +782,21 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // CheckInRepository.live upsert/latest-wins tests — host, migrated in-memory Database.
+    // LocalRepositories tests — the CheckIn (upsert/latest-wins) + StrengthTest (upsert +
+    // at-or-before-latest read) GRDB suites, host, on a migrated in-memory Database (Phase 11.7 merged
+    // the two repo test targets into one alongside the source merge).
     .testTarget(
-      name: "CheckInRepositoryLiveTests",
+      name: "LocalRepositoriesTests",
       dependencies: [
-        "CheckInRepositoryLive",
-        "CheckInRepository",
+        "LocalRepositories",
         "Database",
-        "DatabaseLive",
         "PersistenceModels",
         "DomainModels",
         "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
-      path: "Sources/Repositories/CheckInRepository/Tests",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // StrengthTestRepository.live upsert + at-or-before-latest read tests — host, in-memory Database.
-    .testTarget(
-      name: "StrengthTestRepositoryLiveTests",
-      dependencies: [
-        "StrengthTestRepositoryLive",
-        "StrengthTestRepository",
-        "Database",
-        "DatabaseLive",
-        "PersistenceModels",
-        "DomainModels",
-        "CoachCore",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-        .product(name: "GRDB", package: "GRDB.swift"),
-      ],
-      path: "Sources/Repositories/StrengthTestRepository/Tests",
+      path: "Sources/Repositories/LocalRepositories/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -933,9 +811,7 @@ let package = Package(
         "HealthKitClient",
         "APIClient",
         "Database",
-        "DatabaseLive",
-        "CheckInRepository",
-        "StrengthTestRepository",
+        "LocalRepositories",
         "WireModels",
         "DomainModels",
         "PersistenceModels",
@@ -958,7 +834,6 @@ let package = Package(
         "ProfileRepository",
         "APIClient",
         "Database",
-        "DatabaseLive",
         "WireModels",
         "DomainModels",
         "PersistenceModels",
@@ -999,7 +874,7 @@ let package = Package(
         "LogClient",
         // The 401-mid-orchestration containment test drives a suspended TodayFeature sync→brief chain
         // through the AppFeature reducer, so it overrides the repo + clock dependencies (Phase 11.6).
-        "CheckInRepository",
+        "LocalRepositories",
         "SyncRepository",
         "BriefRepository",
         "ProfileRepository",
@@ -1083,9 +958,9 @@ let package = Package(
         // The main-tab-bar snapshot seeds the Today tab root to a deterministic `.syncing` state (so the
         // app-open orchestration's async churn can't make the capture flaky) — needs `TodayFeature.State`.
         "TodayFeature",
-        // The same snapshot parks the chain's first await — the check-in gate's `current()` read (over
-        // its interface) — so Today holds on `.syncing`.
-        "CheckInRepository",
+        // The same snapshot parks the chain's first await — the check-in gate's `current()` read — so
+        // Today holds on `.syncing`.
+        "LocalRepositories",
         // Pins `\.calendar`/`\.date` to Europe/Sofia for the Today header's date subtitle.
         "CoachCore",
         "CoachTestSupport",
@@ -1146,7 +1021,10 @@ let package = Package(
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         "BriefRepository",
         "SyncRepository",
-        "CheckInRepository",
+        // The local CheckIn repo now lives in `LocalRepositories` (Phase 11.7) — an interface-less local
+        // module, so this feature links the GRDB-backed live code (the §4.3-recorded exception to the
+        // "features depend only on the interface" rule).
+        "LocalRepositories",
         // `ProfileRepository` INTERFACE — the orchestration reads `zones()` so the swapped session resolves
         // its bpm range (DECISIONS #4). Interface only (feature dependency rule), never *Live.
         "ProfileRepository",
@@ -1173,7 +1051,7 @@ let package = Package(
         "TodayFeature",
         "BriefRepository",
         "SyncRepository",
-        "CheckInRepository",
+        "LocalRepositories",
         "DomainModels",
         // `SampleData` vends the `DailyBrief` fixtures the orchestration tests return from the stubbed
         // `BriefRepository` (the `cached` flag is flipped per test to exercise the Freshness branch).

@@ -1,24 +1,22 @@
 import CoachCore
 import Database
-import DatabaseLive
 import Dependencies
 import DomainModels
 import Foundation
 import GRDB
 import PersistenceModels
-import StrengthTestRepository
 import Testing
 
-@testable import StrengthTestRepositoryLive
+@testable import LocalRepositories
 
-struct StrengthTestRepositoryLiveTests {
+struct StrengthTestRepositoryTests {
   /// ~09:00 on 2026-06-08 (Europe/Sofia). `static` so the `@Sendable` work closures don't capture the
   /// test case.
   private static let now = Date(timeIntervalSince1970: 1_780_898_400)
 
   private func run<T>(
     database: DatabaseClient,
-    now: Date = StrengthTestRepositoryLiveTests.now,
+    now: Date = StrengthTestRepositoryTests.now,
     _ work: @escaping @Sendable () async throws -> T
   ) async throws -> T {
     try await withDependencies {

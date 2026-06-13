@@ -1,8 +1,8 @@
-import CheckInRepository
 import CoachCore
 import ComposableArchitecture
 import DomainModels
 import Foundation
+import LocalRepositories
 import Testing
 
 @testable import TodayFeature

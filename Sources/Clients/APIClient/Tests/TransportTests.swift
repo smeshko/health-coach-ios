@@ -7,6 +7,14 @@ import Testing
 import TokenClient
 import WireModels
 
+// Hoisted to file scope (not nested inside `TransportTests`) so it sits at most one level deep — the
+// SwiftLint `nesting` rule caps types at one level of nesting.
+private struct EnvelopeCase {
+  var status: Int
+  var raw: String
+  var code: ErrorCode
+}
+
 extension URLProtocolStubSerialized {
   struct TransportTests {
     private let baseURL = URL(string: "http://localhost:8000")!
@@ -72,12 +80,6 @@ extension URLProtocolStubSerialized {
     }
 
     // MARK: - Envelope decode
-
-    private struct EnvelopeCase {
-      var status: Int
-      var raw: String
-      var code: ErrorCode
-    }
 
     @Test func test_envelope_decodesToAPIError_perCode() async throws {
       let cases = [

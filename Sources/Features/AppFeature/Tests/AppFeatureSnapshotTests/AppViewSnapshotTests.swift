@@ -6,11 +6,11 @@
 
 #if canImport(UIKit)
   import AppFeature
-  import CheckInRepository
   import CoachCore
   import CoachTestSupport
   import ComposableArchitecture
   import Foundation
+  import LocalRepositories
   import OnboardingFeature
   import SnapshotTesting
   import Testing

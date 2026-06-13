@@ -1,9 +1,8 @@
-import DevSettings
 import Foundation
 import SampleData
 import Testing
 
-@testable import DevSettingsLive
+@testable import DevSettings
 
 struct DevSettingsLogCategoryTests {
   /// A throwaway, isolated UserDefaults suite (cleared up front) so tests never touch `.standard`.

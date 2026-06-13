@@ -5,7 +5,6 @@ import DomainModels
 import Foundation
 import GRDB
 import PersistenceModels
-import StrengthTestRepository
 
 extension StrengthTestRepository: DependencyKey {
   public static let liveValue: StrengthTestRepository = .live

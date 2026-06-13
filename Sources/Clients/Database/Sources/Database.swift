@@ -8,7 +8,8 @@ import GRDB
 /// generic, so genericity lives in these methods, mirroring `APIClient.send<R>`).
 ///
 /// No domain methods, no cache policy: repositories (Epic 04) layer typed entity access on top
-/// (§6/D9). Migrations + the queue itself live in `DatabaseLive`.
+/// (§6/D9). Migrations + the queue itself live alongside this interface in the same module (the live
+/// DB + migration sources, merged into this module in Phase 11.7).
 public struct Database: Sendable {
   /// The read connection (a `DatabaseQueue` is both reader and writer).
   public var reader: @Sendable () -> any DatabaseReader
@@ -41,7 +42,7 @@ public extension DependencyValues {
   }
 }
 
-/// Unambiguous alias for the client struct. Consumers that also `import GRDB` (e.g. `DatabaseLive`,
+/// Unambiguous alias for the client struct. Consumers that also `import GRDB` (e.g. the live DB code,
 /// repositories) hit a name clash between this module's `Database` type and `GRDB.Database`; refer to
 /// the client as `DatabaseClient` there. Resolved here, where the local `Database` shadows GRDB's.
 public typealias DatabaseClient = Database
