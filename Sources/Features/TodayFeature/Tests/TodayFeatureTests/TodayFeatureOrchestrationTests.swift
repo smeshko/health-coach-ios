@@ -284,4 +284,16 @@ struct TodayFeatureOrchestrationTests {
     }
     #expect(store.state.session?.selectedAlternativeIndex == nil)
   }
+
+  /// The Exercise/Nutrition segmented toggle (`sectionSelected`) is a pure-UI reducer arm — the one
+  /// arm with no other coverage after the 11.4 consolidation. Initial state is idle + Exercise; the
+  /// toggle flips `selectedSection` with no effect.
+  @Test func test_initialState_idleExercise_andSectionToggle() async {
+    let store = TestStore(initialState: TodayFeature.State()) { TodayFeature() }
+    #expect(store.state.briefState == .idle)
+    #expect(store.state.selectedSection == .exercise)
+
+    await store.send(.sectionSelected(.nutrition)) { $0.selectedSection = .nutrition }
+    await store.send(.sectionSelected(.exercise)) { $0.selectedSection = .exercise }
+  }
 }
