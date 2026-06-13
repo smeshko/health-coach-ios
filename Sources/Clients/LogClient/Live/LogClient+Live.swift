@@ -2,7 +2,6 @@ import Dependencies
 import DevSettings
 import Foundation
 import LogClient
-import Logging
 
 extension LogClient: DependencyKey {
   /// The live logger: console + rotating file (via the process-shared `LogFileWriter`), with category
@@ -14,35 +13,27 @@ extension LogClient: DependencyKey {
     live(writer: .shared)
   }
 
-  /// One-shot, process-global swift-log bootstrap so any **stray** third-party `Logger(label:)` also
-  /// lands in the same console+file sink. Call exactly once at app start (the composition root). The
-  /// `LogClient.live` path builds its own `Logger` and does **not** depend on this — bootstrap only
-  /// redirects loggers we don't own. Re-bootstrapping is the process-global double-bootstrap hazard.
-  public static func bootstrapStandardLogging() {
-    LoggingSystem.bootstrap { _ in
-      CoachLogHandler(writer: .shared, console: { print($0) })
-    }
-  }
-
   /// Builds a live `LogClient` over `writer` (+ console sink). Factored out so tests can point it at a
   /// temp directory and assert on the file. Not for app use — the app uses `liveValue`.
+  ///
+  /// The `log` closure renders the line directly and fans it out to the console + rotating file — there
+  /// is no `swift-log` indirection (DECISIONS D1: the capture layer served third-party `Logger(label:)`
+  /// emitters that don't exist in the dependency tree). The rendered shape is
+  /// `yyyy-MM-dd HH:mm:ss.SSS LEVEL [category] message — key=value …` (metadata keys sorted), the
+  /// timestamp in the canonical `Calendar.europeSofia` frame via `LogTimestamp` — byte-identical to the
+  /// pre-11.5 handler output, so the DEBUG log viewer still parses it.
   static func live(
     writer: LogFileWriter,
     console: @escaping @Sendable (String) -> Void = { print($0) }
   ) -> LogClient {
-    let logger = Logger(label: "com.coach.app") { _ in
-      CoachLogHandler(writer: writer, console: console)
-    }
-    return LogClient(
+    LogClient(
       log: { level, category, message, metadata in
         @Dependency(\.devSettings) var devSettings
         guard category.isAlwaysOn || devSettings.isLogCategoryEnabled(category.rawValue) else { return }
 
-        var entryMetadata: Logger.Metadata = [CoachLogHandler.categoryKey: .string(category.rawValue)]
-        for (key, value) in metadata {
-          entryMetadata[key] = .string(value)
-        }
-        logger.log(level: level.loggerLevel, "\(message)", metadata: entryMetadata)
+        let line = render(level: level, category: category, message: message, metadata: metadata)
+        console(line)
+        writer.enqueue(line)
       },
       // The DEBUG log viewer (Phase 7.4) reads the rotating files back through the same writer.
       readRecent: { await writer.recentLines() },
@@ -50,16 +41,31 @@ extension LogClient: DependencyKey {
       clear: { await writer.clear() }
     )
   }
+
+  /// Render one log line: `yyyy-MM-dd HH:mm:ss.SSS LEVEL [category] message — key=value …`, the
+  /// timestamp in the Europe/Sofia frame (`LogTimestamp`) and the metadata pairs sorted by key. The
+  /// level token matches the pre-11.5 handler output (swift-log's `rawValue.uppercased()`).
+  static func render(
+    level: LogLevel, category: LogCategory, message: String, metadata: [String: String]
+  ) -> String {
+    var line = "\(LogTimestamp.format(Date())) \(level.token) [\(category.rawValue)] \(message)"
+    if !metadata.isEmpty {
+      let pairs = metadata.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: " ")
+      line += " — \(pairs)"
+    }
+    return line
+  }
 }
 
 private extension LogLevel {
-  /// Map the app-facing level onto swift-log's.
-  var loggerLevel: Logger.Level {
+  /// The rendered level token — byte-identical to the pre-11.5 handler, which uppercased swift-log's
+  /// `Logger.Level.rawValue` (`debug`/`info`/`notice`/`error`).
+  var token: String {
     switch self {
-    case .debug: .debug
-    case .info: .info
-    case .notice: .notice
-    case .error: .error
+    case .debug: "DEBUG"
+    case .info: "INFO"
+    case .notice: "NOTICE"
+    case .error: "ERROR"
     }
   }
 }

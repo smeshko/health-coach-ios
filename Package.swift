@@ -63,11 +63,6 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
     // Test-only: SwiftUI image snapshots. Used only by CoachTestSupport + the snapshot test target.
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
-    // swift-log — the app-wide logging mechanism (DECISIONS 1). `LogClient` (interface) depends only
-    // on its `Logging` product; `LogClientLive` adds a custom `LogHandler` (console + rotating file +
-    // category gating). Floor 1.13.0: `CoachLogHandler` implements the current `log(event:)` requirement
-    // (older `log(level:…)` is deprecated), and `LogEvent` only exists from this version.
-    .package(url: "https://github.com/apple/swift-log", from: "1.13.0"),
   ],
   targets: [
     .target(
@@ -151,8 +146,8 @@ let package = Package(
         // The DEBUG dev menu surfaces the design-system gallery (component/token browser) as a sheet.
         // Used only behind `#if DEBUG`; absent from RELEASE behaviour.
         "DesignSystemGallery",
-        // The log viewer parses log timestamps back into `Date`s using the app's canonical Europe/Sofia
-        // frame (`Calendar.europeSofia`) — the same frame the live `CoachLogHandler` wrote them in.
+        // The log viewer parses log timestamps back into `Date`s via the shared `LogTimestamp` helper,
+        // using the app's canonical Europe/Sofia frame — the same frame the live `LogClient` renders in.
         "CoachCore",
       ],
       path: "Sources/Features/SettingsFeature/Sources",
@@ -266,12 +261,13 @@ let package = Package(
       ]
     ),
     // App-wide logging interface — `@Dependency(\.log)`: a Sendable closure-struct + `LogLevel` /
-    // `LogCategory` (`.http` always-on) + a host-assertable `LogRecorder`. Depends ONLY on swift-log
-    // (`Logging`) + Dependencies — no app types, no DevSettings (the gate lives in LogClientLive).
+    // `LogCategory` (`.http` always-on) + a host-assertable `LogRecorder` + the `LogTimestamp`
+    // format/parse contract. Depends on Dependencies + CoachCore (`Calendar.europeSofia`, for the
+    // timestamp frame) — no app types, no DevSettings (the gate lives in LogClientLive).
     .target(
       name: "LogClient",
       dependencies: [
-        .product(name: "Logging", package: "swift-log"),
+        "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/LogClient/Interface",
@@ -279,19 +275,16 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // LogClient.liveValue — a custom swift-log `LogHandler` (CoachLogHandler) writing human-readable
-    // lines to console + a rotating file (LogFileWriter), with category gating read from the persisted
-    // DevSettings toggles. Depends on the LogClient interface + DevSettings (interface) + swift-log +
-    // Dependencies. Imported only by the composition root (TASK-004) + APIClientLive (via the interface).
+    // LogClient.liveValue — the live `log` closure renders human-readable lines directly to console + a
+    // rotating file (LogFileWriter), with category gating read from the persisted DevSettings toggles
+    // (no third-party logging indirection, DECISIONS D1). Depends on the LogClient interface (incl. `LogTimestamp`)
+    // + DevSettings (interface) + Dependencies. Imported only by the composition root + APIClientLive
+    // (via the interface).
     .target(
       name: "LogClientLive",
       dependencies: [
         "LogClient",
         "DevSettings",
-        // Timestamps render in the app's canonical Europe/Sofia frame (`Calendar.europeSofia`) — the
-        // same value `useEuropeSofia()` pins `\.calendar` to — so console + viewer agree on wall-clock.
-        "CoachCore",
-        .product(name: "Logging", package: "swift-log"),
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/LogClient/Live",
@@ -729,6 +722,8 @@ let package = Package(
       name: "LogClientTests",
       dependencies: [
         "LogClient",
+        // The `LogTimestamp` round-trip tests build dates in the Europe/Sofia frame.
+        "CoachCore",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/LogClient/Tests/LogClientTests",

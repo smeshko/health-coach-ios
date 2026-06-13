@@ -117,7 +117,13 @@ extension URLProtocolStubSerialized {
 
       let error = try #require(recorder.entries.first { $0.level == .error })
       #expect(error.category == .http)
-      #expect(error.message.contains("error"), "expected a mapped error line, got: \(error.message)")
+      // The line embeds the route and the actual mapped `APIError` description — assert the real content
+      // (the bare `contains("error")` was trivially satisfied by the `error <path>:` prefix).
+      #expect(error.message.contains("/profile"), "error line should name the route: \(error.message)")
+      #expect(
+        error.message.contains("envelope") && error.message.contains("internalError"),
+        "error line should carry the mapped APIError, got: \(error.message)"
+      )
     }
   }
 }

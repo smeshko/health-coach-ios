@@ -120,7 +120,7 @@ struct LogClientLiveTests {
     #expect(await log.readRecent().isEmpty, "clear must delete every persisted log line")
   }
 
-  @Test func test_writtenLine_carriesLocalDateAndCategory() async throws {
+  @Test func test_writtenLine_isByteIdenticalFullLine() async throws {
     let dir = tempDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
     let writer = LogFileWriter(directory: dir)
@@ -128,17 +128,80 @@ struct LogClientLiveTests {
     await withDependencies {
       $0.devSettings = .testValue
     } operation: {
-      LogClient.live(writer: writer, console: { _ in }).error("boom", category: .http)
+      // Two metadata keys out of sorted order on input → the renderer must emit them sorted by key.
+      LogClient.live(writer: writer, console: { _ in })
+        .error("boom", category: .http, metadata: ["status": "401", "path": "/x"])
     }
     await writer.flush()
 
-    let line = contents(of: await writer.currentFileURL)
-    // The line now begins with a full `yyyy-MM-dd HH:mm:ss.SSS` local timestamp (was time-only UTC).
-    let datedPrefix = #"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ERROR \[http\] boom"#
+    // Full end-to-end pin of the rendered line. Only the timestamp varies (current `Date()`), so it is
+    // matched by shape; everything after it — level token, `[category]`, message, and the sorted
+    // ` — key=value …` metadata tail — is asserted exactly (byte-identical to the pre-11.5 handler).
+    let line = contents(of: await writer.currentFileURL).trimmingCharacters(in: .newlines)
+    let expected =
+      #"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ERROR \[http\] boom — path=/x status=401$"#
     #expect(
-      line.range(of: datedPrefix, options: .regularExpression) != nil,
-      "expected a dated, parseable line, got: \(line)"
+      line.range(of: expected, options: .regularExpression) != nil,
+      "rendered line drifted from the pinned shape, got: \(line)"
     )
+  }
+
+  /// The rendered-line body after the `yyyy-MM-dd HH:mm:ss.SSS ` timestamp prefix (two space-delimited
+  /// tokens: date + time). The timestamp itself is the only non-deterministic part, so it is dropped.
+  private func bodyAfterTimestamp(_ line: String) -> String {
+    line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: false).dropFirst(2)
+      .joined(separator: " ")
+  }
+
+  @Test func test_render_pinsExactTokensAndSortedMetadata() {
+    // `render` is the deterministic core; pin the level token map and the sorted-metadata tail directly
+    // (the timestamp prefix is the only non-deterministic part and is split off here).
+    let line = LogClient.render(
+      level: .notice, category: .tca, message: "hello",
+      metadata: ["b": "2", "a": "1", "c": "3"]
+    )
+    let body = bodyAfterTimestamp(line)
+    #expect(body == "NOTICE [tca] hello — a=1 b=2 c=3", "got: \(body)")
+
+    // No metadata → no ` — …` tail.
+    let bare = LogClient.render(level: .debug, category: .app, message: "m", metadata: [:])
+    let bareBody = bodyAfterTimestamp(bare)
+    #expect(bareBody == "DEBUG [app] m", "got: \(bareBody)")
+  }
+
+  @Test func test_levelTokens_matchLegacyMap() {
+    let tokens = [LogLevel.debug, .info, .notice, .error].map { level in
+      String(
+        bodyAfterTimestamp(LogClient.render(level: level, category: .http, message: "x", metadata: [:]))
+          .prefix(while: { $0 != " " })
+      )
+    }
+    #expect(tokens == ["DEBUG", "INFO", "NOTICE", "ERROR"])
+  }
+
+  @Test func test_rotation_readRecentStaysChronological_pastIndexTen() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    // A tiny cap so each line rotates, and a high file cap so ≥11 files survive — the index crosses 10,
+    // where a lexicographic sort would order `coach-10.log` before `coach-2.log`. `readRecent` must keep
+    // numeric order (oldest→newest), so the line numbers come back ascending.
+    let writer = LogFileWriter(directory: dir, maxBytes: 1, maxFiles: 100)
+
+    await withDependencies {
+      $0.devSettings = .testValue
+    } operation: {
+      let log = LogClient.live(writer: writer, console: { _ in })
+      for index in 0..<15 {
+        log.error("line \(index)", category: .http)
+      }
+    }
+    await writer.flush()
+
+    let lines = await writer.recentLines()
+    #expect(lines.count == 15, "expected one line per file across ≥11 rotations, got \(lines.count)")
+    // Extract the trailing integer from each "… line N" line and assert strictly ascending.
+    let numbers = lines.compactMap { Int($0.split(separator: " ").last ?? "") }
+    #expect(numbers == Array(0..<15), "readRecent is not chronological past index 10: \(numbers)")
   }
 
   @Test func test_rotation_capsFileCount() async throws {

@@ -176,36 +176,11 @@
       level = head.last.flatMap { LogLevel(token: String($0)) }
       let stamp = head.dropLast().joined(separator: " ")
       timestamp = stamp
-      date = LogEntry.parseDate(stamp)
+      // The timestamp contract has one owner (`LogTimestamp`, in the LogClient interface) — the same
+      // helper the live renderer formats with, so parse and render agree on the Europe/Sofia frame.
+      date = LogTimestamp.parse(stamp)
       category = LogCategory(rawValue: String(line[line.index(after: open)..<close]))
       message = String(line[line.index(after: close)...]).trimmingCharacters(in: .whitespaces)
-    }
-
-    /// Parse a `yyyy-MM-dd HH:mm:ss.SSS` timestamp back into a `Date`, interpreting the wall-clock string
-    /// in the **same** frame the live `CoachLogHandler` rendered it in — the app's canonical
-    /// `Calendar.europeSofia` (the value `useEuropeSofia()` pins `\.calendar` to). Returns `nil` for a
-    /// timestamp that doesn't fit the shape (so the row stays visible rather than being date-filtered).
-    static func parseDate(_ timestamp: String) -> Date? {
-      let halves = timestamp.split(separator: " ")
-      guard halves.count == 2 else { return nil }
-      let dateParts = halves[0].split(separator: "-")
-      let timeParts = halves[1].split(separator: ":")
-      guard dateParts.count == 3, timeParts.count == 3 else { return nil }
-      let secondParts = timeParts[2].split(separator: ".")
-      guard
-        let year = Int(dateParts[0]), let month = Int(dateParts[1]), let day = Int(dateParts[2]),
-        let hour = Int(timeParts[0]), let minute = Int(timeParts[1]), let second = Int(secondParts[0])
-      else { return nil }
-      var components = DateComponents()
-      components.timeZone = TimeZone.europeSofia
-      components.year = year
-      components.month = month
-      components.day = day
-      components.hour = hour
-      components.minute = minute
-      components.second = second
-      components.nanosecond = (secondParts.count > 1 ? Int(secondParts[1]) ?? 0 : 0) * 1_000_000
-      return Calendar.europeSofia.date(from: components)
     }
   }
 
@@ -223,9 +198,9 @@
     /// The display order for the level picker (least→most severe).
     static let ordered: [LogLevel] = [.debug, .info, .notice, .error]
 
-    /// Map a rendered level token back to a `LogLevel`. `CoachLogHandler` uppercases swift-log's level
-    /// raw value, so the tokens are `DEBUG`/`INFO`/`NOTICE`/`ERROR`; the rarer swift-log levels we never
-    /// emit (`warning`/`critical`) fold into `.error` so they still surface.
+    /// Map a rendered level token back to a `LogLevel`. The live renderer emits uppercased tokens
+    /// (`DEBUG`/`INFO`/`NOTICE`/`ERROR`); the rarer tokens a legacy line might carry
+    /// (`TRACE`/`WARNING`/`CRITICAL`) fold into the nearest level so they still surface.
     init?(token: String) {
       switch token.uppercased() {
       case "DEBUG", "TRACE": self = .debug

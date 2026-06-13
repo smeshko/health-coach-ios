@@ -115,7 +115,7 @@
       ]
       var state = LogViewerFeature.State(lines: lines)
       // Anchor "now" at 12:30 on 2026-06-10 (Sofia), the same frame timestamps are parsed in.
-      state.referenceDate = LogEntry.parseDate("2026-06-10 12:30:00.000")!
+      state.referenceDate = LogTimestamp.parse("2026-06-10 12:30:00.000")!
 
       // `.today` drops the previous calendar day (Sofia start-of-day cutoff).
       state.dateRange = .today
@@ -138,7 +138,7 @@
         "2026-06-10 12:00:00.000 INFO [app] dated line",
       ]
       var state = LogViewerFeature.State(lines: lines)
-      state.referenceDate = LogEntry.parseDate("2026-06-10 12:30:00.000")!
+      state.referenceDate = LogTimestamp.parse("2026-06-10 12:30:00.000")!
 
       // `.all` (no cutoff) keeps both — an undated line is shown when no time filter is active.
       state.dateRange = .all

@@ -27,9 +27,10 @@ struct Transport: Sendable {
     self.continuation = continuation
   }
 
-  /// Capped exponential backoff schedule (~63 s total ≈ the ~60 s cap). One sleep per retry.
+  /// Capped exponential backoff schedule (~7 s total worst case). One sleep per retry — 3 retries, so
+  /// a transient 502/504 on a brief route gives up after ~7 s instead of silently waiting ~63 s.
   private static let backoff: [Duration] = [
-    .seconds(1), .seconds(2), .seconds(4), .seconds(8), .seconds(16), .seconds(32),
+    .seconds(1), .seconds(2), .seconds(4),
   ]
 
   func send<R: Decodable & Sendable>(_ endpoint: Endpoint<R>) async throws -> R {
