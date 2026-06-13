@@ -98,4 +98,16 @@ struct ProfileCacheTests {
     }
   }
 
+  /// The routing-used `ProfileRepository.mock` must stay **dependency-free** (no live API/DB) and
+  /// return the canned `SampleData` profile + zones. Injecting NO live deps here means a future change
+  /// that made the mock resolve `@Dependency` would crash on an unimplemented dependency, and a wrong
+  /// canned value / dropped zones would fail the equality (review #3 — parallel to the SyncRepository
+  /// mock smoke; the deleted interface target was its only exerciser).
+  @Test func test_mock_returnsCannedProfileAndZones_withoutLiveDeps() async throws {
+    let expected = try SampleData.profile().domain
+    let profile = try await ProfileRepository.mock(scenario: .profile).profile()
+    let zones = try await ProfileRepository.mock(scenario: .profile).zones()
+    #expect(profile == expected)
+    #expect(zones == expected.zones)
+  }
 }
