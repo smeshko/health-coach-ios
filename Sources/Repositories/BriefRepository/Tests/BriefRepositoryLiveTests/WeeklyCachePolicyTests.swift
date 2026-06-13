@@ -1,6 +1,7 @@
 import APIClient
 import BriefRepository
 import CoachCore
+import CoachTestSupport
 import Database
 import Dependencies
 import DomainModels
@@ -30,7 +31,7 @@ struct WeeklyCachePolicyTests {
     let (_, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWeekly(db, domain)
-    let stub = StubAPIClient()
+    let stub = BriefAPIStub()
 
     let result = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
       try await BriefRepository.live.weeklyBrief(nil, false)
@@ -40,30 +41,20 @@ struct WeeklyCachePolicyTests {
     #expect(stub.weeklyCallCount == 0, "a same-week cache hit must not hit the network")
   }
 
-  @Test func test_weeklyBrief_missNoSync_throwsSyncRequired() async throws {
+  /// On an un-synced empty DB the gate trips regardless of `refresh` — subsumes the former
+  /// test_weeklyBrief_refreshUnsynced_throwsSyncRequired (audit MERGE).
+  @Test(arguments: [false, true])
+  func test_weeklyBrief_missNoSync_throwsSyncRequired(refresh: Bool) async throws {
     let (_, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory() // empty, no watermark
-    let stub = StubAPIClient()
+    let stub = BriefAPIStub()
 
     await expectBriefError(.syncRequired) {
       try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
-        try await BriefRepository.live.weeklyBrief(nil, false)
+        try await BriefRepository.live.weeklyBrief(nil, refresh)
       }
     }
-    #expect(stub.weeklyCallCount == 0)
-  }
-
-  @Test func test_weeklyBrief_refreshUnsynced_throwsSyncRequired() async throws {
-    let (_, domain) = try deloadFixture()
-    let db = try TestDatabase.makeInMemory() // no watermark
-    let stub = StubAPIClient()
-
-    await expectBriefError(.syncRequired) {
-      try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
-        try await BriefRepository.live.weeklyBrief(nil, true)
-      }
-    }
-    #expect(stub.weeklyCallCount == 0, "an un-synced refresh must not hit the network")
+    #expect(stub.weeklyCallCount == 0, "an un-synced miss/refresh must not hit the network")
   }
 
   @Test func test_weeklyBrief_specificWeek_passesKeyAndRoundTrips() async throws {
@@ -71,7 +62,7 @@ struct WeeklyCachePolicyTests {
     let week = ISOWeek(year: 2026, week: 24) // matches the deload fixture's isoWeek "2026-W24"
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(weeklyResult: .success(dto))
+    let stub = BriefAPIStub(weeklyResult: .success(dto))
 
     let first = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
       try await BriefRepository.live.weeklyBrief(week, false)
@@ -90,7 +81,7 @@ struct WeeklyCachePolicyTests {
     let (dto, domain) = try deloadFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(weeklyResult: .success(dto))
+    let stub = BriefAPIStub(weeklyResult: .success(dto))
 
     let result = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
       try await BriefRepository.live.weeklyBrief(nil, false)
@@ -101,22 +92,12 @@ struct WeeklyCachePolicyTests {
     #expect(stub.lastWeeklyArg == .some(nil), "current week passes nil so the server resolves it")
     let count = try await TestDatabase.weeklyCount(db)
     #expect(count == 1)
-  }
 
-  @Test func test_weeklyBrief_generateThenReread_isCacheHit() async throws {
-    let (dto, domain) = try deloadFixture()
-    let db = try TestDatabase.makeInMemory()
-    try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(weeklyResult: .success(dto))
-
-    let first = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
-      try await BriefRepository.live.weeklyBrief(nil, false)
-    }
+    // Folded from test_weeklyBrief_generateThenReread_isCacheHit (audit MERGE): a second same-week read
+    // is a cache hit (key↔PK agree) — no extra network call.
     let second = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
-
-    #expect(first == domain)
     #expect(second == domain)
     #expect(stub.weeklyCallCount == 1, "the second same-week call must be a cache hit (key↔PK agree)")
   }
@@ -128,7 +109,7 @@ struct WeeklyCachePolicyTests {
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
     try await TestDatabase.seedWeekly(db, domain)
-    let stub = StubAPIClient(weeklyResult: .success(newDTO))
+    let stub = BriefAPIStub(weeklyResult: .success(newDTO))
 
     let result = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
       try await BriefRepository.live.weeklyBrief(nil, true)
@@ -147,7 +128,7 @@ struct WeeklyCachePolicyTests {
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
     try await TestDatabase.seedWeekly(db, domain) // record under week 24
-    let stub = StubAPIClient(weeklyResult: .success(dto))
+    let stub = BriefAPIStub(weeklyResult: .success(dto))
 
     // Resolve a week later (W+1) → the week-24 record must NOT be a stale hit.
     let nextWeek = domain.weekStart.addingTimeInterval(7 * 86400)
@@ -156,6 +137,36 @@ struct WeeklyCachePolicyTests {
     }
 
     #expect(stub.weeklyCallCount == 1, "the first open of a new ISO week regenerates")
+  }
+
+  /// A Europe/Sofia wall-clock instant, host-independent.
+  private static func sofia(year: Int, month: Int, day: Int, hour: Int) -> Date {
+    var cal = Calendar(identifier: .iso8601)
+    cal.timeZone = TimeZone(identifier: "Europe/Sofia")!
+    return cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+  }
+
+  /// Audit gap #4: weekly `isoWeekKey` rollover across the ISO YEAR boundary (Dec 29–Jan 3, where the
+  /// ISO year ≠ the calendar year). A plan cached under 2026-W53 must be a MISS when resolved in
+  /// 2027-W01 — if `isoWeekKey` confused the ISO year/week here, a stale plan would serve. (2026 is a
+  /// 53-week ISO year; 2027-01-04 is the Monday of 2027-W01.)
+  @Test func test_weeklyBrief_isoYearBoundaryRollover_isMiss() async throws {
+    let (dto, domain) = try deloadFixture()
+    let db = try TestDatabase.makeInMemory()
+    try await TestDatabase.seedWatermark(db)
+    var w53 = domain
+    w53.isoWeek = "2026-W53"
+    w53.weekStart = Self.sofia(year: 2026, month: 12, day: 28, hour: 0) // Monday of 2026-W53
+    try await TestDatabase.seedWeekly(db, w53)
+    let stub = BriefAPIStub(weeklyResult: .success(dto))
+
+    // Resolve in the NEXT ISO week (2027-W01) → key "2027-W01" ≠ seeded "2026-W53" → a miss.
+    let nextIsoWeek = Self.sofia(year: 2027, month: 1, day: 4, hour: 9) // Monday of 2027-W01
+    _ = try await runWithSofia(now: nextIsoWeek, stub: stub, database: db) {
+      try await BriefRepository.live.weeklyBrief(nil, false)
+    }
+
+    #expect(stub.weeklyCallCount == 1, "a plan cached under 2026-W53 is not a stale hit in 2027-W01")
   }
 
   // NOTE: the former `test_weeklyBrief_outOfSetCoreSession_isDropped` is removed — an out-of-set

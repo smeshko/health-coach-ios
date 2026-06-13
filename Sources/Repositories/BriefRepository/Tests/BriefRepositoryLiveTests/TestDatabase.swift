@@ -1,19 +1,14 @@
+import CoachTestSupport
 import Database
-import DatabaseLive
 import DomainModels
 import Foundation
 import GRDB
 import PersistenceModels
 
-/// Migrated in-memory `Database` fixtures + seed helpers for the cache-policy tests. Uses the real
-/// `DatabaseLive` migrations so `Record.fetchOne`/`save` run against the actual schema.
-enum TestDatabase {
-  // `DatabaseClient` (the interface's exported alias) avoids the `Database` module-vs-`GRDB.Database`
-  // ambiguity in a file that imports both.
-  static func makeInMemory() throws -> DatabaseClient {
-    try DatabaseClient.makeInMemory()
-  }
-
+/// Brief-record seed helpers for the cache-policy tests, layered onto the shared
+/// `CoachTestSupport.TestDatabase` (which provides the migrated in-memory `makeInMemory()`). The
+/// seeds live here because they need this repo's `PersistenceModels` record types.
+extension TestDatabase {
   /// Seed a successful sync watermark (so the sync-gate passes).
   static func seedWatermark(_ database: DatabaseClient) async throws {
     try await database.write { db in

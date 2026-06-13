@@ -45,15 +45,8 @@ struct StrengthTestRepositoryLiveTests {
     #expect(count == 1, "a same-day re-test must collide on one row")
     #expect(current?.maxPushups == 35)
     #expect(current?.maxPullups == 10)
-  }
-
-  @Test func test_current_returnsLatest() async throws {
-    let db = try DatabaseClient.makeInMemory()
-    let test = DomainModels.StrengthTest(date: Self.now, maxPushups: 25, maxPullups: 6)
-    try await run(database: db) { try await StrengthTestRepository.live.save(test) }
-
-    let current = try await run(database: db) { try await StrengthTestRepository.live.current(Self.now) }
-    #expect(current?.maxPushups == 25)
+    // (Folded test_current_returnsLatest here — audit MERGE: `current` returning the latest same-day
+    // save is the strict subset asserted by the maxPushups/maxPullups checks above.)
   }
 
   @Test func test_current_findsTestFromEarlierDay() async throws {
@@ -90,5 +83,46 @@ struct StrengthTestRepositoryLiveTests {
     let db = try DatabaseClient.makeInMemory()
     let current = try await run(database: db) { try await StrengthTestRepository.live.current(Self.now) }
     #expect(current == nil)
+  }
+
+  /// A Europe/Sofia wall-clock instant, host-independent.
+  private static func sofia(year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
+    var cal = Calendar(identifier: .iso8601)
+    cal.timeZone = TimeZone(identifier: "Europe/Sofia")!
+    return cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
+  }
+
+  /// Audit gap #4: same-day saves hours apart collapse to one row (mirrors the CheckIn clock-time test,
+  /// missing on the strength side); and with BOTH a past and a future row stored, `current(today)`
+  /// returns the PAST one — if the `date <= day` filter regressed, `ORDER BY date DESC` alone would
+  /// wrongly pick the future row.
+  @Test func test_sofiaClockTime_collapsesSameDay_andExcludesFutureRow() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    let morning = Self.sofia(year: 2026, month: 6, day: 8, hour: 8, minute: 0)
+    let evening = Self.sofia(year: 2026, month: 6, day: 8, hour: 20, minute: 0) // same Sofia day
+    let future = Self.sofia(year: 2026, month: 6, day: 11, hour: 9, minute: 0) // a later day
+
+    try await run(database: db, now: evening) {
+      try await StrengthTestRepository.live.save(
+        DomainModels.StrengthTest(date: morning, maxPushups: 20, maxPullups: 5)
+      )
+      try await StrengthTestRepository.live.save(
+        DomainModels.StrengthTest(date: evening, maxPushups: 33, maxPullups: 9)
+      )
+      try await StrengthTestRepository.live.save(
+        DomainModels.StrengthTest(date: future, maxPushups: 50, maxPullups: 15)
+      )
+    }
+
+    // The two same-day saves collapse to one row; the future row is a second row.
+    let count = try await db.read { dbx in try StrengthTestRecord.fetchCount(dbx) }
+    #expect(count == 2, "same-Sofia-day saves collide on one row; the future-dated save is separate")
+
+    // Queried on the same day as the collapsed pair, current returns that day's latest — never the
+    // future row.
+    let current = try await run(database: db, now: evening) {
+      try await StrengthTestRepository.live.current(evening)
+    }
+    #expect(current?.maxPushups == 33, "current returns the at-or-before-today row, not the future one")
   }
 }

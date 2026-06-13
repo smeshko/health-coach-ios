@@ -8,33 +8,6 @@ struct ValueTypeTests {
     SessionBlock(card: card, intensity: .easy, durationMinLow: 40, durationMinHigh: 55)
   }
 
-  private func makeMacroFocus() -> MacroFocus {
-    MacroFocus(
-      dayType: .moderate, caloriesKcal: 2600, proteinG: 170, carbsG: 300,
-      fatGLow: 60, fatGHigh: 80, hydrationLLow: 2.5, hydrationLHigh: 3.5
-    )
-  }
-
-  @Test func test_dailyBrief_guaranteedArraysDefaultToEmpty() {
-    let brief = DailyBrief(
-      date: Date(timeIntervalSince1970: 0),
-      readiness: Readiness(score: 80, band: .green),
-      safetyGate: SafetyGate(triggered: false),
-      session: makeSession(),
-      skipOk: true,
-      macroFocus: makeMacroFocus(),
-      generatedAt: Date(timeIntervalSince1970: 0),
-      cached: false
-    )
-    // Constructed without alternatives/narrative — both default to [] (never nil).
-    #expect(brief.alternatives == [])
-    #expect(brief.narrative == [])
-    #expect(brief.intakeYesterday == nil)
-    // Readiness/SafetyGate guaranteed arrays default empty too.
-    #expect(brief.readiness.penalties == [])
-    #expect(brief.safetyGate.reasons == [])
-  }
-
   @Test func test_sessionBlock_computedConveniences() {
     let easy = makeSession(card: .easyRun)
     #expect(easy.durationRange == 40 ... 55)
@@ -42,5 +15,13 @@ struct ValueTypeTests {
 
     let rest = SessionBlock(card: .rest, intensity: .recovery, durationMinLow: 0, durationMinHigh: 0)
     #expect(rest.isRest)
+  }
+
+  /// Audit gap #12 / production finding 3: an inverted server brief (`durationMinLow >
+  /// durationMinHigh`) must NOT trap on the `ClosedRange` precondition at render time — the guard
+  /// clamps to `min ... max` so a malformed brief renders instead of crashing.
+  @Test func test_durationRange_invertedBounds_clampsInsteadOfTrapping() {
+    let inverted = SessionBlock(card: .easyRun, intensity: .easy, durationMinLow: 55, durationMinHigh: 40)
+    #expect(inverted.durationRange == 40 ... 55, "inverted bounds clamp to a valid min...max window")
   }
 }

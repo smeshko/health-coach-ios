@@ -205,11 +205,9 @@ extension URLProtocolStubSerialized {
       #expect(result)
     }
 
-    @Test func test_probe_401_throwsUnauthorized() async throws {
-      URLProtocolStub.box.setResponses([.init(status: 401, data: Data())])
-      let client = makeClient()
-      await assertThrows(.unauthorized, from: { try await client.probe() })
-    }
+    // Note: the former test_probe_401_throwsUnauthorized folded into
+    // test_401_emitsUnauthorized_andThrows_withoutRetry below (audit MERGE) — same 401-first path; the
+    // probe wrapper's rethrow is compiler-guaranteed.
 
     // MARK: - 401 stream
 

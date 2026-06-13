@@ -29,10 +29,9 @@ struct CalendarTests {
     } operation: {
       #expect(ISOWeek.current == ISOWeek(year: 2026, week: 1))
     }
-  }
 
-  @Test func testISOWeekRollsOverToWeekTwo() {
-    // 2026-01-05 is the next Monday → ISO week 2 of 2026.
+    // Folds the former testISOWeekRollsOverToWeekTwo (audit MERGE — adjacent-Monday complement of the
+    // same mechanism): 2026-01-05 is the next Monday → ISO week 2 of 2026.
     withDependencies {
       $0.calendar = .europeSofia
       $0.date = .constant(sofiaDate(year: 2026, month: 1, day: 5))
@@ -47,6 +46,17 @@ struct CalendarTests {
       $0.calendar = .europeSofia
     } operation: {
       #expect(ISOWeek.containing(sofiaDate(year: 2026, month: 6, day: 8)) == ISOWeek(year: 2026, week: 24))
+    }
+  }
+
+  /// Audit gap #4: a 53-week ISO year (2026 has W53). The strength-week marker compares `ISOWeek`
+  /// values, so a W53/W1 confusion would skip or duplicate a weekly sync — pin the boundary.
+  @Test func testContainingResolvesWeek53In53WeekIsoYear() {
+    // 2026-12-28 is a Monday → ISO week 53 of 2026 (2026 is a 53-week ISO year).
+    withDependencies {
+      $0.calendar = .europeSofia
+    } operation: {
+      #expect(ISOWeek.containing(sofiaDate(year: 2026, month: 12, day: 28)) == ISOWeek(year: 2026, week: 53))
     }
   }
 

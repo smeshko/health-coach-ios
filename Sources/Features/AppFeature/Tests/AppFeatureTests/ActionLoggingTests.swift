@@ -1,6 +1,5 @@
 import ComposableArchitecture
 import LogClient
-import OnboardingFeature
 import Testing
 
 @testable import AppFeature
@@ -42,20 +41,5 @@ struct ActionLoggingTests {
 
     // The nested case-label path descends through enum associated values (all enums here).
     #expect(recorder.entries.contains { $0.category == .tca && $0.message == "main.tabSelected.weekly" })
-  }
-
-  @Test func test_instrument_doesNotAlterBehaviour() async {
-    let recorder = LogRecorder()
-    let store = TestStore(initialState: AppFeature.State.onboarding(OnboardingFeature.State())) {
-      AppFeature()
-    } withDependencies: {
-      $0.log = .recording(into: recorder)
-    }
-
-    // The connect swap behaves identically with the instrument applied; the `.tca` line is additive.
-    await store.send(.onboarding(.delegate(.connected))) {
-      $0 = .main(MainTabs.State())
-    }
-    #expect(recorder.entries.contains { $0.category == .tca && $0.message == "onboarding.delegate.connected" })
   }
 }

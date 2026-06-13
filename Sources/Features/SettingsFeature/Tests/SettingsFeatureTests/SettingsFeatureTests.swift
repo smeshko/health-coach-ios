@@ -9,7 +9,9 @@
   /// bubbles `SettingsFeature.Delegate.tokenReset` up to the shell.
   @MainActor
   struct SettingsFeatureTests {
-    @Test func test_devMenuTapped_presentsDevMenu() async {
+    /// One present→dismiss round-trip (audit MERGE: the former test_devMenuTapped_presentsDevMenu +
+    /// test_devMenuDismissed_clearsDevMenu).
+    @Test func test_devMenu_presentThenDismiss_roundTrips() async {
       let store = TestStore(initialState: SettingsFeature.State()) {
         SettingsFeature()
       }
@@ -17,15 +19,6 @@
       await store.send(.devMenuTapped) {
         $0.devMenu = DevMenuFeature.State()
       }
-    }
-
-    @Test func test_devMenuDismissed_clearsDevMenu() async {
-      var initial = SettingsFeature.State()
-      initial.devMenu = DevMenuFeature.State()
-      let store = TestStore(initialState: initial) {
-        SettingsFeature()
-      }
-
       await store.send(.devMenu(.dismiss)) {
         $0.devMenu = nil
       }

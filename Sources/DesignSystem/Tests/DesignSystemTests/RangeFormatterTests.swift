@@ -34,4 +34,15 @@ struct RangeFormatterTests {
         "2–2.5 L"
     )
   }
+
+  /// Audit gap #14: the formatter is locale-aware (`.current` default) but only en_US was tested. A
+  /// comma-decimal locale (de_DE) must render the decimal separator as a comma — matching the repo's
+  /// known locale-snapshot gotcha.
+  @Test func test_decimalRange_commaDecimalLocale() {
+    let deDE = Locale(identifier: "de_DE")
+    #expect(
+      RangeFormatter.string(low: 2.5, high: 3.2, unit: "L", locale: deDE) ==
+        "2,5–3,2 L"
+    )
+  }
 }

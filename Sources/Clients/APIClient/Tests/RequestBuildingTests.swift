@@ -27,18 +27,19 @@ struct RequestBuildingTests {
     #expect(request.url?.absoluteString == "https://api.example.com/v1/probe")
   }
 
-  @Test func test_probe_isGet_withAuthHeader() throws {
-    let request = try urlRequest(for: Routes.probe, baseURL: baseURL, bearer: bearer)
-    #expect(request.url?.absoluteString == "http://localhost:8000/probe")
-    #expect(request.httpMethod == "GET")
-    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
-  }
+  /// The two authed GET routes share one builder path — only the path literal differs. Folded into one
+  /// test (audit MERGE: the former test_probe_isGet/test_profile_isGet); the routes carry different
+  /// generic `Response` types, so they're exercised inline rather than via `@Test(arguments:)`.
+  @Test func test_getRoutes_areGet_withAuthHeader() throws {
+    let probe = try urlRequest(for: Routes.probe, baseURL: baseURL, bearer: bearer)
+    #expect(probe.url?.absoluteString == "http://localhost:8000/probe")
+    #expect(probe.httpMethod == "GET")
+    #expect(probe.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
 
-  @Test func test_profile_isGet_withAuthHeader() throws {
-    let request = try urlRequest(for: Routes.profile, baseURL: baseURL, bearer: bearer)
-    #expect(request.url?.absoluteString == "http://localhost:8000/profile")
-    #expect(request.httpMethod == "GET")
-    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+    let profile = try urlRequest(for: Routes.profile, baseURL: baseURL, bearer: bearer)
+    #expect(profile.url?.absoluteString == "http://localhost:8000/profile")
+    #expect(profile.httpMethod == "GET")
+    #expect(profile.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
   }
 
   @Test func test_sync_postsEncodedBody_withAuthAndContentType() throws {

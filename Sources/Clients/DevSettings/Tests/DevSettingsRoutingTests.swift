@@ -70,19 +70,10 @@ private struct DemoRepo: Sendable {
 }
 
 struct DevSettingsRoutingTests {
-  @Test func test_routed_servesLive_whenFlagOff() async {
-    let dev = DevSettings.fake(FakeDevBox(mock: false))
-    let result = await DemoRepo.routed(dev).value()
-    #expect(result == "live")
-  }
-
-  @Test func test_routed_servesMock_whenFlagOn() async {
-    let box = FakeDevBox(mock: true, scenarios: [.dailyBrief: .dailyBriefAmber])
-    let dev = DevSettings.fake(box)
-    let result = await DemoRepo.routed(dev).value()
-    #expect(result == "mock:\(SampleScenario.dailyBriefAmber.rawValue)")
-  }
-
+  // Note: test_routed_servesLive_whenFlagOff folded into test_routed_switchesPerCall_noReconstruction
+  // (its first assert, flag off → "live") and test_routed_servesMock_whenFlagOn into
+  // test_routed_followsScenarioChange (its first assert, flag on → mock) — audit MERGE; the per-call
+  // re-evaluation tests are the load-bearing keepers.
   @Test func test_routed_switchesPerCall_noReconstruction() async {
     let box = FakeDevBox(mock: false, scenarios: [.dailyBrief: .dailyBriefGreen])
     let dev = DevSettings.fake(box)

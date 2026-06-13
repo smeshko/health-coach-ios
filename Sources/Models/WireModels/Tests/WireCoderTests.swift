@@ -35,10 +35,6 @@ struct WireCoderTests {
     var value: Date
   }
 
-  private struct CalendarDateBox: Codable, Equatable {
-    var date: WireCalendarDate
-  }
-
   private struct OptionalCalendarDateBox: Codable, Equatable {
     var date: WireCalendarDate?
   }
@@ -91,16 +87,10 @@ struct WireCoderTests {
 
   // MARK: - WireCalendarDate
 
-  @Test func test_calendarDate_encodesAsDateOnly() throws {
-    let box = try decode(CalendarDateBox.self, from: #"{"date":"2026-06-06"}"#)
-    let json = try encodedString(box)
-    #expect(json.contains(#""date":"2026-06-06""#), "expected bare yyyy-MM-dd, got \(json)")
-    #expect(!json.contains("T"), "must not emit an ISO-8601 instant, got \(json)")
-
-    // decode → encode → decode is value-equal
-    let roundTripped = try decode(CalendarDateBox.self, from: json)
-    #expect(roundTripped == box)
-  }
+  // Note: test_calendarDate_encodesAsDateOnly (synthetic CalendarDateBox) folded into
+  // DecodeRoundTripTests.test_formatDateField_encodesAsDateOnly (audit MERGE) — the real-DTO encode is
+  // the one home for the bare yyyy-MM-dd claim. The optional-absent/null round-trip below stays (it's
+  // the only coverage of the optional WireCalendarDate decode path).
 
   @Test func test_calendarDate_optionalRoundTripsAbsentAndNull() throws {
     let absent = try decode(OptionalCalendarDateBox.self, from: "{}")

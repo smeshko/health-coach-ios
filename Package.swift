@@ -187,6 +187,11 @@ let package = Package(
       name: "CoachTestSupport",
       dependencies: [
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+        // Host-compiling helpers (outside the UIKit guard): the shared APIClient stub factory needs
+        // the APIClient interface; the in-memory-DB convenience re-exports DatabaseLive.makeInMemory.
+        "APIClient",
+        "Database",
+        "DatabaseLive",
       ],
       path: "Sources/Core/CoachTestSupport/Sources",
       swiftSettings: [
@@ -673,6 +678,9 @@ let package = Package(
         // SwiftPM doesn't re-export the transitive import, so list it directly.
         "DomainModels",
         "CoachCore",
+        // Phase 11.6 (TASK-003): the decode tests now load the canonical wire-JSON from SampleData's
+        // bundle resources (one fixture source) instead of inline JSON blobs.
+        "SampleData",
       ],
       path: "Sources/Models/WireModels/Tests",
       swiftSettings: [
@@ -850,20 +858,6 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // BriefRepository interface tests (BriefError + testValue/.mock) — host, no simulator.
-    .testTarget(
-      name: "BriefRepositoryTests",
-      dependencies: [
-        "BriefRepository",
-        "SampleData",
-        "DomainModels",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-      ],
-      path: "Sources/Repositories/BriefRepository/Tests/BriefRepositoryTests",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
     // BriefRepositoryLive cache-policy + APIError-mapping tests — host, with a migrated in-memory
     // Database (DatabaseLive.makeInMemory) and a stubbed APIClient. DatabaseLive is a test-only dep
     // here (the live target itself depends only on the Database interface).
@@ -880,6 +874,7 @@ let package = Package(
         "DomainModels",
         "SampleData",
         "CoachCore",
+        "CoachTestSupport",
         // The `routed(dev:)` mock-toggle test builds a fake DevSettings.
         "DevSettings",
         .product(name: "Dependencies", package: "swift-dependencies"),
@@ -928,19 +923,6 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // SyncRepository interface tests (SyncResult/SyncError + testValue) — host.
-    .testTarget(
-      name: "SyncRepositoryTests",
-      dependencies: [
-        "SyncRepository",
-        "DomainModels",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-      ],
-      path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryTests",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
     // SyncRepository.live orchestration + HK→wire mapping + APIError mapping tests — host, all client
     // deps stubbed + a migrated in-memory Database.
     .testTarget(
@@ -959,24 +941,11 @@ let package = Package(
         "PersistenceModels",
         "SampleData",
         "CoachCore",
+        "CoachTestSupport",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryLiveTests",
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-      ]
-    ),
-    // ProfileRepository interface + mock tests — host.
-    .testTarget(
-      name: "ProfileRepositoryTests",
-      dependencies: [
-        "ProfileRepository",
-        "DomainModels",
-        "SampleData",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-      ],
-      path: "Sources/Repositories/ProfileRepository/Tests/ProfileRepositoryTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -994,6 +963,7 @@ let package = Package(
         "DomainModels",
         "PersistenceModels",
         "SampleData",
+        "CoachTestSupport",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -1027,6 +997,16 @@ let package = Package(
         "APIClient",
         // The logging tests inject `LogClient.recording(into:)` and assert `.app`/`.lifecycle` entries.
         "LogClient",
+        // The 401-mid-orchestration containment test drives a suspended TodayFeature sync→brief chain
+        // through the AppFeature reducer, so it overrides the repo + clock dependencies (Phase 11.6).
+        "CheckInRepository",
+        "SyncRepository",
+        "BriefRepository",
+        "ProfileRepository",
+        "DomainModels",
+        "SampleData",
+        "CoachCore",
+        .product(name: "Clocks", package: "swift-clocks"),
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/AppFeature/Tests/AppFeatureTests",

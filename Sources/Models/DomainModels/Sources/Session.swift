@@ -32,9 +32,13 @@ public struct SessionBlock: Equatable, Codable, Sendable {
     self.flags = flags
   }
 
-  /// The prescribed duration window, in minutes.
+  /// The prescribed duration window, in minutes. Guards against an inverted server brief
+  /// (`durationMinLow > durationMinHigh`): a raw `low ... high` would trap on the `ClosedRange`
+  /// precondition at render time, so clamp to `min ... max` — a malformed/inverted brief renders a
+  /// (reversed-but-valid) window instead of crashing; invisible for all well-formed data
+  /// (Phase 11.6 / audit production finding 3).
   public var durationRange: ClosedRange<Int> {
-    durationMinLow ... durationMinHigh
+    min(durationMinLow, durationMinHigh) ... max(durationMinLow, durationMinHigh)
   }
 
   /// Whether this session is a rest day.

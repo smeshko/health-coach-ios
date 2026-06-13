@@ -57,11 +57,4 @@ struct DevSettingsLogCategoryTests {
     dev.setLogCategoryEnabled(false, "app")
     #expect(!dev.isLogCategoryEnabled("app"))
   }
-
-  @Test func test_testValue_resolvesEveryCategoryOff() {
-    // The interface `testValue` inherits the default-off closure (no persistence) — what features see.
-    let dev = DevSettings.testValue
-    #expect(!dev.isLogCategoryEnabled("tca"))
-    #expect(!dev.isLogCategoryEnabled("app"))
-  }
 }

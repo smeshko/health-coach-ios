@@ -1,6 +1,7 @@
 import APIClient
 import CheckInRepository
 import CoachCore
+import CoachTestSupport
 import Database
 import DatabaseLive
 import Dependencies
@@ -15,6 +16,83 @@ import Testing
 import WireModels
 
 @testable import SyncRepositoryLive
+
+/// Stub clients for the sync orchestration tests. The API route is built on the shared
+/// `APIClient.failing(overriding:)` factory + `CallRecorder` (Phase 11.6); the
+/// HealthKit/CheckIn/StrengthTest builders are sync-specific and live here (their only consumer),
+/// not in the shared API-stub factory.
+final class SyncStubs: @unchecked Sendable {
+  private let requestRecorder = CallRecorder<SyncRequest>()
+  private let sinceRecorder = CallRecorder<Date>()
+
+  let apiResult: Result<SyncResponse, APIError>
+  let samples: HealthSampleSet
+  let checkin: DomainModels.CheckIn?
+  let strengthTest: DomainModels.StrengthTest?
+
+  init(
+    apiResult: Result<SyncResponse, APIError>,
+    samples: HealthSampleSet = HealthSampleSet(),
+    checkin: DomainModels.CheckIn? = nil,
+    strengthTest: DomainModels.StrengthTest? = nil
+  ) {
+    self.apiResult = apiResult
+    self.samples = samples
+    self.checkin = checkin
+    self.strengthTest = strengthTest
+  }
+
+  var capturedRequest: SyncRequest? { requestRecorder.lastArgument }
+  var capturedSince: Date? { sinceRecorder.lastArgument }
+
+  func healthKit() -> HealthKitClient {
+    HealthKitClient(
+      isHealthDataAvailable: { true },
+      requestAuthorization: {},
+      authorizationStatus: { [:] },
+      deltaSamples: { [self] since in
+        sinceRecorder.record(since)
+        return samples
+      }
+    )
+  }
+
+  func api() -> APIClient {
+    .failing(sync: { [self] request in
+      requestRecorder.record(request)
+      return try apiResult.get()
+    })
+  }
+
+  func checkInRepository() -> CheckInRepository {
+    CheckInRepository(save: { _ in }, current: { [self] _ in checkin })
+  }
+
+  func strengthTestRepository() -> StrengthTestRepository {
+    StrengthTestRepository(save: { _ in }, current: { [self] _ in strengthTest })
+  }
+}
+
+/// A canned successful response with caller-supplied counts (defaults all-zero).
+func syncResponse(
+  recordsUpserted: Int = 0,
+  recordsDuplicate: Int = 0,
+  workoutsUpserted: Int = 0,
+  activityDaysUpserted: Int = 0,
+  checkinSaved: Bool = false,
+  strengthTestSaved: Bool = false,
+  serverTime: Date = Date(timeIntervalSince1970: 5000)
+) -> SyncResponse {
+  SyncResponse(
+    recordsUpserted: recordsUpserted,
+    recordsDuplicate: recordsDuplicate,
+    workoutsUpserted: workoutsUpserted,
+    activityDaysUpserted: activityDaysUpserted,
+    checkinSaved: checkinSaved,
+    strengthTestSaved: strengthTestSaved,
+    serverTime: serverTime
+  )
+}
 
 struct SyncOrchestrationTests {
   /// 2026-06-08 ~09:00 Europe/Sofia — a Monday in ISO week 24.
@@ -230,4 +308,58 @@ struct SyncOrchestrationTests {
     let mark = try await watermark(db)
     #expect(mark != nil, "the first sync creates the watermark row on success")
   }
+
+  // MARK: - Partial-input asymmetry (audit gap #15)
+
+  /// A throwing `checkInRepository.current` degrades to nil (`try?`) — the sync still SUCCEEDS, sending
+  /// no check-in. Pins the documented optional-check-in behavior.
+  @Test func test_sync_checkInReadThrows_degradesToNil_syncSucceeds() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    let stubs = SyncStubs(apiResult: .success(syncResponse()))
+
+    let result = try await withDependencies {
+      $0.useEuropeSofia()
+      $0.date = .constant(Self.now)
+      $0.healthKitClient = stubs.healthKit()
+      $0.apiClient = stubs.api()
+      $0.database = db
+      $0.checkInRepository = CheckInRepository(save: { _ in }, current: { _ in throw StubReadError() })
+      $0.strengthTestRepository = stubs.strengthTestRepository()
+    } operation: {
+      try await SyncRepository.live.sync()
+    }
+
+    #expect(result.recordsUpserted == 0, "sync succeeds despite the check-in read failing")
+    #expect(stubs.capturedRequest?.checkin == nil, "a failed check-in read sends no check-in (try? → nil)")
+    let mark = try await watermark(db)
+    #expect(mark != nil, "the watermark still advances on a successful sync")
+  }
+
+  /// ASYMMETRY: a throwing `strengthTestRepository.current` is NOT swallowed — it ABORTS the whole sync
+  /// (the read is `try`, not `try?`). Pins the asymmetry vs the check-in half above (documented, not
+  /// fixed — the strength read is on the due-gate path and a failure there is treated as fatal).
+  @Test func test_sync_strengthReadThrows_abortsSync() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    let stubs = SyncStubs(apiResult: .success(syncResponse()))
+
+    let work: @Sendable () async throws -> Void = {
+      _ = try await withDependencies {
+        $0.useEuropeSofia()
+        $0.date = .constant(Self.now)
+        $0.healthKitClient = stubs.healthKit()
+        $0.apiClient = stubs.api()
+        $0.database = db
+        $0.checkInRepository = stubs.checkInRepository()
+        $0.strengthTestRepository = StrengthTestRepository(save: { _ in }, current: { _ in throw StubReadError() })
+      } operation: {
+        try await SyncRepository.live.sync()
+      }
+    }
+
+    await #expect(throws: StubReadError.self) { try await work() }
+    let mark = try await watermark(db)
+    #expect(mark == nil, "an aborted sync must not advance the watermark")
+  }
 }
+
+private struct StubReadError: Error {}

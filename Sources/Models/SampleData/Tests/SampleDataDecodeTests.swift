@@ -34,6 +34,13 @@ struct SampleDataDecodeTests {
       .dailyBriefRestKnee: .amber,
       .dailyBriefNoFood: .green,
     ]
+    // Audit gap: pin that the expected-band map covers EXACTLY the daily-brief scenarios — a newly
+    // added daily scenario would otherwise dodge the semantic band pin silently.
+    let dailyScenarios = SampleScenario.allCases.filter { $0.rawValue.hasPrefix("daily_brief_") }
+    #expect(
+      Set(expectedBands.keys) == Set(dailyScenarios),
+      "every daily-brief scenario must carry an expected-band assertion"
+    )
     for (scenario, band) in expectedBands {
       let brief = try SampleData.dailyBrief(scenario).domain
       #expect(brief.readiness.band == band, "\(scenario)")
@@ -49,17 +56,16 @@ struct SampleDataDecodeTests {
     #expect(
       try SampleData.dailyBrief(.dailyBriefRestKnee).domain.safetyGate.reasons == [.kneePainHigh]
     )
-  }
 
-  @Test func test_noFood_hasNilIntake() throws {
-    #expect(try SampleData.dailyBrief(.dailyBriefNoFood).domain.intakeYesterday == nil)
-  }
-
-  @Test func test_unknownFlag_survivesMapping() throws {
-    let brief = try SampleData.dailyBrief(.dailyBriefNoFood).domain
+    // Folded from test_noFood_hasNilIntake (audit MERGE): the no-food scenario maps to a nil yesterday
+    // intake.
+    let noFood = try SampleData.dailyBrief(.dailyBriefNoFood).domain
+    #expect(noFood.intakeYesterday == nil)
+    // Folded from test_unknownFlag_survivesMapping (audit MERGE): an unknown flag survives the map with
+    // its raw string.
     #expect(
-      brief.session.flags.contains(.unknown("moon_phase")),
-      "unknown flag must survive the map with its raw string: \(brief.session.flags)"
+      noFood.session.flags.contains(.unknown("moon_phase")),
+      "unknown flag must survive the map with its raw string: \(noFood.session.flags)"
     )
   }
 
@@ -67,5 +73,13 @@ struct SampleDataDecodeTests {
     let plan = try SampleData.weeklyPlan(.weeklyPlanDeload).domain
     #expect(plan.budgets.deload)
     #expect(plan.budgets.longRunKm == nil, "deload fixture has a null longRunKm")
+  }
+
+  /// Audit gap: the sync_response fixture is only decode-checked elsewhere; pin a couple of its fields
+  /// so a resource edit that changes the canned counts is caught.
+  @Test func test_syncResponse_fixtureFields() throws {
+    let response = try SampleData.syncResponse()
+    #expect(response.recordsUpserted == 128)
+    #expect(response.checkinSaved)
   }
 }

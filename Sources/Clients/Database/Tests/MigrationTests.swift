@@ -26,15 +26,9 @@ struct MigrationTests {
     }
   }
 
-  @Test func test_migratorIsIdempotent() throws {
-    let queue = try DatabaseQueue()
-    try DatabaseClient.migrator.migrate(queue)
-    let firstApplied = try queue.read { db in try DatabaseClient.migrator.appliedMigrations(db) }
-    // Second run must not throw / duplicate-table-fail.
-    #expect(throws: Never.self) { try DatabaseClient.migrator.migrate(queue) }
-    let secondApplied = try queue.read { db in try DatabaseClient.migrator.appliedMigrations(db) }
-    #expect(firstApplied == secondApplied)
-  }
+  // Note: test_migratorIsIdempotent folded into StrengthWeekMigrationTests
+  // (test_migration_addsStrengthWeekColumn_idempotent_preservesAnchor) — audit MERGE; the
+  // appliedMigrations-equality assert lives there now.
 
   @Test func test_makeInMemory_isAlreadyMigrated() async throws {
     let database = try DatabaseClient.makeInMemory()
