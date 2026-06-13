@@ -10,6 +10,10 @@ public extension CoachColor {
   static let foregroundSubtle = neutral40 // fg-subtle
 
   // Surfaces.
+  // NOTE (Phase 12.4): the launch screen can't read this token (it renders before any code runs), so its
+  // values are duplicated in `App/Assets.xcassets/LaunchBackground.colorset` (light 0xF2F1EC / dark
+  // 0x121214 = `neutral10`). A palette change here MUST update that asset too, or the cold-launch frame
+  // will flash a stale color before the app's real background paints.
   static let background = neutral10 // bg
   static let surface = neutral0
   static let surfaceSunken = neutral05 // surface-sunken
