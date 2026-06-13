@@ -28,6 +28,7 @@ public struct DesignSystemGalleryList: View {
         NavigationLink("Colors") { ColorsGalleryPage() }
         NavigationLink("Typography") { TypographyGalleryPage() }
         NavigationLink("Spacing & Radii") { SpacingGalleryPage() }
+        NavigationLink("Motion") { MotionGalleryPage() }
         NavigationLink("Icons") { IconsGalleryPage() }
         NavigationLink("Labels") { LabelsGalleryPage() }
       }

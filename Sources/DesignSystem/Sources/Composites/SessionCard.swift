@@ -314,7 +314,7 @@ private struct SessionFooter: View {
           }
         }
       }
-      .buttonStyle(.plain)
+      .buttonStyle(.coachPressable)
       .foregroundStyle(.coachAccent)
     }
   }

@@ -81,7 +81,7 @@ struct ConnectView: View {
                 .stroke(.coachBorder, lineWidth: 1)
             )
           }
-          .buttonStyle(.plain)
+          .buttonStyle(.coachPressable)
         }
         .padding(CoachSpacing.spaceMd)
         .background(

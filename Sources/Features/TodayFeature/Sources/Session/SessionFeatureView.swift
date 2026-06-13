@@ -62,7 +62,7 @@ private struct SwapList: View {
         Button { onTap(offset) } label: {
           SwapRow(block: block, isSelected: offset == selectedIndex)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.coachPressable)
       }
     }
     .padding(CoachSpacing.spaceLg)

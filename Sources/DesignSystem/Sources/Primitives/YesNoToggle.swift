@@ -33,7 +33,7 @@ public struct YesNoToggle: View {
           .frame(width: Metrics.segmentWidth, height: Metrics.segmentHeight)
           .background(Capsule().fill(isActive ? .coachSurfaceRaised : Color.clear))
       }
-      .buttonStyle(.plain)
+      .buttonStyle(.coachPressable)
     }
   }
 }

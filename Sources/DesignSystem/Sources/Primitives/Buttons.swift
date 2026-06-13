@@ -41,7 +41,7 @@ public struct PrimaryButton: View {
         }
       }
     }
-    .buttonStyle(.plain)
+    .buttonStyle(.coachPressable)
     .disabled(isLoading)
   }
 }
@@ -74,7 +74,7 @@ public struct SecondaryButton: View {
         RoundedRectangle(cornerRadius: CoachRadius.md).stroke(.coachBorder, lineWidth: 1)
       )
     }
-    .buttonStyle(.plain)
+    .buttonStyle(.coachPressable)
   }
 }
 

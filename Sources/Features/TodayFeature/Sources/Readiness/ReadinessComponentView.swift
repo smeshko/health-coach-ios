@@ -41,7 +41,7 @@ public struct ReadinessComponentView: View {
           .font(.coachTextSm)
           .foregroundStyle(.coachAccent)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.coachPressable)
       }
 
       // Score numeral + the colored band word ("78 Ready"). The word + the meter's marker keep color
