@@ -46,6 +46,10 @@
       assertCoachSnapshot(of: NavigationStack { SpacingGalleryPage() })
     }
 
+    @Test func test_motionTokenTable() {
+      assertCoachSnapshot(of: MotionTokenTableSection())
+    }
+
     @Test func test_iconsPage() {
       assertCoachSnapshot(of: NavigationStack { IconsGalleryPage() })
     }
