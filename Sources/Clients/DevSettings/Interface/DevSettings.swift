@@ -8,8 +8,8 @@ import SampleData
 ///   `false` in RELEASE (`DevSettingsLive` hard-wires it; the routing collapses to `.live`).
 /// - `scenario(_:)` — the selected `SampleScenario` for an endpoint (falls back to the endpoint's
 ///   `defaultScenario`).
-/// - `setUseMockData(_:)` / `setScenario(_:for:)` — DEBUG-meaningful writers, so the launch-arg
-///   bootstrap (`DevSettingsLive.applyLaunchOverrides`) and the Epic 6.4 dev menu write through one
+/// - `setUseMockData(_:)` / `setScenario(_:for:)` — DEBUG-meaningful writers, so the first-launch
+///   seed (`DevSettingsLive.seedFirstLaunchDefault`) and the Epic 6.4 dev menu write through one
 ///   seam. No-ops in RELEASE.
 /// - `isLogCategoryEnabled(_:)` / `setLogCategoryEnabled(_:_:)` — the **persisted** per-log-category
 ///   enabled flag `LogClientLive` gates verbose categories on (`.http` is always-on and never

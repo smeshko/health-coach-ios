@@ -9,13 +9,12 @@
   ///
   /// `@unchecked Sendable` is sound because every access goes through a **shared static** `NSLock`,
   /// which serializes the scenario-map read-modify-write across *all* store instances over the same
-  /// `UserDefaults` (a per-instance lock would not — `liveValue`, `applyLaunchOverrides`, and tests
+  /// `UserDefaults` (a per-instance lock would not — `liveValue`, the first-launch seed, and tests
   /// each construct their own store). Contention is irrelevant: this is a DEBUG-only tool with rare
   /// writes.
   final class DevSettingsStore: @unchecked Sendable {
-    /// Persisted flag key. Deliberately distinct from the NSArgumentDomain launch-arg key
-    /// (`useMockData`) so `applyLaunchOverrides` can express "launch arg > persisted" precedence — if
-    /// both shared one key the argument domain would shadow the persisted value.
+    /// Persisted mock-flag key. The first-launch seed writes it once when missing; the dev-menu toggle
+    /// is the only control thereafter. `hasPersistedMock()` distinguishes "set to false" from "unset".
     static let mockKey = "coach.dev.useMockData"
     /// Persisted scenario map key: `[DevEndpoint.rawValue: SampleScenario.rawValue]`.
     static let scenariosKey = "coach.dev.scenarios"
@@ -60,8 +59,8 @@
       }
     }
 
-    /// Whether the persisted flag slot exists (distinguishes "set to false" from "never set" for the
-    /// override precedence).
+    /// Whether the persisted flag slot exists (distinguishes "set to false" from "never set" — the
+    /// first-launch seed only writes when this is false).
     func hasPersistedMock() -> Bool {
       Self.lock.withLock { defaults.object(forKey: Self.mockKey) != nil }
     }

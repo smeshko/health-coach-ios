@@ -21,14 +21,10 @@ import TokenClientLive
 @main
 struct CoachApp: App {
   init() {
-    // Route any stray third-party swift-log `Logger` to the console+file sink (process-global,
-    // one-shot). The `LogClient.live` path builds its own `Logger`, so this is not load-bearing for
-    // our logging — it only redirects loggers we don't own. Must precede everything else.
-    LogClient.bootstrapStandardLogging()
-
-    // DEBUG dev overrides (launch-arg > env > persisted > default); no-op in RELEASE. Must run BEFORE
-    // dependencies resolve `devSettings`, so the routed repos below read the resolved flag.
-    DevSettings.applyLaunchOverrides()
+    // DEBUG first-launch default: seed mock=true when nothing is persisted yet; no-op in RELEASE. Must
+    // run BEFORE dependencies resolve `devSettings`, so the routed repos below read the seeded flag. The
+    // dev-menu toggle is the only mock/live control thereafter.
+    DevSettings.seedFirstLaunchDefault()
 
     prepareDependencies {
       $0.context = .live
