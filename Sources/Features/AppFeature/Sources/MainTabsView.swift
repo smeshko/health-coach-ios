@@ -42,10 +42,10 @@ struct MainTabsView: View {
       .tag(MainTabs.Tab.settings)
     }
     .tint(.coachAccent)
-    // Drive the Today morning orchestration (check-in → sync → daily brief) once when the tab bar
-    // appears. `MainTabsView` mounts once per `.main` session (the outer `AppView` container does not
-    // re-mount on a branch swap), so this fires once — the "host sends `onAppOpen` on app-open" seam.
-    .task { store.send(.todayRoot(.onAppOpen)) }
+    // The Today cache-first open is dispatched from the AppFeature reducer (Phase 12.1, DECISIONS D8) —
+    // the `._tokenChecked(hasToken: true)` staying-put branch (cold launch with a token) and the
+    // `.onboarding(.delegate(.connected))` post-connect swap. A token-less launch therefore never
+    // hydrates cached health content before the onboarding swap. No view `.task` here.
   }
 }
 

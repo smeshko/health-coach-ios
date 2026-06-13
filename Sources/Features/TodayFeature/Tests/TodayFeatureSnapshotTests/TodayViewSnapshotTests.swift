@@ -132,5 +132,33 @@
         assertCoachSnapshot(of: TodayView(store: Store(initialState: state) { TodayFeature() }))
       }
     }
+
+    /// The `.ready` brief with `isBackgroundRefreshing == true` (Phase 12.1): the header shows the
+    /// "Updating…" pill + spinner instead of the synced pill. `lastSyncedAt` is set so the difference is
+    /// the pill swap, not its absence.
+    @Test func test_ready_backgroundRefreshing_showsUpdatingPill() {
+      let brief = SampleData.dailyBriefGreen
+      let map = zones()
+      let state = TodayFeature.State(
+        briefState: .ready(brief, .fresh),
+        readiness: ReadinessComponent.State(readiness: brief.readiness),
+        session: SessionFeature.State(
+          session: brief.session,
+          alternatives: brief.alternatives,
+          skipOk: brief.skipOk,
+          narrative: brief.narrative.filter { $0.type == .session },
+          zones: map
+        ),
+        zones: map,
+        lastSyncedAt: fixedInstant(),
+        isBackgroundRefreshing: true
+      )
+      withDependencies {
+        $0.calendar = .europeSofia
+        $0.date = .constant(fixedInstant())
+      } operation: {
+        assertCoachSnapshot(of: TodayView(store: Store(initialState: state) { TodayFeature() }))
+      }
+    }
   }
 #endif

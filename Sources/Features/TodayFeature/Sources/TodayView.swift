@@ -24,6 +24,9 @@ public struct TodayView: View {
   @Bindable var store: StoreOf<TodayFeature>
   @Dependency(\.date) var date
   @Dependency(\.calendar) var calendar
+  /// Scene re-activation drives the staleness-gated refresh (Phase 12.1, DECISIONS D6); the view stays
+  /// dumb (no staleness logic) and just forwards `.active` transitions to the reducer.
+  @Environment(\.scenePhase) private var scenePhase
 
   public init(store: StoreOf<TodayFeature>) {
     self.store = store
@@ -45,15 +48,17 @@ public struct TodayView: View {
           // The brief is gated behind the check-in, so it hasn't loaded yet — the base stays empty; the
           // check-in cover (below) is the entry screen on top.
           Color.clear
-        // One branch for both loading states (not two `case`s) — a shared view identity is what lets the
-        // ring's trim tween 0.3 → 0.7 and the spinners keep turning across the syncing→generating handoff.
+        // One branch for both loading states (not two `case`s) — a shared view identity keeps the
+        // indeterminate spinner turning across the syncing→generating handoff (no per-state remount).
         case .syncing, .generating:
           let generating = store.briefState == .generating
+          // Honest indeterminate ring (Phase 12.1, D5): no `progress` → the ring spins a fixed arc; the
+          // step checklist is the real progress UI. A quiet Cancel falls back to the cached brief (D4).
           SyncProgressView(
-            progress: generating ? LoadingCopy.generatingProgress : LoadingCopy.syncingProgress,
             title: generating ? LoadingCopy.generatingTitle : LoadingCopy.syncingTitle,
             subtitle: generating ? LoadingCopy.generatingSubtitle : LoadingCopy.syncingSubtitle,
-            steps: generating ? LoadingCopy.generatingSteps : LoadingCopy.syncingSteps
+            steps: generating ? LoadingCopy.generatingSteps : LoadingCopy.syncingSteps,
+            cancelAction: { store.send(.cancelSyncTapped) }
           )
           .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .syncFailed:
@@ -65,14 +70,27 @@ public struct TodayView: View {
             TodayBriefErrorContent(display: errorDisplay(for: error)) { store.send(.retryTapped) }
           }
         case let .ready(brief, freshness):
-          TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
-            TodayReadyContent(
-              store: store,
-              brief: brief,
-              cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
-            )
-          }
+          TodayContentScroll(
+            dateSubtitle: dateSubtitle,
+            syncedLabel: syncedLabel,
+            isBackgroundRefreshing: store.isBackgroundRefreshing,
+            // Pull-to-refresh runs the quiet background pass; `.finish()` keeps the system spinner up
+            // until the effect completes (Phase 12.1).
+            onRefresh: { await store.send(.pullToRefresh).finish() },
+            content: {
+              TodayReadyContent(
+                store: store,
+                brief: brief,
+                cachedLabel: freshness == .cached ? cachedLabel(brief.generatedAt) : nil
+              )
+            }
+          )
         }
+      }
+      // Scene re-activation drives the staleness-gated refresh / day-rollover re-orchestration (the
+      // reducer owns the decision); the view just forwards `.active` transitions (Phase 12.1, D6).
+      .onChange(of: scenePhase) { _, newPhase in
+        if newPhase == .active { store.send(.sceneBecameActive) }
       }
 
       // The morning check-in presented **on top** of the brief — an opaque full cover, so while the gate
@@ -138,6 +156,8 @@ private func errorDisplay(for error: BriefError) -> ErrorDisplay {
 private struct TodayHeader: View {
   let dateSubtitle: String
   let syncedLabel: String?
+  /// Phase 12.1: while a background refresh runs, the synced pill becomes an "Updating…" pill + spinner.
+  var isBackgroundRefreshing = false
 
   var body: some View {
     HStack(alignment: .firstTextBaseline) {
@@ -150,7 +170,14 @@ private struct TodayHeader: View {
           .foregroundStyle(.coachForegroundMuted)
       }
       Spacer(minLength: CoachSpacing.spaceSm)
-      if let syncedLabel {
+      if isBackgroundRefreshing {
+        // The quiet "Updating…" status during a background refresh (Phase 12.1) — a tiny spinner + a
+        // neutral pill, replacing the synced pill in place (no layout jump beyond intrinsic width).
+        HStack(spacing: CoachSpacing.space2xs) {
+          ProgressView().controlSize(.mini)
+          Pill("Updating…", tone: .accent)
+        }
+      } else if let syncedLabel {
         Pill(syncedLabel, tone: .positive, leading: .dot)
       }
     }
@@ -166,16 +193,40 @@ private struct TodayHeader: View {
 private struct TodayContentScroll<Content: View>: View {
   let dateSubtitle: String
   let syncedLabel: String?
+  /// Phase 12.1: while a background refresh runs the header shows an "Updating…" pill instead of the
+  /// synced pill.
+  var isBackgroundRefreshing = false
+  /// Phase 12.1: pull-to-refresh, wired only on the `.ready` scroll (the loading/terminal states carry
+  /// explicit Retry instead). `nil` ⇒ no `.refreshable`.
+  var onRefresh: (@Sendable () async -> Void)?
   @ViewBuilder let content: Content
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
-        TodayHeader(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel)
+        TodayHeader(
+          dateSubtitle: dateSubtitle,
+          syncedLabel: syncedLabel,
+          isBackgroundRefreshing: isBackgroundRefreshing
+        )
         content
       }
       .padding(CoachSpacing.spaceLg)
       .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .refreshableIf(onRefresh)
+  }
+}
+
+private extension View {
+  /// Attaches `.refreshable` only when a refresh closure is supplied (the `.ready` scroll), so the
+  /// loading/terminal scrolls — which use explicit Retry — don't gain a pull gesture.
+  @ViewBuilder
+  func refreshableIf(_ action: (@Sendable () async -> Void)?) -> some View {
+    if let action {
+      refreshable { await action() }
+    } else {
+      self
     }
   }
 }
@@ -185,7 +236,6 @@ private struct TodayContentScroll<Content: View>: View {
 /// The designed loading copy + step lists for `.syncing` / `.generating` (`2 ·`/`3 · Loading` mockups),
 /// factored out so the two states read declaratively. `.generating` shows step 1 done, step 2 active.
 private enum LoadingCopy {
-  static let syncingProgress = 0.3
   static let syncingTitle = "Syncing health data…"
   static let syncingSubtitle = "Pulling sleep, HRV and resting heart rate from Apple Health."
   static var syncingSteps: [SyncStep] {
@@ -195,7 +245,6 @@ private enum LoadingCopy {
     ]
   }
 
-  static let generatingProgress = 0.7
   static let generatingTitle = "Building today's brief…"
   static let generatingSubtitle =
     "Weighing your recovery, sleep and yesterday's load. This takes a few seconds."

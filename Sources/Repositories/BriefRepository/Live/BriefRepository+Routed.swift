@@ -19,6 +19,13 @@ public extension BriefRepository {
             mock: { scenario in try await Self.mock(scenario: scenario).dailyBrief(refresh) }
           )
         },
+        cachedDailyBrief: {
+          try await devRoute(
+            dev, .dailyBrief,
+            live: { try await live.cachedDailyBrief() },
+            mock: { scenario in try await Self.mock(scenario: scenario).cachedDailyBrief() }
+          )
+        },
         weeklyBrief: { isoWeek, refresh in
           try await devRoute(
             dev, .weeklyPlan,

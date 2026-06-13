@@ -26,21 +26,35 @@ public struct SyncStep: Identifiable, Sendable {
 }
 
 public struct SyncProgressView: View {
-  let progress: Double
+  /// The ring trim. `nil` (the default) is an **honest indeterminate** spinner — `sync()` exposes no
+  /// granular progress, so the ring shows a fixed partial arc that just spins, and the step checklist
+  /// below is the real progress UI (Phase 12.1, DECISIONS D5). A non-nil value renders a determinate trim
+  /// (kept for the gallery demo / future real progress).
+  let progress: Double?
   let title: String
   let subtitle: String
   let steps: [SyncStep]
+  /// An optional quiet "Cancel" affordance below the step list (Phase 12.1, DECISIONS D4). `nil` ⇒ no
+  /// button — the cache-first open made the blocking sync rare, so cancel is opt-in per caller.
+  let cancelAction: (() -> Void)?
 
   /// Drives the continuous spinner rotations (the ring + the active step arc). Flipped once in
   /// `onAppear`; the `repeatForever` animations key off it. Snapshot-safe: the resting end state is a
   /// full turn, which renders identically to the start frame.
   @State private var isSpinning = false
 
-  public init(progress: Double, title: String, subtitle: String, steps: [SyncStep]) {
+  public init(
+    progress: Double? = nil,
+    title: String,
+    subtitle: String,
+    steps: [SyncStep],
+    cancelAction: (() -> Void)? = nil
+  ) {
     self.progress = progress
     self.title = title
     self.subtitle = subtitle
     self.steps = steps
+    self.cancelAction = cancelAction
   }
 
   public var body: some View {
@@ -49,7 +63,8 @@ public struct SyncProgressView: View {
         Circle()
           .stroke(.coachBorder, lineWidth: Metrics.ringWidth)
         Circle()
-          .trim(from: 0, to: max(0, min(1, progress)))
+          // Indeterminate (`nil`) → a fixed partial arc that reads as a spinner; determinate → the trim.
+          .trim(from: 0, to: progress.map { max(0, min(1, $0)) } ?? Metrics.indeterminateTrim)
           .stroke(.coachAccent, style: StrokeStyle(lineWidth: Metrics.ringWidth, lineCap: .round))
           .rotationEffect(.degrees(isSpinning ? 270 : -90))
           .animation(
@@ -79,6 +94,14 @@ public struct SyncProgressView: View {
         ForEach(steps) { step in
           StepRow(step: step)
         }
+      }
+
+      // A quiet, secondary Cancel below the progress content (Phase 12.1) — muted so it never competes
+      // with the active loading state. Only rendered when a caller wires it.
+      if let cancelAction {
+        Button("Cancel", action: cancelAction)
+          .font(.coachTextMd)
+          .foregroundStyle(.coachForegroundMuted)
       }
     }
     .padding(CoachSpacing.spaceLg)
@@ -134,6 +157,9 @@ private enum Metrics {
   /// One full turn of the big ring / the active step arc — slow enough to read as "working".
   static let ringSpinDuration: TimeInterval = 1.8
   static let stepSpinDuration: TimeInterval = 1.2
-  /// The ring's trim tween when `progress` moves (e.g. syncing 0.3 → generating 0.7).
+  /// The ring's trim tween when `progress` moves (e.g. a determinate gallery demo).
   static let progressTweenDuration: TimeInterval = 0.45
+  /// The fixed partial arc of the **indeterminate** ring (`progress == nil`) — long enough to read as a
+  /// working spinner, short enough not to look like a determinate near-full ring (Phase 12.1, D5).
+  static let indeterminateTrim: CGFloat = 0.25
 }

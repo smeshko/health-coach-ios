@@ -1,6 +1,10 @@
+import CoachCore
 import ComposableArchitecture
+import DomainModels
+import Foundation
 import LogClient
 import OnboardingFeature
+import SampleData
 import SettingsFeature
 import Testing
 
@@ -41,30 +45,73 @@ struct AppFeatureSwitchTests {
     #expect(recorder.entries.contains { $0.category == .app && $0.message.contains("falling back to onboarding") })
   }
 
-  @Test func test_restoreSession_storedToken_staysInMain() async {
-    // The happy path: a token exists → the default `.main` is kept, no state change.
+  @Test func test_restoreSession_storedToken_staysInMain_andDispatchesOnAppOpen() async {
+    // The happy path: a token exists → the default `.main` is kept, AND the reducer dispatches the Today
+    // cache-first open (Phase 12.1, DECISIONS D8). `current` returns nil so the open lands at the check-in
+    // gate (no sync/network), keeping this an enum-routing test.
+    let now = sofiaInstant()
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
     } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
       $0.tokenClient.read = { "stored-bearer-token" }
+      $0.checkInRepository.current = { _ in nil }
     }
 
     await store.send(._restoreSession)
     await store.receive(\._tokenChecked, true)
+    // D8: the token-bearing staying-put branch dispatches the Today open.
+    await store.receive(\.main.todayRoot.onAppOpen)
+    await store.receive(\.main.todayRoot._checkInRequired) {
+      $0 = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
+    }
   }
 
-  @Test func test_connectedDelegate_swapsToMain() async {
+  /// D8 (round-3 #1): a token-LESS launch with a same-day cached brief swaps to onboarding and NEVER
+  /// dispatches `.onAppOpen`, so the cached Today content is never hydrated before the swap. The
+  /// `cachedDailyBrief` stub would return a brief if the open ran — its absence from the walk (exhaustive
+  /// store) proves the open was never triggered.
+  @Test func test_restoreSession_missingToken_neverDispatchesOnAppOpen() async {
+    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
+      AppFeature()
+    } withDependencies: {
+      $0.tokenClient.read = { nil }
+      $0.briefRepository.cachedDailyBrief = { SampleData.dailyBriefGreen }
+      $0.checkInRepository.current = { _ in
+        DomainModels.CheckIn(date: Date(), giSymptoms: false, kneePain: 0, illness: false)
+      }
+    }
+
+    await store.send(._restoreSession)
+    await store.receive(\._tokenChecked, false) {
+      $0 = .onboarding(OnboardingFeature.State())
+    }
+    // No `.main.todayRoot.onAppOpen` (or any Today action) in the exhaustive walk → the open never ran.
+    await store.finish()
+  }
+
+  @Test func test_connectedDelegate_swapsToMain_andDispatchesOnAppOpen() async {
     // Folds the former AppFeatureLogTests.test_connected_emitsAppLog (audit MERGE): the `.app`
-    // "Connected" line is asserted here on the same connected-swap walk.
+    // "Connected" line is asserted here on the same connected-swap walk. D8: post-connect also dispatches
+    // the Today cache-first open (the connected branch is token-bearing).
+    let now = sofiaInstant()
     let recorder = LogRecorder()
     let store = TestStore(initialState: AppFeature.State.onboarding(OnboardingFeature.State())) {
       AppFeature()
     } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
       $0.log = .recording(into: recorder)
+      $0.checkInRepository.current = { _ in nil }
     }
 
     await store.send(.onboarding(.delegate(.connected))) {
       $0 = .main(MainTabs.State())
+    }
+    await store.receive(\.main.todayRoot.onAppOpen)
+    await store.receive(\.main.todayRoot._checkInRequired) {
+      $0 = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
     }
 
     #expect(recorder.entries.contains { $0.category == .app && $0.message.contains("Connected") })
@@ -98,4 +145,16 @@ struct AppFeatureSwitchTests {
     #expect(mainState.weekly.count == 0)
     #expect(mainState.settings.count == 0)
   }
+
+  /// A `MainTabs.State` built with a mutating closure (keeps the `receive` mutation expressions terse).
+  private static func main(_ mutate: (inout MainTabs.State) -> Void) -> MainTabs.State {
+    var state = MainTabs.State()
+    mutate(&state)
+    return state
+  }
+}
+
+/// A wall-clock instant in Europe/Sofia (the pinned frame) for the D8 open-dispatch walks.
+private func sofiaInstant() -> Date {
+  Calendar.europeSofia.date(from: DateComponents(year: 2026, month: 6, day: 10, hour: 9))!
 }

@@ -47,3 +47,18 @@ func dailyBriefPolicy(refresh: Bool) async throws -> DomainModels.DailyBrief {
   }
   return domain
 }
+
+/// The pure same-day cache **peek** (Phase 12.1, DECISIONS D1) backing `BriefRepository.cachedDailyBrief`:
+/// read today's (Europe/Sofia) `DailyBriefRecord` straight from the DB and map it to domain, returning
+/// `nil` on a miss. **No `APIClient`, no `requireSyncedWatermark()`, never generates** — that is the
+/// whole point of the peek versus `dailyBriefPolicy` (get-or-generate). The day key (`sofiaToday()`) and
+/// the `toDomain()` mapping are shared with `dailyBriefPolicy` so the peek and the get-or-generate read
+/// agree on the same-day row.
+func cachedDailyBriefPolicy() async throws -> DomainModels.DailyBrief? {
+  @Dependency(\.database) var database
+
+  let cached = try await database.read { db in
+    try DailyBriefRecord.fetchOne(db, key: sofiaToday())
+  }
+  return try cached?.toDomain()
+}

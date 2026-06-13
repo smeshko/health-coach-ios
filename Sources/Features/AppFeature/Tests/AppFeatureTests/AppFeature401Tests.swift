@@ -1,5 +1,7 @@
 import APIClient
+import CoachCore
 import ComposableArchitecture
+import Foundation
 import LogClient
 import OnboardingFeature
 import Testing
@@ -44,10 +46,14 @@ struct AppFeature401Tests {
   }
 
   @Test func test_unauthorized_thenConnect_doesNotResubscribe() async {
+    let now = Date(timeIntervalSince1970: 0)
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
     } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
+      $0.checkInRepository.current = { _ in nil } // the post-connect Today open lands at the gate
       $0.apiClient.sessionEvents = { stream }
     }
 
@@ -60,9 +66,16 @@ struct AppFeature401Tests {
     }
 
     // User reconnects → back to main. The reducer never self-sends `._appWillAppear`, so no new
-    // subscription is opened (the view's once-mounted hook is not re-fired by the TestStore).
+    // subscription is opened (the view's once-mounted hook is not re-fired by the TestStore). The connect
+    // swap also dispatches the Today cache-first open (D8), which lands at the check-in gate here.
     await store.send(.onboarding(.delegate(.connected))) {
       $0 = .main(MainTabs.State())
+    }
+    await store.receive(\.main.todayRoot.onAppOpen)
+    await store.receive(\.main.todayRoot._checkInRequired) {
+      var main = MainTabs.State()
+      main.todayRoot.briefState = .checkInRequired
+      $0 = .main(main)
     }
 
     // Proof the ORIGINAL subscription survived the swap-back: a second 401 on the same stream is still
