@@ -1,5 +1,6 @@
 import APIClient
 import ComposableArchitecture
+import LogClient
 import OnboardingFeature
 import Testing
 
@@ -16,15 +17,20 @@ struct AppFeature401Tests {
   }
 
   @Test func test_appWillAppear_unauthorized_swapsToConnectTokenInvalid() async {
+    // Folds the former AppFeatureLogTests.test_appWillAppear_emitsLifecycleLog (audit MERGE): the
+    // `.lifecycle` "App will appear" line is asserted here on the same `._appWillAppear` walk.
+    let recorder = LogRecorder()
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
       AppFeature()
     } withDependencies: {
       $0.apiClient.sessionEvents = { stream }
+      $0.log = .recording(into: recorder)
     }
 
     // Start the subscription, then deliver a 401.
     await store.send(._appWillAppear)
+    #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("App will appear") })
     continuation.yield(.unauthorized)
     await store.receive(\._sessionEvent, .unauthorized) {
       $0 = self.tokenInvalid
@@ -70,32 +76,9 @@ struct AppFeature401Tests {
     await store.finish()
   }
 
-  @Test func test_unauthorized_whenAlreadyOnboarding_isNoOp() async {
-    let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
-      AppFeature()
-    } withDependencies: {
-      $0.apiClient.sessionEvents = { stream }
-    }
-
-    await store.send(._appWillAppear)
-
-    // First 401 from `.main` → swap to onboarding/connect.
-    continuation.yield(.unauthorized)
-    await store.receive(\._sessionEvent, .unauthorized) {
-      $0 = self.tokenInvalid
-    }
-
-    // A second 401 — now delivered while already `.onboarding` — is a NO-OP under the `.main`-only
-    // guard: no state change (the `receive` carries no mutation closure), no extra effect (the
-    // exhaustive store would catch any re-subscribe / retry).
-    continuation.yield(.unauthorized)
-    await store.receive(\._sessionEvent, .unauthorized)
-
-    continuation.finish()
-    await store.finish()
-  }
-
+  // Note: the former test_unauthorized_whenAlreadyOnboarding_isNoOp folded into the test below (audit
+  // MERGE) — both exercise the `guard case .main` no-op while `.onboarding`; this one asserts the
+  // stronger property (typed token + reason preserved across the no-op 401).
   @Test func test_unauthorized_whileOnboarding_preservesTypedToken() async {
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
     var onboarding = OnboardingFeature.State(step: .connect(reason: nil))
@@ -116,28 +99,6 @@ struct AppFeature401Tests {
 
     #expect(store.state.onboarding?.connect.token == "typed-token-123")
     #expect(store.state.onboarding?.step == .connect(reason: nil))
-
-    continuation.finish()
-    await store.finish()
-  }
-
-  @Test func test_validation_401SwapsToOnboarding() async {
-    // The epic's literal validation case: a TestStore emits a 401 session event → state swaps to
-    // onboarding.
-    let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
-    let store = TestStore(initialState: AppFeature.State.main(MainTabs.State())) {
-      AppFeature()
-    } withDependencies: {
-      $0.apiClient.sessionEvents = { stream }
-    }
-
-    await store.send(._appWillAppear)
-    continuation.yield(.unauthorized)
-    await store.receive(\._sessionEvent, .unauthorized) {
-      $0 = self.tokenInvalid
-    }
-
-    #expect(store.state.onboarding != nil)
 
     continuation.finish()
     await store.finish()

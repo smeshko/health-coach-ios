@@ -5,11 +5,25 @@ import SwiftUI
 /// Composite gallery page — the `NarrativeRenderer` (verbatim narrative sections). Shows the in-card
 /// eyebrow sections (summary + "why this today?" + COACH NOTE) on a surface card, then the standalone
 /// `.caution` "gentle note" callout on the background, mirroring `Today · Nutrition.png`.
+///
+/// The matrix fits one device frame, so the page wraps a single device-fitting section
+/// (`NarrativeGallerySection`) that the snapshot tests render directly (not the scrolling page).
 struct NarrativePage: View {
   var body: some View {
     GalleryScaffold(title: "Narrative") {
+      NarrativeGallerySection()
+    }
+  }
+}
+
+/// The device-fitting `NarrativeRenderer` matrix. Named `NarrativeGallerySection` (not
+/// `NarrativeSection`) to avoid colliding with `DomainModels.NarrativeSection` — the model type the
+/// renderer consumes in this same file.
+struct NarrativeGallerySection: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
       stateLabel("Eyebrow sections (summary + session)")
-      galleryCard {
+      narrativeSectionCard {
         NarrativeRenderer([
           NarrativeSection(
             type: .summary,
@@ -29,7 +43,7 @@ struct NarrativePage: View {
       }
 
       stateLabel("Coach note")
-      galleryCard {
+      narrativeSectionCard {
         NarrativeRenderer([
           NarrativeSection(
             type: .nutrition,
@@ -52,5 +66,20 @@ struct NarrativePage: View {
         ),
       ])
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .padding(CoachSpacing.spaceMd)
+    .background(.coachBackground)
   }
+}
+
+/// Wraps catalog content in a surface card (card radius + `spaceLg` padding) so the eyebrow sections show
+/// on their real product surface (the brief card) rather than the sunken background.
+@ViewBuilder
+private func narrativeSectionCard(@ViewBuilder _ content: () -> some View) -> some View {
+  content()
+    .padding(CoachSpacing.spaceLg)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous).fill(.coachSurface)
+    )
 }

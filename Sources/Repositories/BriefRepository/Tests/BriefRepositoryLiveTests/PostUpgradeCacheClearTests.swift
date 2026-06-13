@@ -1,5 +1,6 @@
 import APIClient
 import BriefRepository
+import CoachTestSupport
 import Database
 import Dependencies
 import DomainModels
@@ -47,7 +48,7 @@ struct PostUpgradeCacheClearTests {
     // rather than short-circuiting at the sync gate.
     try await TestDatabase.seedWatermark(database)
 
-    let stub = StubAPIClient(
+    let stub = BriefAPIStub(
       dailyResult: .failure(envelopeError(.internalError, 500)),
       weeklyResult: .failure(envelopeError(.internalError, 500))
     )

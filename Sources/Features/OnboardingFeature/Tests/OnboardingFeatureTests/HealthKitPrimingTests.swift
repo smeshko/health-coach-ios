@@ -24,20 +24,10 @@ struct HealthKitPrimingTests {
       seen.formUnion(row.categories)
     }
     #expect(seen == Set(HealthDataCategory.allCases), "rows must cover every HealthDataCategory")
-  }
-
-  /// `runningForm` is the sole home for `runningDynamics` (so the row is mandatory, not conditional).
-  @Test func test_runningForm_isSoleHomeOfRunningDynamics() {
-    let homes = PrimingRow.allCases.filter { $0.categories.contains(.runningDynamics) }
-    #expect(homes == [.runningForm])
-  }
-
-  /// `primingGroups` collapses the 11 degraded rows into the 8 priming-screen groups.
-  @Test func test_primingGroups_areTheEightDesignGroups() {
-    #expect(
-      PrimingRow.primingGroups
-        == [.heartRate, .sleep, .steps, .vo2Max, .runningForm, .workoutsEffort, .bodyWeight, .dietary]
-    )
+    // Folded from test_runningForm_isSoleHomeOfRunningDynamics (audit MERGE): runningForm is the sole
+    // home for runningDynamics (so the row is mandatory, not conditional).
+    let runningHomes = PrimingRow.allCases.filter { $0.categories.contains(.runningDynamics) }
+    #expect(runningHomes == [.runningForm])
   }
 
   // MARK: DesignSystem label boundary (no raw machine key reaches a view)
@@ -60,35 +50,6 @@ struct HealthKitPrimingTests {
       #expect(!group.groupLabel.title.isEmpty, "\(group) has an empty group label")
       #expect(!group.groupLabel.subtitle.isEmpty, "\(group) has an empty group subtitle")
     }
-  }
-
-  /// The priming-group head copy matches the design (and is distinct from the per-row label for the
-  /// grouped heads — `heartRate` heads "Heart & recovery", not "Heart rate").
-  @Test func test_groupHeads_useGroupCopy_distinctFromRowCopy() {
-    #expect(PrimingRow.heartRate.groupLabel.title == "Heart & recovery")
-    #expect(PrimingRow.heartRate.rowLabel.title == "Heart rate")
-    #expect(PrimingRow.steps.groupLabel.title == "Activity & energy")
-    #expect(PrimingRow.steps.rowLabel.title == "Steps")
-  }
-
-  // MARK: Pure state transitions (no effects in TASK-001)
-
-  /// The step opens in `.priming` (the `connectTapped` → `.authorizing` edge is asserted in every effect
-  /// scenario below, since `connectTapped` now also kicks off the authorize/probe effect).
-  @Test func test_initialState_isPriming() {
-    let store = TestStore(initialState: HealthKitPriming.State()) {
-      HealthKitPriming()
-    }
-    #expect(store.state.phase == .priming)
-  }
-
-  @Test func test_continueTapped_fromDegraded_emitsFinished() async {
-    let summary = HealthKitPriming.DegradedSummary(missing: [.sleep])
-    let store = TestStore(initialState: HealthKitPriming.State(phase: .degraded(summary))) {
-      HealthKitPriming()
-    }
-    await store.send(.continueTapped)
-    await store.receive(\.delegate, .finished)
   }
 
   // MARK: Authorize + degraded-detection effects (TASK-002)

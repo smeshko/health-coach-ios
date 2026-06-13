@@ -29,6 +29,7 @@ public struct DesignSystemGalleryList: View {
         NavigationLink("Typography") { TypographyGalleryPage() }
         NavigationLink("Spacing & Radii") { SpacingGalleryPage() }
         NavigationLink("Icons") { IconsGalleryPage() }
+        NavigationLink("Labels") { LabelsGalleryPage() }
       }
       Section("Primitives") {
         ForEach(GalleryComponent.primitives) { component in

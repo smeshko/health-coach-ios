@@ -23,11 +23,15 @@ struct CodableTests {
 
   @Test func test_closedEnum_encodesWireRawString() throws {
     #expect(try encodedString(Card.easyRun) == "\"easy_run\"")
+    #expect(try encodedString(Card.longRun) == "\"long_run\"")
     #expect(try encodedString(Card.boxingTechnique) == "\"boxing_technique\"")
     #expect(try encodedString(Card.threshold) == "\"threshold\"")
     #expect(try encodedString(Zone.z3) == "\"z3\"")
     #expect(try encodedString(Intensity.quality) == "\"quality\"")
     #expect(try encodedString(NarrativeType.summary) == "\"summary\"")
+    // Decode-direction pin too (the wire→domain raw string for long_run was previously only covered
+    // by the deleted inline weekly fixture — review #2.1).
+    #expect(try decoder.decode(Card.self, from: Data("\"long_run\"".utf8)) == .longRun)
   }
 
   @Test func test_closedEnum_roundTrips() throws {

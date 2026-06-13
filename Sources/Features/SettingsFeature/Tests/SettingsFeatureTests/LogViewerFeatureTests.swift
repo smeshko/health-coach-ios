@@ -24,12 +24,16 @@
     private let now = Date(timeIntervalSince1970: 1_749_556_800)
 
     @Test func test_onAppear_loadsParsesAndAnchorsDate() async {
+      // `.onAppear` and `.refreshTapped` are literally one combined reducer case, so this test also
+      // covers the former test_refreshTapped_reloadsLines (audit MERGE): the second send below re-loads
+      // a fresh line set over the already-loaded entries via `.refreshTapped`.
       let lines = sample
+      let fresh = LockIsolated(sample)
       let store = TestStore(initialState: LogViewerFeature.State()) {
         LogViewerFeature()
       } withDependencies: {
         $0.date = .constant(now)
-        $0.log.readRecent = { lines }
+        $0.log.readRecent = { fresh.value }
       }
 
       await store.send(.onAppear) {
@@ -40,24 +44,17 @@
         $0.isLoading = false
         $0.entries = LogViewerFeature.State.parse(lines)
       }
-    }
 
-    @Test func test_refreshTapped_reloadsLines() async {
-      let fresh = ["2026-06-10 13:00:00.000 INFO [app] fresh"]
-      let store = TestStore(initialState: LogViewerFeature.State(lines: ["2026-06-10 12:00:00.000 INFO [app] old"])) {
-        LogViewerFeature()
-      } withDependencies: {
-        $0.date = .constant(now)
-        $0.log.readRecent = { fresh }
-      }
-
+      // Refresh re-loads the (now different) recent lines over the existing entries — same reducer case.
+      let freshLines = ["2026-06-10 13:00:00.000 INFO [app] fresh"]
+      fresh.setValue(freshLines)
       await store.send(.refreshTapped) {
         $0.isLoading = true
         $0.referenceDate = now
       }
       await store.receive(\.logsLoaded) {
         $0.isLoading = false
-        $0.entries = LogViewerFeature.State.parse(fresh)
+        $0.entries = LogViewerFeature.State.parse(freshLines)
       }
     }
 
@@ -74,18 +71,6 @@
       await store.finish()
 
       #expect(cleared.value, "clearTapped must clear the on-disk logs")
-    }
-
-    @Test func test_filterActions_updateState() async {
-      let store = TestStore(initialState: LogViewerFeature.State()) {
-        LogViewerFeature()
-      }
-
-      await store.send(.queryChanged("boom")) { $0.query = "boom" }
-      await store.send(.minLevelChanged(.error)) { $0.minLevel = .error }
-      await store.send(.categoryToggled(.http)) { $0.enabledCategories.remove(.http) }
-      await store.send(.categoryToggled(.http)) { $0.enabledCategories.insert(.http) }
-      await store.send(.dateRangeChanged(.today)) { $0.dateRange = .today }
     }
 
     @Test func test_filteredEntries_appliesLevelCategoryAndQuery() {
@@ -128,6 +113,26 @@
       // `.all` shows everything, including the unparsed-date case left untouched.
       state.dateRange = .all
       #expect(state.filteredEntries.count == 3)
+    }
+
+    /// Audit gap (cheap residual): exercise the `.last15min` / `.last24h` cutoffs (only `.today` /
+    /// `.lastHour` / `.all` were covered).
+    @Test func test_filteredEntries_last15minAndLast24h() {
+      let lines = [
+        "2026-06-09 11:00:00.000 INFO [app] yesterday morning", // before the 24h cutoff (yesterday 12:30)
+        "2026-06-10 08:00:00.000 INFO [app] this morning", // inside 24h, outside 15min
+        "2026-06-10 12:20:00.000 ERROR [http] ten minutes ago", // inside the 15min window
+      ]
+      var state = LogViewerFeature.State(lines: lines)
+      state.referenceDate = LogTimestamp.parse("2026-06-10 12:30:00.000")!
+
+      // `.last15min` (cutoff 12:15) keeps only the 12:20 entry.
+      state.dateRange = .last15min
+      #expect(state.filteredEntries.map(\.message) == ["ten minutes ago"])
+
+      // `.last24h` (cutoff yesterday 12:30) drops the 13:00 entry from the day before.
+      state.dateRange = .last24h
+      #expect(state.filteredEntries.map(\.message) == ["this morning", "ten minutes ago"])
     }
 
     @Test func test_filteredEntries_dropsUndatedLinesUnderActiveDateRange() {

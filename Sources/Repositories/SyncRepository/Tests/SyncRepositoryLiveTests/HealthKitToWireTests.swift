@@ -29,16 +29,16 @@ struct HealthKitToWireTests {
     #expect(wire.category == "resting")
     #expect(wire.source == "Watch")
     #expect(wire.metadata == ["motion": "still"])
-  }
 
-  @Test func test_wireHealthRecord_nilOptionals() {
-    let payload = HealthRecordPayload(
+    // Folded from test_wireHealthRecord_nilOptionals (audit MERGE): a payload with the optionals
+    // absent maps to nil (the `metadata.map` is the only real branch here).
+    let bare = HealthRecordPayload(
       uuid: "u2", type: .stepCount, start: Date(timeIntervalSince1970: 1), end: Date(timeIntervalSince1970: 2)
     )
-    let wire = wireHealthRecord(payload)
-    #expect(wire.value == nil)
-    #expect(wire.unit == nil)
-    #expect(wire.metadata == nil)
+    let bareWire = wireHealthRecord(bare)
+    #expect(bareWire.value == nil)
+    #expect(bareWire.unit == nil)
+    #expect(bareWire.metadata == nil)
   }
 
   @Test func test_wireWorkout_mapsOptionals() {

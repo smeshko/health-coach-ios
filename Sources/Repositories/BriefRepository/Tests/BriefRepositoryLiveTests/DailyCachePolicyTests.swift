@@ -1,6 +1,7 @@
 import APIClient
 import BriefRepository
 import CoachCore
+import CoachTestSupport
 import Database
 import Dependencies
 import DomainModels
@@ -24,7 +25,7 @@ struct DailyCachePolicyTests {
     let (_, domain) = try greenFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedDaily(db, domain)
-    let stub = StubAPIClient()
+    let stub = BriefAPIStub()
 
     let result = try await runWithSofia(now: domain.date, stub: stub, database: db) {
       try await BriefRepository.live.dailyBrief(false)
@@ -34,38 +35,46 @@ struct DailyCachePolicyTests {
     #expect(stub.dailyCallCount == 0, "a same-day cache hit must not hit the network")
   }
 
-  @Test func test_dailyBrief_missNoSync_throwsSyncRequired() async throws {
+  /// Audit gap #10: a `refresh == true` on a seeded same-day cache with NO watermark. `refresh` skips
+  /// the cache-read and hits the sync gate, so a stale-but-cached, un-synced state throws
+  /// `.syncRequired` — the cached copy does NOT serve under a gated refresh (both prior refresh-unsynced
+  /// tests used an empty DB, leaving this unpinned).
+  @Test func test_dailyBrief_refreshTrue_cachedButUnsynced_throwsSyncRequired() async throws {
     let (_, domain) = try greenFixture()
-    let db = try TestDatabase.makeInMemory() // empty, no watermark
-    let stub = StubAPIClient()
-
-    await expectBriefError(.syncRequired) {
-      try await runWithSofia(now: domain.date, stub: stub, database: db) {
-        try await BriefRepository.live.dailyBrief(false)
-      }
-    }
-    #expect(stub.dailyCallCount == 0, "an un-synced miss must not hit the network")
-  }
-
-  @Test func test_dailyBrief_refreshUnsynced_throwsSyncRequired() async throws {
-    // A refresh on an un-synced state is still gated (locked: PLAN line 66 / Decisions).
-    let (_, domain) = try greenFixture()
-    let db = try TestDatabase.makeInMemory() // no watermark
-    let stub = StubAPIClient()
+    let db = try TestDatabase.makeInMemory()
+    try await TestDatabase.seedDaily(db, domain) // same-day cached row, but NO watermark
+    let stub = BriefAPIStub()
 
     await expectBriefError(.syncRequired) {
       try await runWithSofia(now: domain.date, stub: stub, database: db) {
         try await BriefRepository.live.dailyBrief(true)
       }
     }
-    #expect(stub.dailyCallCount == 0, "an un-synced refresh must not hit the network")
+    #expect(stub.dailyCallCount == 0, "a gated refresh must not hit the network even with a cached row")
+  }
+
+  /// On an un-synced empty DB the gate trips regardless of `refresh` — the refresh true/false paths
+  /// converge before the gate, so this parameterized test subsumes the former
+  /// test_dailyBrief_refreshUnsynced_throwsSyncRequired (audit MERGE).
+  @Test(arguments: [false, true])
+  func test_dailyBrief_missNoSync_throwsSyncRequired(refresh: Bool) async throws {
+    let (_, domain) = try greenFixture()
+    let db = try TestDatabase.makeInMemory() // empty, no watermark
+    let stub = BriefAPIStub()
+
+    await expectBriefError(.syncRequired) {
+      try await runWithSofia(now: domain.date, stub: stub, database: db) {
+        try await BriefRepository.live.dailyBrief(refresh)
+      }
+    }
+    #expect(stub.dailyCallCount == 0, "an un-synced miss/refresh must not hit the network")
   }
 
   @Test func test_dailyBrief_missSynced_generatesAndPersists() async throws {
     let (dto, domain) = try greenFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(dailyResult: .success(dto))
+    let stub = BriefAPIStub(dailyResult: .success(dto))
 
     let result = try await runWithSofia(now: domain.date, stub: stub, database: db) {
       try await BriefRepository.live.dailyBrief(false)
@@ -76,22 +85,12 @@ struct DailyCachePolicyTests {
     #expect(stub.lastDailyRefresh == false)
     let count = try await TestDatabase.dailyCount(db)
     #expect(count == 1, "the generated brief must be persisted")
-  }
 
-  @Test func test_dailyBrief_generateThenReread_isCacheHit() async throws {
-    let (dto, domain) = try greenFixture()
-    let db = try TestDatabase.makeInMemory()
-    try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(dailyResult: .success(dto))
-
-    let first = try await runWithSofia(now: domain.date, stub: stub, database: db) {
-      try await BriefRepository.live.dailyBrief(false)
-    }
+    // Folded from test_dailyBrief_generateThenReread_isCacheHit (audit MERGE): a second same-day read
+    // is a cache hit (key↔PK agree) — no extra network call.
     let second = try await runWithSofia(now: domain.date, stub: stub, database: db) {
       try await BriefRepository.live.dailyBrief(false)
     }
-
-    #expect(first == domain)
     #expect(second == domain)
     #expect(stub.dailyCallCount == 1, "the second same-day call must be a cache hit (key↔PK agree)")
   }
@@ -103,7 +102,7 @@ struct DailyCachePolicyTests {
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
     try await TestDatabase.seedDaily(db, domain) // the stale cached record
-    let stub = StubAPIClient(dailyResult: .success(newDTO))
+    let stub = BriefAPIStub(dailyResult: .success(newDTO))
 
     let result = try await runWithSofia(now: domain.date, stub: stub, database: db) {
       try await BriefRepository.live.dailyBrief(true)
@@ -127,6 +126,9 @@ struct DailyCachePolicyTests {
       (envelopeError(.unauthorized, 401), .unauthorized),
       (envelopeError(.notFound, 404), .serverError),
       (.unauthorized, .unauthorized),
+      // Folded from test_dailyBrief_transportFailure_throwsTransient (audit MERGE): a transport error
+      // is retry-friendly.
+      (.transport("offline"), .transientGenerationFailed),
       // An unknown error code fails envelope decode → `.unexpectedStatus` → retry-friendly (D3).
       (.unexpectedStatus(500), .transientGenerationFailed),
       // A 2xx body whose closed enum is out-of-set (Phase 11.3 strict decode) throws `.decoding`,
@@ -140,7 +142,7 @@ struct DailyCachePolicyTests {
       let (_, domain) = try greenFixture()
       let db = try TestDatabase.makeInMemory()
       try await TestDatabase.seedWatermark(db)
-      let stub = StubAPIClient(dailyResult: .failure(apiError))
+      let stub = BriefAPIStub(dailyResult: .failure(apiError))
       await expectBriefError(expected) {
         try await runWithSofia(now: domain.date, stub: stub, database: db) {
           try await BriefRepository.live.dailyBrief(false)
@@ -153,7 +155,7 @@ struct DailyCachePolicyTests {
     let (_, domain) = try greenFixture()
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(dailyResult: .failure(envelopeError(.internalError, 500)))
+    let stub = BriefAPIStub(dailyResult: .failure(envelopeError(.internalError, 500)))
 
     await expectBriefError(.insufficientData) {
       try await runWithSofia(now: domain.date, stub: stub, database: db) {
@@ -170,22 +172,9 @@ struct DailyCachePolicyTests {
     var yesterday = domain
     yesterday.date = domain.date.addingTimeInterval(-86400)
     try await TestDatabase.seedDaily(db, yesterday)
-    let stub = StubAPIClient(dailyResult: .failure(envelopeError(.internalError, 500)))
+    let stub = BriefAPIStub(dailyResult: .failure(envelopeError(.internalError, 500)))
 
     await expectBriefError(.serverError) {
-      try await runWithSofia(now: domain.date, stub: stub, database: db) {
-        try await BriefRepository.live.dailyBrief(false)
-      }
-    }
-  }
-
-  @Test func test_dailyBrief_transportFailure_throwsTransient() async throws {
-    let (_, domain) = try greenFixture()
-    let db = try TestDatabase.makeInMemory()
-    try await TestDatabase.seedWatermark(db)
-    let stub = StubAPIClient(dailyResult: .failure(.transport("offline")))
-
-    await expectBriefError(.transientGenerationFailed) {
       try await runWithSofia(now: domain.date, stub: stub, database: db) {
         try await BriefRepository.live.dailyBrief(false)
       }
@@ -202,7 +191,7 @@ struct DailyCachePolicyTests {
     let db = try TestDatabase.makeInMemory()
     try await TestDatabase.seedWatermark(db)
     try await TestDatabase.seedDaily(db, domain) // record under day D
-    let stub = StubAPIClient(dailyResult: .success(dto))
+    let stub = BriefAPIStub(dailyResult: .success(dto))
 
     // Resolve on the next Sofia day → the day-D record must NOT be a stale hit.
     let nextDay = domain.date.addingTimeInterval(86400)
@@ -211,5 +200,34 @@ struct DailyCachePolicyTests {
     }
 
     #expect(stub.dailyCallCount == 1, "a different Sofia day is a miss → generate, not a stale hit")
+  }
+
+  /// A Europe/Sofia wall-clock midnight, host-independent (used to seed the DST-boundary record).
+  private static func sofiaMidnight(year: Int, month: Int, day: Int) -> Date {
+    var cal = Calendar(identifier: .iso8601)
+    cal.timeZone = TimeZone(identifier: "Europe/Sofia")!
+    return cal.date(from: DateComponents(year: year, month: month, day: day))!
+  }
+
+  /// Audit gap #4: daily rollover pinned across a Sofia DST-transition midnight (2026-03-29, EET→EEST,
+  /// a 23-hour day) — the riskiest expiry boundary. A brief cached under 2026-03-28 must be a MISS when
+  /// resolved on 2026-03-29, not a stale hit (the existing rollover tests use flat +86400 offsets, which
+  /// silently skip the short DST day). The seeded record's PK is its own Sofia midnight.
+  @Test func test_dailyBrief_dstTransitionRollover_isMiss() async throws {
+    let (dto, domain) = try greenFixture()
+    let db = try TestDatabase.makeInMemory()
+    try await TestDatabase.seedWatermark(db)
+    var dayBefore = domain
+    dayBefore.date = Self.sofiaMidnight(year: 2026, month: 3, day: 28) // day before the spring-forward
+    try await TestDatabase.seedDaily(db, dayBefore)
+    let stub = BriefAPIStub(dailyResult: .success(dto))
+
+    // Resolve at noon on the 23-hour DST day → a different Sofia day → a miss, not a stale hit.
+    let dstDayNoon = Self.sofiaMidnight(year: 2026, month: 3, day: 29).addingTimeInterval(12 * 3600)
+    _ = try await runWithSofia(now: dstDayNoon, stub: stub, database: db) {
+      try await BriefRepository.live.dailyBrief(false)
+    }
+
+    #expect(stub.dailyCallCount == 1, "a brief cached the day before a DST transition is not a stale hit")
   }
 }

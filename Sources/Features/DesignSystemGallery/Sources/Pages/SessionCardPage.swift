@@ -5,10 +5,30 @@ import SwiftUI
 /// Composite gallery page — the `SessionCard` variants: an easy run + a quality session
 /// (`Today · Exercise.png`), a strength session with the 1–10 effort scale
 /// (`Strength · Duration-led.png`), and a rest day (`Cell.png`).
+///
+/// The variants are tall, so each is its own device-fitting section (an easy-run + a quality cardio
+/// section, then strength + rest); the page stacks them and the snapshot tests render the sections
+/// (not this scrolling page) so nothing clips below the fold.
 struct SessionCardPage: View {
   var body: some View {
     GalleryScaffold(title: "SessionCard") {
       stateLabel("Easy run (cardio)")
+      SessionCardEasyRunSection()
+      stateLabel("Quality session (cardio)")
+      SessionCardQualitySection()
+      stateLabel("Strength (effort scale)")
+      SessionCardStrengthSection()
+      stateLabel("Rest day")
+      SessionCardRestSection()
+    }
+  }
+}
+
+/// The **easy-run cardio** variant (`Today · Exercise.png`): a Z2 zone bar + zone-range caption +
+/// cadence line + the in-card session narrative + a prehab add-on + footer slots. Fits one frame.
+struct SessionCardEasyRunSection: View {
+  var body: some View {
+    sessionCardSectionColumn {
       SessionCard(
         SessionBlock(
           card: .easyRun,
@@ -31,8 +51,15 @@ struct SessionCardPage: View {
         onSwap: {},
         onSkip: {}
       )
+    }
+  }
+}
 
-      stateLabel("Quality session (cardio)")
+/// The **quality cardio** variant (`Today · Exercise.png`): a Z4 bar + an hr-cap line (no zone-range
+/// caption) + the in-card session narrative + footer slots. Fits one frame.
+struct SessionCardQualitySection: View {
+  var body: some View {
+    sessionCardSectionColumn {
       SessionCard(
         SessionBlock(
           card: .threshold,
@@ -54,8 +81,16 @@ struct SessionCardPage: View {
         onSwap: {},
         onSkip: {}
       )
+    }
+  }
+}
 
-      stateLabel("Strength (effort scale)")
+/// The **strength / effort-scale** variant (`Strength · Duration-led.png`): the duration numeral + the
+/// 1–10 `SegmentedBar.range` effort scale with the derived band, the narrative, the flags, and a prehab
+/// add-on. Only model-backed data (no fabricated RPE/reserve/rest/lift copy).
+struct SessionCardStrengthSection: View {
+  var body: some View {
+    sessionCardSectionColumn {
       SessionCard(
         SessionBlock(
           card: .strengthLower,
@@ -75,8 +110,15 @@ struct SessionCardPage: View {
         onSwap: {},
         onSkip: {}
       )
+    }
+  }
+}
 
-      stateLabel("Rest day")
+/// The **rest-day** variant (`Cell.png`): the narrative, the authored optional-activity suggestion box,
+/// the "To help recovery along" recovery row, and the "Rest is training too." footer (no swap).
+struct SessionCardRestSection: View {
+  var body: some View {
+    sessionCardSectionColumn {
       SessionCard(
         SessionBlock(
           card: .rest,
@@ -95,4 +137,16 @@ struct SessionCardPage: View {
       )
     }
   }
+}
+
+/// Shared column scaffold — the card(s) on the app background with standard padding. A device-fitting,
+/// non-scrolling container so each section can be snapshotted whole.
+@ViewBuilder
+private func sessionCardSectionColumn(@ViewBuilder _ content: () -> some View) -> some View {
+  VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+    content()
+  }
+  .padding(CoachSpacing.spaceMd)
+  .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+  .background(.coachBackground)
 }

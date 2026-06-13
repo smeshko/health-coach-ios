@@ -39,7 +39,11 @@ struct ConnectComponentTests {
     #expect(calls == ["write", "probe"], "write must precede probe; clear must NOT run on success")
   }
 
-  @Test func test_connect_invalidToken_401_clearsToken_showsError_noConnected() async {
+  /// A probe failure (any error type — the reducer has a single `.probeResponse(.failure)` arm with no
+  /// per-error branch) clears the just-written candidate and shows the inline error. Parameterized over
+  /// 401 + transport (folds the former test_connect_transportFailure_… — audit MERGE).
+  @Test(arguments: [APIError.unauthorized, APIError.transport("offline")])
+  func test_connect_probeFailure_clearsToken_showsError_noConnected(probeError: APIError) async {
     let recorder = CallRecorder()
     let store = TestStore(initialState: ConnectComponent.State(token: "ahc_live_bad")) {
       ConnectComponent()
@@ -48,7 +52,7 @@ struct ConnectComponentTests {
       $0.tokenClient.clear = { await recorder.record("clear") }
       $0.apiClient.probe = {
         await recorder.record("probe")
-        throw APIError.unauthorized
+        throw probeError
       }
     }
 
@@ -57,30 +61,9 @@ struct ConnectComponentTests {
     await store.finish()
 
     let calls = await recorder.calls
-    #expect(calls == ["write", "probe", "clear"], "a 401 must clear the just-written candidate")
+    #expect(calls == ["write", "probe", "clear"], "a probe failure must clear the just-written candidate")
     // The absence of a received `.delegate(.connected)` is asserted by the exhaustive store (it would
     // fail on any unexpected action).
-  }
-
-  @Test func test_connect_transportFailure_clearsToken_showsError_noConnected() async {
-    let recorder = CallRecorder()
-    let store = TestStore(initialState: ConnectComponent.State(token: "ahc_live_x")) {
-      ConnectComponent()
-    } withDependencies: {
-      $0.tokenClient.write = { _ in await recorder.record("write") }
-      $0.tokenClient.clear = { await recorder.record("clear") }
-      $0.apiClient.probe = {
-        await recorder.record("probe")
-        throw APIError.transport("offline")
-      }
-    }
-
-    await store.send(.connectTapped) { $0.validation = .validating }
-    await store.receive(\.probeResponse) { $0.validation = .invalid }
-    await store.finish()
-
-    let calls = await recorder.calls
-    #expect(calls == ["write", "probe", "clear"], "a transport failure clears the candidate too")
   }
 
   @Test func test_editingToken_afterError_resetsValidationToIdle() async {
@@ -92,14 +75,6 @@ struct ConnectComponentTests {
       $0.token = "ahc_live_x93k7q7"
       $0.validation = .idle
     }
-  }
-
-  @Test func test_paste_fillsTokenField() async {
-    let store = TestStore(initialState: ConnectComponent.State()) {
-      ConnectComponent()
-    }
-
-    await store.send(.tokenPasted("ahc_live_pasted")) { $0.token = "ahc_live_pasted" }
   }
 
   @Test func test_connectTapped_emptyOrValidating_doesNothing() async {

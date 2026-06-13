@@ -72,11 +72,17 @@ struct RequestDTOTests {
     let request = try roundTrip(DailyBriefRequest.self, from: "{}")
     #expect(request.date == nil)
     #expect(request == DailyBriefRequest(date: nil))
+    // Folded the empty-body encode pin here (audit MERGE — moved from DecodeRoundTripTests): an
+    // absent-date request re-encodes to the empty object the server accepts.
+    let encoded = try #require(String(bytes: WireCoder.encoder.encode(DailyBriefRequest()), encoding: .utf8))
+    #expect(encoded == "{}")
   }
 
   @Test func test_weeklyBriefRequest_absentIsoWeek() throws {
     let request = try roundTrip(WeeklyBriefRequest.self, from: "{}")
     #expect(request.isoWeek == nil)
     #expect(request == WeeklyBriefRequest(isoWeek: nil))
+    let encoded = try #require(String(bytes: WireCoder.encoder.encode(WeeklyBriefRequest()), encoding: .utf8))
+    #expect(encoded == "{}")
   }
 }

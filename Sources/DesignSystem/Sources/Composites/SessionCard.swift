@@ -203,10 +203,13 @@ private struct ActiveSessionBody: View {
   }
 
   /// The big duration figure — a low–high window, collapsing to a single value when the bounds match.
+  /// Derived from `durationRange` (not the raw bounds) so an inverted server brief renders a normalized
+  /// window (`40–55`), never a backwards `55–40` (Phase 11.6 audit production finding 3).
   private var durationNumeral: String {
-    block.durationMinLow == block.durationMinHigh
-      ? "\(block.durationMinLow)"
-      : "\(block.durationMinLow)–\(block.durationMinHigh)"
+    let range = block.durationRange
+    return range.lowerBound == range.upperBound
+      ? "\(range.lowerBound)"
+      : "\(range.lowerBound)–\(range.upperBound)"
   }
 
   /// The unit beside the numeral. A cardio session carries the intensity word ("minutes, easy"); other

@@ -162,6 +162,16 @@ struct BannerPage: View {
 struct BarColumnsPage: View {
   var body: some View {
     GalleryScaffold(title: "BarColumns") {
+      BarColumnsSection()
+    }
+  }
+}
+
+/// The device-fitting `BarColumns` matrix — flat, ramp, and per-bar-color series on surface cards.
+/// Snapshotted directly (not via the scrolling page).
+struct BarColumnsSection: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
       stateLabel("Flat series · last highlighted")
       galleryCard { BarColumns(bars: flat) }
       stateLabel("Ascending ramp · last highlighted")
@@ -169,6 +179,9 @@ struct BarColumnsPage: View {
       stateLabel("Per-bar color")
       galleryCard { BarColumns(bars: multitone) }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .padding(CoachSpacing.spaceMd)
+    .background(.coachBackground)
   }
 
   /// Eight equal columns with the last in the strong accent — the flat-trend shape (#chart-1).
@@ -198,9 +211,23 @@ struct BarColumnsPage: View {
   }
 }
 
+/// The `SegmentedBar` primitive across its documented shapes. The full matrix is taller than the device
+/// frame, so it is split into two device-fitting sections — `SegmentedBarZonesSection` (zones +
+/// readiness) and `SegmentedBarMeterSection` (effort range + weekly streak) — which the page stacks and
+/// the snapshot tests render directly (so nothing clips below the fold).
 struct SegmentedBarPage: View {
   var body: some View {
     GalleryScaffold(title: "SegmentedBar") {
+      SegmentedBarZonesSection()
+      SegmentedBarMeterSection()
+    }
+  }
+}
+
+/// Zones (single + multiple active) and the 3-band readiness meter — a device-fitting section.
+struct SegmentedBarZonesSection: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
       stateLabel("Zones (Z1–Z5, active highlighted)")
       ForEach(1 ... 5, id: \.self) { target in
         SegmentedBar.zones(target: target)
@@ -212,6 +239,17 @@ struct SegmentedBarPage: View {
       ForEach([10, 60, 88], id: \.self) { score in
         SegmentedBar.readiness(score: score)
       }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .padding(CoachSpacing.spaceMd)
+    .background(.coachBackground)
+  }
+}
+
+/// The effort-range meter and the weekly-streak rows — a device-fitting section.
+struct SegmentedBarMeterSection: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
       stateLabel("Effort range")
       // The RPE/effort meter (#7): a markerless range bar framed by caller-composed captions.
       VStack(spacing: CoachSpacing.spaceXs) {
@@ -235,6 +273,9 @@ struct SegmentedBarPage: View {
                   days: [true, true, false, true, true, true, false], tone: .warning)
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .padding(CoachSpacing.spaceMd)
+    .background(.coachBackground)
   }
 
   /// One labelled weekly-streak row (#8): a title + count caption over a markerless steps bar.

@@ -2,8 +2,15 @@ import DomainModels
 import Foundation
 import WireModels
 
-/// Inline `WireModels` fixtures for the mapping tests (no `SampleData` yet — that arrives in
-/// Phase 2.3, D17). Parameterised just enough for the acceptance-criteria variants.
+/// Typed `WireModels` DTO builders for the mapping tests.
+///
+/// Phase 11.6 (TASK-003) audited these against SampleData: they are kept as **divergent-by-design**
+/// survivors, NOT re-pointed. Every builder deliberately carries off-canon values the SampleData
+/// resources do not — unknown flags (`"totally_new_flag"`), unknown reasons (`"brand_new_reason"`),
+/// a `.longRun` core card, nil rest-day/last-week variants — precisely to exercise the mapping's
+/// tolerant unknown-string handling (the point of these tests). No builder exactly mirrors a
+/// SampleData scenario, so re-pointing via `jsonData` would lose the divergence; re-pointing via
+/// `.domain` is forbidden (it would run the very mapping under test). They stay inline.
 enum WireFixtures {
   static func day(_ year: Int, _ month: Int, _ dayOfMonth: Int) -> Date {
     var calendar = Calendar(identifier: .iso8601)

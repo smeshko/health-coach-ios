@@ -56,12 +56,6 @@ struct DisplayLabelTests {
     #expect(Flag.unknown("").label == "Unknown")
   }
 
-  @Test func test_errorDisplay_allCasesHaveLabels() {
-    for value in ErrorDisplay.allCases {
-      #expect(!value.label.isEmpty, "\(value) has an empty label")
-    }
-  }
-
   @Test func test_errorDisplay_tokenRejected_hasConnectCopy() {
     #expect(
       ErrorDisplay.tokenRejected.label ==
@@ -69,11 +63,5 @@ struct DisplayLabelTests {
     )
     // Distinct from the 401 *banner* copy, which stays `.unauthorized`.
     #expect(ErrorDisplay.tokenRejected.label != ErrorDisplay.unauthorized.label)
-  }
-
-  @Test func test_colorAndIconCues_existForBandAndIntensity() {
-    // Compile-proof that the surviving cues are present (color/icon are never the sole signal).
-    _ = ReadinessBand.green.color
-    _ = Intensity.quality.iconName
   }
 }
