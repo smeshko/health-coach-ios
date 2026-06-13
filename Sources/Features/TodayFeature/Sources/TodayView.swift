@@ -44,12 +44,15 @@ public struct TodayView: View {
         case .idle:
           ProgressView()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transition(.opacity)
         case .checkInRequired:
           // The brief is gated behind the check-in, so it hasn't loaded yet — the base stays empty; the
           // check-in cover (below) is the entry screen on top.
           Color.clear
+            .transition(.opacity)
         // One branch for both loading states (not two `case`s) — a shared view identity keeps the
-        // indeterminate spinner turning across the syncing→generating handoff (no per-state remount).
+        // indeterminate spinner turning across the syncing→generating handoff (no per-state remount); the
+        // single `.transition` only fires entering/leaving `loading`, never *between* the two phases.
         case .syncing, .generating:
           let generating = store.briefState == .generating
           // Honest indeterminate ring (Phase 12.1, D5): no `progress` → the ring spins a fixed arc; the
@@ -61,14 +64,17 @@ public struct TodayView: View {
             cancelAction: { store.send(.cancelSyncTapped) }
           )
           .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .transition(.opacity)
         case .syncFailed:
           TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
             TodaySyncFailedContent { store.send(.retryTapped) }
           }
+          .transition(.opacity)
         case let .error(error):
           TodayContentScroll(dateSubtitle: dateSubtitle, syncedLabel: syncedLabel) {
             TodayBriefErrorContent(display: errorDisplay(for: error)) { store.send(.retryTapped) }
           }
+          .transition(.opacity)
         case let .ready(brief, freshness):
           TodayContentScroll(
             dateSubtitle: dateSubtitle,
@@ -85,6 +91,7 @@ public struct TodayView: View {
               )
             }
           )
+          .transition(.opacity)
         }
       }
       // Scene re-activation drives the staleness-gated refresh / day-rollover re-orchestration (the
@@ -102,8 +109,14 @@ public struct TodayView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.coachBackground)
+        .transition(.opacity)
       }
     }
+    // Crossfade every lifecycle swap — and the check-in cover's appearance/dismissal — on the payload-free
+    // `caseID` (Phase 12.3, DECISIONS D1/D2): scoped here so it covers reducer-driven transitions (effect
+    // resolution, scene refresh) as well as taps, without touching the reducer. Keyed on `caseID` (not the
+    // full `briefState`) so a Phase 12.1 `.ready`→`.ready` background swap doesn't re-crossfade the screen.
+    .coachAnimation(.screenChange, value: store.briefState.caseID)
     .background(.coachBackground)
   }
 

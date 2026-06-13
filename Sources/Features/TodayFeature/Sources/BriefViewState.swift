@@ -28,3 +28,30 @@ public enum BriefViewState: Equatable, Sendable {
 /// Whether a `ready` brief was served fresh (this request generated it) or from the same-day cache
 /// (PRD §8.2 — the `cached` flag drives the "as of HH:MM" label, never the spinner decision).
 public enum Freshness: Equatable, Sendable { case fresh, cached }
+
+public extension BriefViewState {
+  /// A payload-free discriminator over `BriefViewState` — one case per *screen kind* (Phase 12.3,
+  /// DECISIONS D1). `.syncing` and `.generating` collapse to a single `loading` case so the shared
+  /// loading-ring view identity survives the syncing→generating handoff (the ring keeps spinning) while
+  /// still crossfading against every *other* branch. Animating/triggering on `caseID` instead of the full
+  /// value means a Phase 12.1 background brief swap (`.ready(old)` → `.ready(new)`) or a freshness flip —
+  /// same `caseID` — never re-fires the whole-screen crossfade or the success haptic. One definition, two
+  /// consumers: TASK-001 (screen transition) and TASK-005 (`.success` haptic).
+  enum CaseID: Equatable, Sendable {
+    case idle, checkInRequired, loading, ready, syncFailed, error
+  }
+
+  /// The screen-kind of the current state (see `CaseID`). Payload-free, so `.ready(_, .fresh)` and
+  /// `.ready(_, .cached)` share `.ready` — freshness-sensitive consumers (the brief-ready haptic) read the
+  /// `Freshness` separately rather than splitting the case.
+  var caseID: CaseID {
+    switch self {
+    case .idle: .idle
+    case .checkInRequired: .checkInRequired
+    case .syncing, .generating: .loading
+    case .ready: .ready
+    case .syncFailed: .syncFailed
+    case .error: .error
+    }
+  }
+}
