@@ -10,6 +10,7 @@ import Foundation
 import GRDB
 import HealthKitClient
 import PersistenceModels
+import SampleData
 import StrengthTestRepository
 import SyncRepository
 import Testing
@@ -359,6 +360,16 @@ struct SyncOrchestrationTests {
     await #expect(throws: StubReadError.self) { try await work() }
     let mark = try await watermark(db)
     #expect(mark == nil, "an aborted sync must not advance the watermark")
+  }
+
+  /// The routing-used `SyncRepository.mock` must stay **dependency-free** (no HealthKit/APIClient/
+  /// Database) and return the canned `SampleData` result. Injecting NO live deps here means a future
+  /// change that made the mock resolve `@Dependency` would crash on an unimplemented dependency
+  /// (review #2.3 — the no-live-deps guard the deleted `MockTests` carried).
+  @Test func test_mock_returnsCannedResult_withoutResolvingLiveDeps() async throws {
+    let result = try await SyncRepository.mock(scenario: .success).sync()
+    let expected = try syncResult(SampleData.syncResponse())
+    #expect(result == expected)
   }
 }
 

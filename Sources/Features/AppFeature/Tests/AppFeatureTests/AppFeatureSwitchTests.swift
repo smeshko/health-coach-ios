@@ -11,6 +11,13 @@ import Testing
 /// covered separately in `AppFeature401Tests` (TASK-002).
 @MainActor
 struct AppFeatureSwitchTests {
+  /// The app defaults to `.main` (the session-restore design: start in `.main`, the background token
+  /// check swaps to onboarding only when no token is stored — a returning user lands straight on the
+  /// app). If this default flips, a stored-token launch would wrongly stick on Connect (review #2.2).
+  @Test func test_defaultState_isMain() {
+    #expect(AppFeature.State() == .main(MainTabs.State()))
+  }
+
   /// A nil OR empty stored token both fall back to onboarding (parameterized — the two cases share the
   /// `._tokenChecked(false)` receive path). Folds the former AppFeatureLogTests.test_restoreSession_*
   /// log asserts (audit MERGE): the `.lifecycle` "Restoring session" + `.app` onboarding-fallback lines
