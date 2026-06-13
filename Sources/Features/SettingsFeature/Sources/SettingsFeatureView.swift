@@ -38,6 +38,10 @@ public struct SettingsFeatureView: View {
             }
             .contentShape(Rectangle())
           }
+          // ALLOWLIST (Phase 12.2 / DECISIONS D4): `.plain` here SUPPRESSES the `List`-row button
+          // chrome (full-row highlight + chevron) so this custom row renders flat like its sibling
+          // `NavigationLink` — it is not feedback-stripping, so it deliberately stays `.plain` (not
+          // `.coachPressable`).
           .buttonStyle(.plain)
 
           NavigationLink("Component Gallery") {

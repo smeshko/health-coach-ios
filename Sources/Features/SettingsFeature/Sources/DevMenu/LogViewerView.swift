@@ -101,7 +101,7 @@
             } label: {
               Image(systemName: "xmark.circle.fill").foregroundStyle(.coachForegroundSubtle)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.coachPressable)
           }
         }
         .padding(.horizontal, CoachSpacing.spaceSm)
@@ -167,7 +167,7 @@
                   .background(Capsule().fill(isOn ? Color.coachAccentSoft : .clear))
                   .overlay(Capsule().stroke(isOn ? .clear : .coachBorder, lineWidth: 1))
               }
-              .buttonStyle(.plain)
+              .buttonStyle(.coachPressable)
             }
           }
         }
