@@ -244,6 +244,10 @@ public struct TodayFeature {
               await send(._syncFailed(.transient))
             }
           }
+          // Register the peek under the orchestration ID so a superseding trigger (e.g. a day-rollover
+          // `sceneBecameActive`) that fires inside this DB read drops it — otherwise its late
+          // `._cachedBriefLoaded` could stomp the new chain's `.syncing` (review #1).
+          .cancellable(id: CancelID.orchestration, cancelInFlight: true)
         )
 
       case ._checkInRequired:
@@ -315,10 +319,15 @@ public struct TodayFeature {
         // what makes the HR chip appear — and it preserves the child's swap/expansion UI state. A nil
         // fetch keeps previously held zones.
         mergeZones(&state, zones)
+        // Only act over a still-rendered `.ready` brief. If the state moved on (e.g. a day-rollover
+        // re-orchestration put a loading screen back up), this background result is stale — drop it
+        // rather than hydrate over a non-`.ready` state (defensive; the shared `CancelID.orchestration`
+        // normally makes this unreachable, but keep the terminal symmetric with the gated fallbacks).
+        guard case let .ready(current, _) = state.briefState else { return .none }
         // Content equality (DECISIONS D3): an unchanged brief leaves the children untouched (only the
         // freshness/cached-label metadata may shift); a changed brief re-seeds them via the full
         // hydration (same semantics as a fresh generation).
-        guard case let .ready(current, _) = state.briefState, contentEquals(current, brief) else {
+        guard contentEquals(current, brief) else {
           hydrate(&state, from: brief, freshness: .fresh)
           return .none
         }
