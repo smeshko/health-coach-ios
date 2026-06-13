@@ -1,5 +1,4 @@
 import APIClient
-import CheckInRepository
 import CoachCore
 import Database
 import Dependencies
@@ -7,8 +6,8 @@ import DomainModels
 import Foundation
 import GRDB
 import HealthKitClient
+import LocalRepositories
 import PersistenceModels
-import StrengthTestRepository
 import SyncRepository
 import WireModels
 

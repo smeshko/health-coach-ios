@@ -1,9 +1,8 @@
-import Database
 import GRDB
 import PersistenceModels
 import Testing
 
-@testable import DatabaseLive
+@testable import Database
 
 struct MigrationTests {
   private let tableNames = [

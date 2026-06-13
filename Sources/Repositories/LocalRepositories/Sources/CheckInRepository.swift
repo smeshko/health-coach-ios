@@ -5,9 +5,10 @@ import Foundation
 
 /// The local-only daily check-in repository (ARCHITECTURE §7, PRD §7.2). A `Sendable` struct of
 /// `@Sendable` closures: `save(_:)` upserts today's check-in by Europe/Sofia day (latest-wins) and
-/// `current(date:)` reads the check-in for a given Sofia day (`nil` if none). `.live` (GRDB) lives in
-/// `CheckInRepositoryLive`; `SyncRepository` (4.3) reads `current(date:)` to attach today's check-in
-/// to the `/sync` payload. No network — these inputs are local until a sync sends them.
+/// `current(date:)` reads the check-in for a given Sofia day (`nil` if none). `.live` (GRDB) lives
+/// alongside this in the `LocalRepositories` module (the two local repos were merged here in Phase
+/// 11.7); `SyncRepository` (4.3) reads `current(date:)` to attach today's check-in to the `/sync`
+/// payload. No network — these inputs are local until a sync sends them.
 public struct CheckInRepository: Sendable {
   public var save: @Sendable (_ checkIn: DomainModels.CheckIn) async throws -> Void
   public var current: @Sendable (_ date: Date) async throws -> DomainModels.CheckIn?

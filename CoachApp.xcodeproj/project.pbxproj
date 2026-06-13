@@ -11,16 +11,15 @@
 		CA000000000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA0000000000000000000008 /* Assets.xcassets */; };
 		CA000000000000000000000E /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000016 /* AppFeature */; };
 		CA0000000000000000000030 /* CoachCore in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000020 /* CoachCore */; };
-		CA0000000000000000000031 /* DevSettingsLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000021 /* DevSettingsLive */; };
+		CA0000000000000000000031 /* DevSettings in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000021 /* DevSettings */; };
 		CA0000000000000000000032 /* APIClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000022 /* APIClientLive */; };
-		CA0000000000000000000033 /* DatabaseLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000023 /* DatabaseLive */; };
+		CA0000000000000000000033 /* Database in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000023 /* Database */; };
 		CA0000000000000000000034 /* HealthKitClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000024 /* HealthKitClientLive */; };
-		CA0000000000000000000035 /* TokenClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000025 /* TokenClientLive */; };
+		CA0000000000000000000035 /* TokenClient in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000025 /* TokenClient */; };
 		CA0000000000000000000036 /* BriefRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000026 /* BriefRepositoryLive */; };
 		CA0000000000000000000037 /* SyncRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000027 /* SyncRepositoryLive */; };
 		CA0000000000000000000038 /* ProfileRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000028 /* ProfileRepositoryLive */; };
-		CA0000000000000000000039 /* CheckInRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000029 /* CheckInRepositoryLive */; };
-		CA000000000000000000003A /* StrengthTestRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA000000000000000000002A /* StrengthTestRepositoryLive */; };
+		CA0000000000000000000039 /* LocalRepositories in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000029 /* LocalRepositories */; };
 		CA000000000000000000003B /* LogClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA000000000000000000002B /* LogClientLive */; };
 /* End PBXBuildFile section */
 
@@ -37,16 +36,15 @@
 			files = (
 				CA000000000000000000000E /* AppFeature in Frameworks */,
 				CA0000000000000000000030 /* CoachCore in Frameworks */,
-				CA0000000000000000000031 /* DevSettingsLive in Frameworks */,
+				CA0000000000000000000031 /* DevSettings in Frameworks */,
 				CA0000000000000000000032 /* APIClientLive in Frameworks */,
-				CA0000000000000000000033 /* DatabaseLive in Frameworks */,
+				CA0000000000000000000033 /* Database in Frameworks */,
 				CA0000000000000000000034 /* HealthKitClientLive in Frameworks */,
-				CA0000000000000000000035 /* TokenClientLive in Frameworks */,
+				CA0000000000000000000035 /* TokenClient in Frameworks */,
 				CA0000000000000000000036 /* BriefRepositoryLive in Frameworks */,
 				CA0000000000000000000037 /* SyncRepositoryLive in Frameworks */,
 				CA0000000000000000000038 /* ProfileRepositoryLive in Frameworks */,
-				CA0000000000000000000039 /* CheckInRepositoryLive in Frameworks */,
-				CA000000000000000000003A /* StrengthTestRepositoryLive in Frameworks */,
+				CA0000000000000000000039 /* LocalRepositories in Frameworks */,
 				CA000000000000000000003B /* LogClientLive in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -98,16 +96,15 @@
 			packageProductDependencies = (
 				CA0000000000000000000016 /* AppFeature */,
 				CA0000000000000000000020 /* CoachCore */,
-				CA0000000000000000000021 /* DevSettingsLive */,
+				CA0000000000000000000021 /* DevSettings */,
 				CA0000000000000000000022 /* APIClientLive */,
-				CA0000000000000000000023 /* DatabaseLive */,
+				CA0000000000000000000023 /* Database */,
 				CA0000000000000000000024 /* HealthKitClientLive */,
-				CA0000000000000000000025 /* TokenClientLive */,
+				CA0000000000000000000025 /* TokenClient */,
 				CA0000000000000000000026 /* BriefRepositoryLive */,
 				CA0000000000000000000027 /* SyncRepositoryLive */,
 				CA0000000000000000000028 /* ProfileRepositoryLive */,
-				CA0000000000000000000029 /* CheckInRepositoryLive */,
-				CA000000000000000000002A /* StrengthTestRepositoryLive */,
+				CA0000000000000000000029 /* LocalRepositories */,
 				CA000000000000000000002B /* LogClientLive */,
 			);
 			productName = CoachApp;
@@ -390,25 +387,25 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = CoachCore;
 		};
-		CA0000000000000000000021 /* DevSettingsLive */ = {
+		CA0000000000000000000021 /* DevSettings */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = DevSettingsLive;
+			productName = DevSettings;
 		};
 		CA0000000000000000000022 /* APIClientLive */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = APIClientLive;
 		};
-		CA0000000000000000000023 /* DatabaseLive */ = {
+		CA0000000000000000000023 /* Database */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = DatabaseLive;
+			productName = Database;
 		};
 		CA0000000000000000000024 /* HealthKitClientLive */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = HealthKitClientLive;
 		};
-		CA0000000000000000000025 /* TokenClientLive */ = {
+		CA0000000000000000000025 /* TokenClient */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = TokenClientLive;
+			productName = TokenClient;
 		};
 		CA0000000000000000000026 /* BriefRepositoryLive */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -422,13 +419,9 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ProfileRepositoryLive;
 		};
-		CA0000000000000000000029 /* CheckInRepositoryLive */ = {
+		CA0000000000000000000029 /* LocalRepositories */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = CheckInRepositoryLive;
-		};
-		CA000000000000000000002A /* StrengthTestRepositoryLive */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = StrengthTestRepositoryLive;
+			productName = LocalRepositories;
 		};
 		CA000000000000000000002B /* LogClientLive */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -61,7 +61,7 @@
         switch action {
         case .onAppear:
           // Re-seed the per-presentation mirror from the source of truth (`DevSettings`, persisted by
-          // Phase 4.1's `DevSettingsLive`) every time the menu appears.
+          // its UserDefaults-backed live value) every time the menu appears.
           state.useMockData = dev.useMockData()
           state.scenarios = Dictionary(
             uniqueKeysWithValues: DevEndpoint.allCases.map { ($0, dev.scenario($0)) }

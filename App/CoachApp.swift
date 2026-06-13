@@ -1,20 +1,18 @@
 import APIClientLive
 import AppFeature
 import BriefRepositoryLive
-import CheckInRepositoryLive
 import CoachCore
 import ComposableArchitecture
-import DatabaseLive
+import Database
 import DevSettings
-import DevSettingsLive
 import HealthKitClientLive
+import LocalRepositories
 import LogClient
 import LogClientLive
 import ProfileRepositoryLive
-import StrengthTestRepositoryLive
 import SwiftUI
 import SyncRepositoryLive
-import TokenClientLive
+import TokenClient
 
 /// The composition root (ARCHITECTURE §7.1 / D25 / D3) — the **only** place `*Live` targets are
 /// imported. Everything below the app target depends on interfaces; the live values are installed here.

@@ -1,15 +1,16 @@
 import SampleData
 
 /// DEBUG mock/live routing control (ARCHITECTURE §4.2 / §7.1, D25). A `Sendable` struct of
-/// `@Sendable` closures so the live (UserDefaults, `DevSettingsLive`) and test (in-memory)
-/// implementations swap cleanly through `@Dependency(\.devSettings)`.
+/// `@Sendable` closures so the live (UserDefaults) and test (in-memory) implementations swap cleanly
+/// through `@Dependency(\.devSettings)`. The live value lives alongside this interface in the same
+/// module (`DevSettings+Live.swift`, merged in Phase 11.7).
 ///
 /// - `useMockData()` — whether repositories should route to their `.mock(scenario:)` value. Always
-///   `false` in RELEASE (`DevSettingsLive` hard-wires it; the routing collapses to `.live`).
+///   `false` in RELEASE (the live value hard-wires it; the routing collapses to `.live`).
 /// - `scenario(_:)` — the selected `SampleScenario` for an endpoint (falls back to the endpoint's
 ///   `defaultScenario`).
 /// - `setUseMockData(_:)` / `setScenario(_:for:)` — DEBUG-meaningful writers, so the first-launch
-///   seed (`DevSettingsLive.seedFirstLaunchDefault`) and the Epic 6.4 dev menu write through one
+///   seed (`seedFirstLaunchDefault`) and the Epic 6.4 dev menu write through one
 ///   seam. No-ops in RELEASE.
 /// - `isLogCategoryEnabled(_:)` / `setLogCategoryEnabled(_:_:)` — the **persisted** per-log-category
 ///   enabled flag `LogClientLive` gates verbose categories on (`.http` is always-on and never

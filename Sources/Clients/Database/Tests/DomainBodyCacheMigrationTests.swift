@@ -1,4 +1,3 @@
-import Database
 import DomainModels
 import Foundation
 import GRDB
@@ -6,7 +5,7 @@ import PersistenceModels
 import SampleData
 import Testing
 
-@testable import DatabaseLive
+@testable import Database
 
 /// Phase 11.2 migration `v3_clearDomainBodyCaches`: it must empty exactly the two enum-bearing
 /// composite body-blob tables (daily brief / weekly plan — whose blobs were written by the old

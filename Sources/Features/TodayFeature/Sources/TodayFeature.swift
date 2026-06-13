@@ -1,8 +1,8 @@
 import BriefRepository
-import CheckInRepository
 import ComposableArchitecture
 import DomainModels
 import Foundation
+import LocalRepositories
 import LogClient
 import ProfileRepository
 import SyncRepository

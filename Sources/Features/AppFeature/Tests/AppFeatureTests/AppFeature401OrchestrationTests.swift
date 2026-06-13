@@ -1,11 +1,11 @@
 import APIClient
 import BriefRepository
-import CheckInRepository
 import Clocks
 import CoachCore
 import ComposableArchitecture
 import DomainModels
 import Foundation
+import LocalRepositories
 import OnboardingFeature
 import ProfileRepository
 import SampleData

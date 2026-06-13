@@ -1,7 +1,5 @@
-import CheckInRepository
 import CoachCore
 import Database
-import DatabaseLive
 import Dependencies
 import DomainModels
 import Foundation
@@ -9,16 +7,16 @@ import GRDB
 import PersistenceModels
 import Testing
 
-@testable import CheckInRepositoryLive
+@testable import LocalRepositories
 
-struct CheckInRepositoryLiveTests {
+struct CheckInRepositoryTests {
   /// A fixed Europe/Sofia instant (~09:00 on 2026-06-06). `static` so the `@Sendable` work closures
   /// capture it without capturing the (non-Sendable) test case.
   private static let now = Date(timeIntervalSince1970: 1_780_725_600)
 
   private func run<T>(
     database: DatabaseClient,
-    now: Date = CheckInRepositoryLiveTests.now,
+    now: Date = CheckInRepositoryTests.now,
     _ work: @escaping @Sendable () async throws -> T
   ) async throws -> T {
     try await withDependencies {

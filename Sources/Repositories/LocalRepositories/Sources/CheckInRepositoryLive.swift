@@ -1,4 +1,3 @@
-import CheckInRepository
 import CoachCore
 import Database
 import Dependencies

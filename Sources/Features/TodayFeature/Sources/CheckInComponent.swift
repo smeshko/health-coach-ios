@@ -1,7 +1,7 @@
-import CheckInRepository
 import ComposableArchitecture
 import DomainModels
 import Foundation
+import LocalRepositories
 
 /// The morning check-in (PRD §7.2) — the three self-report inputs with `kneePain` **constrained to
 /// 0–10** so an out-of-range value can never be stored (DECISIONS #2: the clamping `kneePainChanged`

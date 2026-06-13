@@ -1,14 +1,13 @@
-import DevSettings
 import Foundation
 import SampleData
 import Testing
 
-@testable import DevSettingsLive
+@testable import DevSettings
 
-struct DevSettingsLiveTests {
+struct DevSettingsStoreTests {
   /// A throwaway, isolated UserDefaults suite (cleared up front) so tests never touch `.standard`.
   private func freshSuite(_ name: String = #function) -> (UserDefaults, String) {
-    let suiteName = "DevSettingsLiveTests.\(name)"
+    let suiteName = "DevSettingsStoreTests.\(name)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     return (defaults, suiteName)
