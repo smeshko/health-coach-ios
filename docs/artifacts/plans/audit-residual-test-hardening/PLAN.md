@@ -120,7 +120,7 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-002: Pin _appWillAppear single-subscription dedupe
 - [x] TASK-003: Characterize concurrent sync() watermark behavior
 - [x] TASK-004: Cover Database.makeLive on-disk open and migration path
-- [ ] TASK-005: Assert HealthKit recordQuerySpecs are a subset of allReadTypes
+- [x] TASK-005: Assert HealthKit recordQuerySpecs are a subset of allReadTypes
 - [ ] TASK-006: Pin LogFileWriter concurrent-enqueue line integrity
 - [ ] TASK-007: Strengthen the two shallow WEAK tests (DevMenu viewLogs, Calendar timeZone)
 - [ ] TASK-008: Final Validation
