@@ -12,9 +12,9 @@ import SwiftUI
 struct SessionCardPage: View {
   var body: some View {
     GalleryScaffold(title: "SessionCard") {
-      stateLabel("Easy run (cardio)")
+      stateLabel("Easy run (cardio) · Suggested + selected")
       SessionCardEasyRunSection()
-      stateLabel("Quality session (cardio)")
+      stateLabel("Quality session (cardio) · Alternative + unselected")
       SessionCardQualitySection()
       stateLabel("Strength (effort scale)")
       SessionCardStrengthSection()
@@ -48,7 +48,8 @@ struct SessionCardEasyRunSection: View {
               + "nose, and finish with a few relaxed strides."
           ),
         ],
-        onSwap: {},
+        roleLabel: "Suggested",
+        isSelected: true,
         onSkip: {}
       )
     }
@@ -78,7 +79,8 @@ struct SessionCardQualitySection: View {
               + "race. Back off if your form starts to slip."
           ),
         ],
-        onSwap: {},
+        roleLabel: "Alternative",
+        isSelected: false,
         onSkip: {}
       )
     }
@@ -107,7 +109,6 @@ struct SessionCardStrengthSection: View {
               + "load only when all sets feel clean."
           ),
         ],
-        onSwap: {},
         onSkip: {}
       )
     }

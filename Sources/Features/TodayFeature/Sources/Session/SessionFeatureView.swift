@@ -31,10 +31,9 @@ public struct SessionFeatureView: View {
         store.displayedSession,
         zoneRange: store.displayedZoneRange,
         narrative: store.narrative,
-        // The card shows "Swap ›" only when its `onSwap` is non-nil (alternatives exist) and the warm
-        // "Skipping is fine today" only when `onSkip` is non-nil (`skipOk`). A rest-day session renders the
-        // card's own "Rest is training too." footer and ignores both slots.
-        onSwap: store.alternatives.isEmpty ? nil : { store.send(.swapToggled) },
+        // The card shows the warm "Skipping is fine today" only when `onSkip` is non-nil (`skipOk`). A
+        // rest-day session renders the card's own "Rest is training too." footer and ignores the slot.
+        // (The in-card "Swap ›" affordance is gone; the carousel replaces it in TASK-003.)
         onSkip: store.skipOk ? { store.send(.skipTapped) } : nil
       )
       // Identity-keyed directional slide of the card's content (Phase 12.3, TASK-004): `SessionCard` is
