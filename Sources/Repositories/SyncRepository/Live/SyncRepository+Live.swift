@@ -23,6 +23,12 @@ extension SyncRepository: DependencyKey {
   }
 }
 
+// No in-flight guard: `runSync()` is a stateless free function (read watermark → POST → write
+// watermark), so two concurrent calls both read the same anchor and the last writer wins — but the
+// only caller, `TodayFeature`'s orchestration, runs sync under `.cancellable(cancelInFlight: true)`,
+// which cancels any prior invocation, so concurrent `sync()` is not reachable in-app (single-user app).
+// The behavior is characterized — not serialized — by `test_concurrentSync_lastWriterWins_noGuard`
+// (SyncOrchestrationTests); see DECISIONS.md D2. A second caller would be the cue to revisit a guard.
 private func runSync() async throws -> SyncResult {
   @Dependency(\.healthKitClient) var healthKit
   @Dependency(\.apiClient) var apiClient
