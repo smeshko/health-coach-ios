@@ -184,7 +184,7 @@ struct TodayFeatureCacheFirstTests {
         session: SessionFeature.State(
           session: cached.session, alternatives: cached.alternatives, skipOk: cached.skipOk,
           narrative: cached.narrative.filter { $0.type == .session }, zones: nil,
-          selectedAlternativeIndex: 0
+          selectedIndex: 1
         )
       )
     ) {
@@ -209,7 +209,7 @@ struct TodayFeatureCacheFirstTests {
       $0.session?.zones = sampleZones()
       $0.briefState = .ready(regenerated, .fresh)
     }
-    #expect(store.state.session?.selectedAlternativeIndex == 0, "constitutionVersion-only refresh is unchanged")
+    #expect(store.state.session?.selectedIndex == 1, "constitutionVersion-only refresh is unchanged")
   }
 
   // MARK: - Gate precedence + miss (AC: gate wins, miss = blocking)

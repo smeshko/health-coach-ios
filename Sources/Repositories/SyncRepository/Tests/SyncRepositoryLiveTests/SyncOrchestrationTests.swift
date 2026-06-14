@@ -303,7 +303,7 @@ struct SyncOrchestrationTests {
 
     _ = try await run(stubs: stubs, database: db) { try await SyncRepository.live.sync() }
 
-    #expect(stubs.capturedSince == .distantPast, "first-ever sync reads from the backfill anchor")
+    #expect(stubs.capturedSince == backfillFloor, "first-ever sync reads from the bounded backfill floor")
     let mark = try await watermark(db)
     #expect(mark != nil, "the first sync creates the watermark row on success")
   }

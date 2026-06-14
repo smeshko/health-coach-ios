@@ -262,9 +262,9 @@ struct TodayFeatureOrchestrationTests {
     }
   }
 
-  /// Re-hydration resets the swap selection: a second `_briefResolved` re-seeds the session child, so a
-  /// stale `selectedAlternativeIndex` is cleared (the doc-comment claims it; this asserts it).
-  @Test func test_reHydration_resetsSwapSelection() async {
+  /// Re-hydration resets the carousel selection: a second `_briefResolved` re-seeds the session child, so a
+  /// stale `selectedIndex` is cleared back to the primary (the doc-comment claims it; this asserts it).
+  @Test func test_reHydration_resetsSelection() async {
     let fresh = sampleBrief(cached: false)
     let store = TestStore(initialState: TodayFeature.State()) { TodayFeature() }
 
@@ -274,15 +274,17 @@ struct TodayFeatureOrchestrationTests {
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
       $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
-    // The athlete swaps to the first alternative via the child reducer.
-    await store.send(.session(.alternativeTapped(index: 0))) {
-      $0.session?.selectedAlternativeIndex = 0
+    // The athlete commits the first alternative (candidate 1) via the child reducer; the child tells the
+    // parent its selection changed (persistence wiring lands in a later task).
+    await store.send(.session(.cardSelected(index: 1))) {
+      $0.session?.selectedIndex = 1
     }
-    // A second resolve (e.g. a re-save) re-seeds the child from the brief, clearing the selection.
+    await store.receive(\.session.delegate, .selectionChanged(fresh.alternatives[0]))
+    // A second resolve (e.g. a re-save) re-seeds the child from the brief, clearing the selection to primary.
     await store.send(._briefResolved(fresh, .fresh, sampleZones())) {
       $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
-    #expect(store.state.session?.selectedAlternativeIndex == nil)
+    #expect(store.state.session?.selectedIndex == 0)
   }
 
   /// The Exercise/Nutrition segmented toggle (`sectionSelected`) is a pure-UI reducer arm — the one
