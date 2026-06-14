@@ -36,6 +36,9 @@ struct AppFeature401OrchestrationTests {
       $0.date = .constant(now)
       $0.continuousClock = ImmediateClock()
       $0.apiClient.sessionEvents = { sessionStream }
+      // The cache-first orchestration now reads the persisted pick; stub it deterministically (no real DB
+      // threading) like the other repositories so the ImmediateClock parked-gate timing stays exact.
+      $0.sessionSelectionRepository.current = { _ in nil }
       $0.checkInRepository.current = { _ in
         DomainModels.CheckIn(
           date: Calendar.europeSofia.startOfDay(for: now), giSymptoms: false, kneePain: 0, illness: false
