@@ -204,6 +204,51 @@ struct LogClientLiveTests {
     #expect(numbers == Array(0..<15), "readRecent is not chronological past index 10: \(numbers)")
   }
 
+  /// Pins the serial-actor guarantee the writer's design hangs on (doc: "lines never interleave"): N
+  /// writers each enqueuing M uniquely-identifiable lines concurrently must yield whole, non-spliced
+  /// lines and the full N×M multiset after a drain. `enqueue` funnels through one `AsyncStream` consumed
+  /// by a single actor loop, so a write is never interleaved with another's bytes. Deterministic: the
+  /// task group completes all enqueues, then `flush()` (a FIFO sentinel) guarantees every prior write
+  /// landed before `recentLines()` reads — no wall-clock waits.
+  @Test func test_concurrentEnqueue_yieldsWholeLines_noInterleave() async throws {
+    let dir = tempDirectory()
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let writer = LogFileWriter(directory: dir)
+
+    let writerCount = 8
+    let perWriter = 50
+    let expected = Set((0..<writerCount).flatMap { writerIndex in
+      (0..<perWriter).map { lineIndex in "w\(writerIndex)-l\(lineIndex)" }
+    })
+
+    await withTaskGroup(of: Void.self) { group in
+      for writerIndex in 0..<writerCount {
+        group.addTask {
+          for lineIndex in 0..<perWriter {
+            writer.enqueue("w\(writerIndex)-l\(lineIndex)")
+            await Task.yield() // interleave the producers to actually stress the single consumer
+          }
+        }
+      }
+    }
+    await writer.flush()
+
+    let lines = await writer.recentLines()
+    let shape = #"^w\d+-l\d+$"#
+    let spliced = lines.first { $0.range(of: shape, options: .regularExpression) == nil }
+    #expect(spliced == nil, "a line was spliced/interleaved: \(spliced ?? "")")
+    #expect(lines.count == writerCount * perWriter, "expected \(writerCount * perWriter) lines, got \(lines.count)")
+    #expect(Set(lines) == expected, "the read-back set must equal the enqueued set (no loss/dup)")
+
+    // Per-writer order survives: each task enqueues its lines sequentially, so the FIFO stream keeps that
+    // writer's lines ascending even though writers interleave with one another.
+    for writerIndex in 0..<writerCount {
+      let prefix = "w\(writerIndex)-l"
+      let mine = lines.filter { $0.hasPrefix(prefix) }.compactMap { Int($0.dropFirst(prefix.count)) }
+      #expect(mine == Array(0..<perWriter), "writer \(writerIndex) lines lost their order: \(mine)")
+    }
+  }
+
   @Test func test_rotation_capsFileCount() async throws {
     let dir = tempDirectory()
     defer { try? FileManager.default.removeItem(at: dir) }
