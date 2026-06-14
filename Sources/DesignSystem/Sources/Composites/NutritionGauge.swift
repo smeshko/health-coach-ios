@@ -41,15 +41,23 @@ public struct NutritionGauge: View {
         ) {
           VStack(spacing: CoachSpacing.space2xs) {
             Text(focus.caloriesKcal.formatted())
-              .font(.coachText2xl)
+              .font(.coachTextXl)
               .foregroundStyle(.coachForeground)
+              .lineLimit(1)
+              .minimumScaleFactor(0.6)
             Text("kcal")
               .font(.coachTextXs)
               .foregroundStyle(.coachForegroundMuted)
             Text(carbCharacterLine)
               .font(.coachText2xs)
               .foregroundStyle(.coachForegroundSubtle)
+              .lineLimit(1)
+              .minimumScaleFactor(0.7)
           }
+          // Keep the center stack inside the ring's inner hole (diameter − both strokes) so the kcal
+          // figure and captions never collide with the arc — the donut's fixed frame doesn't clip.
+          .frame(maxWidth: Metrics.donutDiameter - Metrics.donutLineWidth * 2)
+          .multilineTextAlignment(.center)
         }
 
         VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
@@ -119,7 +127,12 @@ private struct LegendRow: View {
           Text(value)
             .font(.coachTextLg)
             .foregroundStyle(.coachForeground)
-            .fixedSize(horizontal: true, vertical: false) // the value+unit never truncates
+            // Shrink to fit the legend column rather than `fixedSize`, which forced the value to its
+            // intrinsic width and could push the whole gauge (and the ScrollView content) wider than the
+            // screen on range strings ("1.5–2.0 L") — that horizontal overflow was the Today
+            // Exercise↔Nutrition width "jump".
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
           Text(name)
             .font(.coachTextSm)
             .foregroundStyle(.coachForegroundMuted)

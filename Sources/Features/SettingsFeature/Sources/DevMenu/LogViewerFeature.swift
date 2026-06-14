@@ -72,6 +72,11 @@
     @Dependency(\.log) var log
     @Dependency(\.date) var date
 
+    /// Identifies the reload effect so a re-trigger can cancel an in-flight read. Without this, two rapid
+    /// `onAppear`/`refreshTapped` reloads race and whichever `readRecent()` resolves last wins — a stale
+    /// snapshot can overwrite a newer one and mis-anchor the relative date filters (DECISIONS.md D1).
+    private enum CancelID { case reload }
+
     public init() {}
 
     public var body: some ReducerOf<Self> {
@@ -84,6 +89,10 @@
           return .run { [log] send in
             await send(.logsLoaded(log.readRecent()))
           }
+          // Cancel any in-flight reload so only the latest `logsLoaded` lands (mirrors the
+          // `_appWillAppear` session-stream dedupe). TCA's `Send` guards on `Task.isCancelled`, so the
+          // cancelled read's terminal action is dropped.
+          .cancellable(id: CancelID.reload, cancelInFlight: true)
         case let .logsLoaded(lines):
           state.isLoading = false
           state.entries = State.parse(lines)

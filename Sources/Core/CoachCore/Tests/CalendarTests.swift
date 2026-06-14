@@ -96,9 +96,20 @@ struct CalendarTests {
     } operation: {
       @Dependency(\.calendar) var calendar
       @Dependency(\.timeZone) var timeZone
-      #expect(calendar.timeZone.identifier == "Europe/Sofia")
       #expect(calendar.identifier == .iso8601)
-      #expect(timeZone.identifier == "Europe/Sofia")
+
+      // Behavioral pin (not a setter readback): feed the injected `\.timeZone` to a fresh calendar and
+      // resolve the wall-clock day of a UTC-built instant. 2026-01-04 22:00 UTC is 2026-01-05 00:00 in
+      // Europe/Sofia (UTC+2, no January DST) — so the day is 5 under the pinned zone but would be 4 under
+      // UTC. This fails if `\.timeZone` ever regresses away from Europe/Sofia; the identifier readback
+      // alone would still pass.
+      var consumer = Calendar(identifier: .iso8601)
+      consumer.timeZone = timeZone
+      let instant = utcInstant(year: 2026, month: 1, day: 4, hour: 22)
+      #expect(
+        consumer.component(.day, from: instant) == 5,
+        "the injected \\.timeZone must shift the 22:00 UTC instant into the next Sofia day"
+      )
     }
   }
 }
