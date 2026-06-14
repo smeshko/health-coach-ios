@@ -88,6 +88,7 @@ public extension MacroDonut where Center == EmptyView {
 private enum Metrics {
   static let diameter: CGFloat = 150
   static let ringWidth: CGFloat = 20
-  /// Gap between neighbouring segments, as a fraction of the full circle.
-  static let gap: CGFloat = 0.014
+  /// Gap between neighbouring segments, as a fraction of the full circle. Zero — the design is a single
+  /// continuous ring where the macro arcs meet seamlessly (color change only, no break).
+  static let gap: CGFloat = 0
 }

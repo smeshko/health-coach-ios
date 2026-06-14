@@ -16,6 +16,10 @@ public struct SessionFeatureView: View {
   /// Keyed on the tap, not `selectedAlternativeIndex` (which a fresh-brief re-seed also resets), so a
   /// programmatic re-seed stays silent.
   @State private var swapTapCount = 0
+  /// Direction of the card slide. Set at tap time (we know the current selection vs the tapped index): a
+  /// *select* plays forward (new in from trailing), a *revert* plays the mirror (new in from leading) so it
+  /// reads as "rewinding" the select. Defaults forward for the silent 12.1 re-seed.
+  @State private var slidesForward = true
 
   public init(store: StoreOf<SessionFeature>) {
     self.store = store
@@ -33,14 +37,21 @@ public struct SessionFeatureView: View {
         onSwap: store.alternatives.isEmpty ? nil : { store.send(.swapToggled) },
         onSkip: store.skipOk ? { store.send(.skipTapped) } : nil
       )
-      // Identity-keyed crossfade of the card's content (Phase 12.3, TASK-004): `SessionCard` is
+      // Identity-keyed directional slide of the card's content (Phase 12.3, TASK-004): `SessionCard` is
       // non-animatable `Text`s + conditional rest/zone/effort branches, so a bare animation transaction
-      // would snap them. Re-`.id` on the content discriminant + `.transition(.opacity)` crossfades the whole
-      // card on a swap tap AND on a 12.1 background re-seed that changes the session. `.opacity` stays valid
-      // under Reduce Motion's snap fallback (a same-card/zone sub-field-only change leaves `.id` unchanged →
-      // a documented accepted snap).
+      // would snap them. Re-`.id` on the content discriminant drives the transition on a swap tap AND on a
+      // 12.1 background re-seed that changes the session. The new card enters from the trailing edge while the
+      // old card exits to the leading edge — a "lateral move to an alternative" read — combined with opacity
+      // so the snapping interior crossfades rather than hard-cuts. `.opacity` keeps it valid under Reduce
+      // Motion's snap fallback.
       .id(store.displayedCardID)
-      .transition(.opacity)
+      .transition(
+        .asymmetric(
+          insertion: .move(edge: slidesForward ? .trailing : .leading),
+          removal: .move(edge: slidesForward ? .leading : .trailing)
+        )
+        .combined(with: .opacity)
+      )
 
       // The inline swap panel — SWAP TO, or SWAPPED TO once an alternative is selected; collapsing keeps
       // the swap (the reducer's independent expansion/selection state). Enters/leaves with a slide-from-top
@@ -49,8 +60,12 @@ public struct SessionFeatureView: View {
         SwapList(
           rows: store.alternativeRows,
           selectedIndex: store.selectedAlternativeIndex,
-          onTap: {
-            store.send(.alternativeTapped(index: $0))
+          onTap: { index in
+            // Decide slide direction before the store updates: tapping the already-selected row reverts
+            // (mirror/back), tapping any other row selects (forward). Set synchronously so the asymmetric
+            // transition reads the right edges when `displayedCardID` flips in the same render.
+            slidesForward = store.selectedAlternativeIndex != index
+            store.send(.alternativeTapped(index: index))
             swapTapCount += 1
           }
         )

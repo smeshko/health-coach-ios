@@ -143,8 +143,7 @@ public extension SegmentedBar {
     return SegmentedBar(
       segments: segments,
       labels: labels,
-      segmentHeight: Metrics.barSegmentHeight,
-      width: Metrics.barWidth
+      segmentHeight: Metrics.barSegmentHeight
     )
   }
 
@@ -170,8 +169,7 @@ public extension SegmentedBar {
       marker: marker,
       labels: labels,
       segmentHeight: Metrics.barSegmentHeight,
-      labelSpacing: 0,
-      width: Metrics.barWidth
+      labelSpacing: 0
     )
   }
 
@@ -274,11 +272,10 @@ private struct Marker: View {
 }
 
 /// Bar + marker geometry — named constants, not inline literals. Markered shapes use the thin track
-/// (`barSegmentHeight`) at the fixed `barWidth`, reserving `barHeight` for the marker's clearance;
-/// markerless meters use the chunkier `segmentBarHeight` and fill their container.
+/// (`barSegmentHeight`), reserving `barHeight` for the marker's clearance; markerless meters use the
+/// chunkier `segmentBarHeight`. All meters fill their container width (no fixed bar width).
 private enum Metrics {
   static let barSegmentHeight: CGFloat = 10
-  static let barWidth: CGFloat = 320
   static let barHeight: CGFloat = 32
   static let segmentBarHeight: CGFloat = 14
   /// Opacity applied to a non-active zone segment (its own zone color, dimmed).
