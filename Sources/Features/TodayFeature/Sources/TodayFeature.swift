@@ -62,6 +62,10 @@ public struct TodayFeature {
     /// nil, so the scene-staleness gate compares `max(lastSyncedAt, lastRefreshAttemptAt)` — without this a
     /// failed refresh would re-fire on every activation (flap-prone).
     public var lastRefreshAttemptAt: Date?
+    /// The day's persisted workout pick, restored at app open (`._selectionLoaded`) and consumed by the
+    /// first `hydrate` to seed the carousel's `selectedIndex` by value (DECISIONS D4/D5). Thereafter the
+    /// session child's own `selectedSession` is what a background re-seed preserves, so this lingers unused.
+    public var restoredSelection: SessionBlock?
 
     public init(
       briefState: BriefViewState = .idle,
@@ -72,7 +76,8 @@ public struct TodayFeature {
       selectedSection: TodaySection = .exercise,
       lastSyncedAt: Date? = nil,
       isBackgroundRefreshing: Bool = false,
-      lastRefreshAttemptAt: Date? = nil
+      lastRefreshAttemptAt: Date? = nil,
+      restoredSelection: SessionBlock? = nil
     ) {
       self.briefState = briefState
       self.checkIn = checkIn
@@ -83,6 +88,7 @@ public struct TodayFeature {
       self.lastSyncedAt = lastSyncedAt
       self.isBackgroundRefreshing = isBackgroundRefreshing
       self.lastRefreshAttemptAt = lastRefreshAttemptAt
+      self.restoredSelection = restoredSelection
     }
   }
 
@@ -113,6 +119,9 @@ public struct TodayFeature {
     // Internal transition actions drive the orchestration's `BriefViewState` mutations through the
     // reducer. The leading underscore (TCA convention) trips `identifier_name`, so scope a disable.
     // swiftlint:disable identifier_name
+    /// The day's persisted workout pick, restored at app open BEFORE the brief hydrates (DECISIONS D4/D5) —
+    /// stashed in `restoredSelection` for the next `hydrate`. Sent **only** when a pick exists.
+    case _selectionLoaded(SessionBlock)
     /// No check-in saved today — the chain stops at the check-in screen (the gate).
     case _checkInRequired
     case _syncStarted
@@ -163,6 +172,7 @@ public struct TodayFeature {
   @Dependency(\.checkInRepository) var checkInRepository
   @Dependency(\.syncRepository) var syncRepository
   @Dependency(\.briefRepository) var briefRepository
+  @Dependency(\.sessionSelectionRepository) var sessionSelectionRepository
   @Dependency(\.profileRepository) var profileRepository
   @Dependency(\.continuousClock) var clock
   @Dependency(\.calendar) var calendar
@@ -170,10 +180,6 @@ public struct TodayFeature {
   @Dependency(\.log) var log
 
   public init() {}
-
-  /// Today in the Europe/Sofia frame (the pinned `\.calendar`/`\.date`, CoachCore) — the key the
-  /// orchestration reads the check-in for.
-  var today: Date { calendar.startOfDay(for: date.now) }
 
   public var body: some ReducerOf<Self> {
     Scope(state: \.checkIn, action: \.checkIn) {
@@ -249,6 +255,12 @@ public struct TodayFeature {
           // `._cachedBriefLoaded` could stomp the new chain's `.syncing` (review #1).
           .cancellable(id: CancelID.orchestration, cancelInFlight: true)
         )
+
+      case let ._selectionLoaded(block):
+        // Stash the restored pick so the next `hydrate` seeds the carousel on it (DECISIONS D4). Arrives
+        // before the brief actions in the same open effect, so `restoredSelection` is set when `hydrate` runs.
+        state.restoredSelection = block
+        return .none
 
       case ._checkInRequired:
         state.briefState = .checkInRequired
@@ -364,8 +376,13 @@ public struct TodayFeature {
         log.info("Athlete requested to skip today's session", category: .lifecycle)
         return .none
 
+      case let .session(.delegate(.selectionChanged(block))):
+        // The athlete committed a workout — persist it by value for the day, best-effort (DECISIONS D4/D5).
+        log.info("Session selection changed — persisting today's pick", category: .lifecycle)
+        return persistSelectionEffect(block)
+
       case .session:
-        // The inline swap (expand/collapse, select/revert) is handled by the scoped child reducer (below).
+        // The carousel selection (`cardSelected`) is handled by the scoped child reducer (below).
         return .none
       }
     }
