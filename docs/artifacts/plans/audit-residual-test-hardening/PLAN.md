@@ -117,7 +117,7 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
 - [x] TASK-001: Guard LogViewer reload against out-of-order double-refresh
-- [ ] TASK-002: Pin _appWillAppear single-subscription dedupe
+- [x] TASK-002: Pin _appWillAppear single-subscription dedupe
 - [ ] TASK-003: Characterize concurrent sync() watermark behavior
 - [ ] TASK-004: Cover Database.makeLive on-disk open and migration path
 - [ ] TASK-005: Assert HealthKit recordQuerySpecs are a subset of allReadTypes
