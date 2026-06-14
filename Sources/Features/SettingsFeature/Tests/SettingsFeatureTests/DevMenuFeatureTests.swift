@@ -1,6 +1,7 @@
 #if DEBUG
   import ComposableArchitecture
   import DevSettings
+  import Foundation
   import LogClient
   import SampleData
   import Testing
@@ -133,12 +134,32 @@
       #expect(recorder.setLogCalls.value.isEmpty)
     }
 
-    @Test func test_viewLogsTapped_presentsAndDismissesLogViewer() async {
+    @Test func test_viewLogsTapped_presentsLogViewer_routesChildAction_andDismisses() async {
+      let now = Date(timeIntervalSince1970: 1_749_556_800)
+      let sample = ["2026-06-10 12:00:00.000 INFO [app] hello"]
       let store = TestStore(initialState: DevMenuFeature.State()) {
         DevMenuFeature()
+      } withDependencies: {
+        $0.date = .constant(now)
+        $0.log.readRecent = { sample }
       }
 
+      // Present the viewer.
       await store.send(.viewLogsTapped) { $0.logViewer = LogViewerFeature.State() }
+
+      // Route a child action THROUGH the presentation: the scoped `LogViewerFeature` reducer runs its
+      // `onAppear` — loading, re-anchoring the date, then parsing the read lines. This exercises the
+      // `ifLet(\.$logViewer, action: \.logViewer)` wiring, not just the `@Presents` setter + dismiss.
+      await store.send(.logViewer(.presented(.onAppear))) {
+        $0.logViewer?.isLoading = true
+        $0.logViewer?.referenceDate = now
+      }
+      await store.receive(\.logViewer.presented.logsLoaded) {
+        $0.logViewer?.isLoading = false
+        $0.logViewer?.entries = LogViewerFeature.State.parse(sample)
+      }
+
+      // Dismiss tears the child down.
       await store.send(.logViewer(.dismiss)) { $0.logViewer = nil }
     }
 
