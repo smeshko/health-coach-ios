@@ -119,7 +119,7 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-001: Guard LogViewer reload against out-of-order double-refresh
 - [x] TASK-002: Pin _appWillAppear single-subscription dedupe
 - [x] TASK-003: Characterize concurrent sync() watermark behavior
-- [ ] TASK-004: Cover Database.makeLive on-disk open and migration path
+- [x] TASK-004: Cover Database.makeLive on-disk open and migration path
 - [ ] TASK-005: Assert HealthKit recordQuerySpecs are a subset of allReadTypes
 - [ ] TASK-006: Pin LogFileWriter concurrent-enqueue line integrity
 - [ ] TASK-007: Strengthen the two shallow WEAK tests (DevMenu viewLogs, Calendar timeZone)
