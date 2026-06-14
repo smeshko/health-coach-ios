@@ -77,6 +77,16 @@ extension DatabaseClient {
       try db.execute(sql: "DELETE FROM \(WeeklyPlanRecord.databaseTableName)")
     }
 
+    // Additive (today-session-carousel): the athlete's selected daily workout, keyed by the Europe/Sofia
+    // day with the chosen `SessionBlock` stored as a `body` blob (DECISIONS D4/D6 — persist by value).
+    // `DatabaseMigrator` records applied identifiers so a re-run is a no-op; existing tables untouched.
+    migrator.registerMigration("v4_createSessionSelection") { db in
+      try db.create(table: SessionSelectionRecord.databaseTableName) { table in
+        table.column("date", .datetime).primaryKey()
+        table.column("body", .blob).notNull()
+      }
+    }
+
     return migrator
   }
 }
