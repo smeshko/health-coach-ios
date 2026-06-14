@@ -58,6 +58,63 @@
       }
     }
 
+    /// Out-of-order double-refresh guard (DECISIONS.md D1): two rapid reloads must not land out of order —
+    /// the second `refreshTapped` cancels the first in-flight read so only the latest `logsLoaded` wins.
+    /// Each `readRecent` call is gated on its own `AsyncStream` so both reloads are observably in flight
+    /// before either resolves (deterministic — no wall-clock sleeps). Against the pre-fix uncancelled
+    /// effect both reads land (the stale set A overwrites B); with `.cancellable(cancelInFlight:)` only B
+    /// does (TCA's `Send` drops the cancelled read's terminal action).
+    @Test func test_doubleRefresh_cancelsInFlightReload_onlyLatestLands() async {
+      let setA = ["2026-06-10 12:00:00.000 INFO [app] stale set A"]
+      let setB = ["2026-06-10 13:00:00.000 INFO [app] fresh set B"]
+      let callCount = LockIsolated(0)
+      let releaseConts = LockIsolated<[Int: AsyncStream<Void>.Continuation]>([:])
+      let entered = AsyncStream.makeStream(of: Int.self)
+
+      let store = TestStore(initialState: LogViewerFeature.State()) {
+        LogViewerFeature()
+      } withDependencies: {
+        $0.date = .constant(now)
+        $0.log.readRecent = {
+          let index = callCount.withValue { count -> Int in
+            defer { count += 1 }
+            return count
+          }
+          let (releaseStream, releaseCont) = AsyncStream.makeStream(of: Void.self)
+          releaseConts.withValue { $0[index] = releaseCont }
+          entered.continuation.yield(index) // signal: this reload is now in flight
+          for await _ in releaseStream { break } // suspend until released (or the task is cancelled)
+          return index == 0 ? setA : setB
+        }
+      }
+
+      var entryIter = entered.stream.makeAsyncIterator()
+
+      // First reload starts and suspends inside readRecent (call 0).
+      await store.send(.refreshTapped) {
+        $0.isLoading = true
+        $0.referenceDate = now
+      }
+      #expect(await entryIter.next() == 0)
+
+      // Second reload cancels the first in-flight read (cancelInFlight) and suspends (call 1).
+      // isLoading is already true and referenceDate re-stamps to the same constant → no state change.
+      await store.send(.refreshTapped)
+      #expect(await entryIter.next() == 1)
+
+      // Release the latest reload → only set B lands.
+      releaseConts.value[1]?.yield(())
+      await store.receive(\.logsLoaded) {
+        $0.isLoading = false
+        $0.entries = LogViewerFeature.State.parse(setB)
+      }
+
+      // Releasing the first (now-cancelled) reload delivers nothing: the cancelled read's `logsLoaded(A)`
+      // is dropped by `Send`'s `Task.isCancelled` guard, so set A never overwrites set B.
+      releaseConts.value[0]?.yield(())
+      await store.finish()
+    }
+
     @Test func test_clearTapped_clearsFilesAndEntries() async {
       let cleared = LockIsolated(false)
       let store = TestStore(initialState: LogViewerFeature.State(lines: sample)) {

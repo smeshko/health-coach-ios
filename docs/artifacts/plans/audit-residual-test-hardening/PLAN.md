@@ -1,6 +1,6 @@
 # Plan: Audit residual test hardening — races + entry-point coverage
 
-Status: draft
+Status: in-progress
 Branch: chore/audit-residual-test-hardening
 Risk: medium
 Epic: none
@@ -116,7 +116,7 @@ See [DECISIONS.md](DECISIONS.md):
 Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
-- [ ] TASK-001: Guard LogViewer reload against out-of-order double-refresh
+- [x] TASK-001: Guard LogViewer reload against out-of-order double-refresh
 - [ ] TASK-002: Pin _appWillAppear single-subscription dedupe
 - [ ] TASK-003: Characterize concurrent sync() watermark behavior
 - [ ] TASK-004: Cover Database.makeLive on-disk open and migration path
