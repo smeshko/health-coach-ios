@@ -1,6 +1,6 @@
 # Plan: Audit residual test hardening — races + entry-point coverage
 
-Status: in-progress
+Status: done
 Branch: chore/audit-residual-test-hardening
 Risk: medium
 Epic: none
@@ -123,4 +123,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-005: Assert HealthKit recordQuerySpecs are a subset of allReadTypes
 - [x] TASK-006: Pin LogFileWriter concurrent-enqueue line integrity
 - [x] TASK-007: Strengthen the two shallow WEAK tests (DevMenu viewLogs, Calendar timeZone)
-- [ ] TASK-008: Final Validation
+- [x] TASK-008: Final Validation
