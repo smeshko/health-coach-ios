@@ -231,6 +231,33 @@ struct WeeklyFeatureTests {
     await store.receive(\.zonesResolved) { $0.zones = zones }
   }
 
+  @Test func test_hungZones_doesNotBlockReadyPlan() async throws {
+    // Review #2 regression lock: a parked profile read must NOT block the primary plan. weeklyBrief
+    // returns immediately while zones() sleeps "forever"; the plan must land `.ready` with zones still
+    // nil, and zones only hydrate once the parked read resumes.
+    let plan = try Self.deloadPlan()
+    let zones = Self.sampleZones()
+    let clock = TestClock()
+    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+      $0.continuousClock = clock
+      $0.profileRepository.zones = {
+        try await clock.sleep(for: .seconds(3600)) // parked until the test releases it
+        return zones
+      }
+      $0.briefRepository.weeklyBrief = { _, _ in plan }
+    }
+
+    await store.send(.task) { $0.weeklyState = .loading }
+    await store.receive(\.weeklyResolved) { // the plan renders WHILE zones is still parked
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.weeklyState = .ready(plan, .fresh)
+      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
+    }
+    #expect(store.state.zones == nil, "the plan is ready before the parked zones read resolves")
+    await clock.advance(by: .seconds(3600)) // release the parked zones → it hydrates after the fact
+    await store.receive(\.zonesResolved) { $0.zones = zones }
+  }
+
   // MARK: - Helpers
 
   /// A test store with the Europe/Sofia frame pinned, a fresh appStorage suite (so the `@Shared` watermark
