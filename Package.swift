@@ -71,6 +71,9 @@ let package = Package(
         // The Today-tab root feature (Epic 8): `MainTabs` composes it and renders `TodayView` in place of
         // the 6.1 placeholder so each Today phase (8.1–8.4) is testable in the running app as it lands.
         "TodayFeature",
+        // The Week-tab root feature (Epic 9): `MainTabs` composes it and renders `WeeklyView` in place of
+        // the 6.1 placeholder. Same-package target dep (no product needed — mirrors TodayFeature).
+        "WeeklyFeature",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
         // App-spine observability: emits `.app`/`.lifecycle` log lines (state swaps, session restore,
