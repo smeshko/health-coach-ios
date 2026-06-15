@@ -159,12 +159,15 @@ public struct WeeklyFeature {
   /// `.ready`/`.error` lands.
   private func fetchEffect(refresh: Bool) -> Effect<Action> {
     .run { [briefRepository, profileRepository] send in
-      // Zones first (non-fatal — a throw degrades to nil; the rows omit the bpm line), then the plan, both
-      // carried on one `weeklyResolved` payload. A cancelled run aborts before the plan request.
-      let zones = try? await profileRepository.zones()
+      // Zones runs **concurrently** with the plan (mirroring the TodayFeature precedent's `async let`):
+      // it is optional (non-fatal — a throw degrades to nil; the rows omit the bpm line), so a slow/hung
+      // profile read must never block the primary weekly plan (review #2). Both land on one
+      // `weeklyResolved` payload. A cancelled run aborts before sending.
+      async let zonesResult = try? await profileRepository.zones()
       do {
         try Task.checkCancellation()
         let plan = try await briefRepository.weeklyBrief(nil, refresh)
+        let zones = await zonesResult
         await send(.weeklyResolved(plan, zones))
       } catch is CancellationError {
         return
