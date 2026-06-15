@@ -85,17 +85,20 @@ private struct TargetLine: View {
   var body: some View {
     if let zone = session.zoneTarget {
       VStack(alignment: .leading, spacing: CoachSpacing.spaceXs) {
-        if let zoneRange {
-          HStack {
-            Text("Zone \(zone.barIndex) target")
-              .textCase(.uppercase)
-              .tracking(Metrics.eyebrowTracking)
+        // The zone target is plan data (always shown from `session.zoneTarget`); only the bpm range
+        // depends on the optional `zoneRange` (resolved from profile zones, which hydrate after the
+        // plan / may be absent — review #2). So a degraded row still states the prescribed zone.
+        HStack {
+          Text("Zone \(zone.barIndex) target")
+            .textCase(.uppercase)
+            .tracking(Metrics.eyebrowTracking)
+          if let zoneRange {
             Spacer(minLength: CoachSpacing.spaceSm)
             Text("\(zoneRange.low)–\(zoneRange.high) bpm")
           }
-          .font(.coachText2xs)
-          .foregroundStyle(.coachForegroundSubtle)
         }
+        .font(.coachText2xs)
+        .foregroundStyle(.coachForegroundSubtle)
         SegmentedBar.zones(target: zone.barIndex)
       }
     } else {

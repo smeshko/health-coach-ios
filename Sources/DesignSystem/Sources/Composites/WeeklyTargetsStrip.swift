@@ -52,16 +52,17 @@ private struct EasyHardSplit: View {
       }
       .font(.coachTextSm)
       // Two weighted segments via the in-module primitive init (not a new visual) — a hairline floor on
-      // each weight so a 100/0 split still shows a sliver of the other tone.
+      // each weight so a 100/0 split still shows a sliver of the other tone. Clamp as `Double`, then
+      // convert once to the `CGFloat` weight (explicit, not relying on CGFloat/Double interop).
       SegmentedBar(segments: [
-        SegmentedBar.Segment(weight: max(easyRatio, Metrics.minWeight), color: .coachAccent),
-        SegmentedBar.Segment(weight: max(1 - easyRatio, Metrics.minWeight), color: .coachNegative),
+        SegmentedBar.Segment(weight: CGFloat(max(easyRatio, Metrics.minWeight)), color: .coachAccent),
+        SegmentedBar.Segment(weight: CGFloat(max(1 - easyRatio, Metrics.minWeight)), color: .coachNegative),
       ])
     }
   }
 
   private enum Metrics {
-    static let minWeight: CGFloat = 0.02
+    static let minWeight: Double = 0.02
   }
 }
 

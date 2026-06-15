@@ -40,7 +40,8 @@ struct WeeklySessionRowCoreSection: View {
   }
 }
 
-/// The **extras / edge** rows: an outlined teal easy run (Z2 bar, EASY badge), a nil-`suggestedDay`
+/// The **extras / edge** rows: an outlined teal easy run (Z2 bar, EASY badge), a **degraded cardio** row
+/// (a Z3 target but no resolved `zoneRange` — the zone target still shows, no bpm), a nil-`suggestedDay`
 /// recovery row (no day chip), and a strength extra with no durations (no duration chip).
 struct WeeklySessionRowExtrasSection: View {
   var body: some View {
@@ -51,6 +52,13 @@ struct WeeklySessionRowExtrasSection: View {
           suggestedDay: .thu, zoneTarget: .z2, durationMinLow: 30, durationMinHigh: 40
         ),
         zoneRange: ZoneRange(low: 120, high: 138)
+      )
+      WeeklySessionRow(
+        session: PlannedSession(
+          card: .steadyCardio, tier: .extra, intensity: .easy, isHardDay: false,
+          suggestedDay: .sun, zoneTarget: .z3, durationMinLow: 40, durationMinHigh: 50
+        ),
+        zoneRange: nil // degraded: zone target shows, bpm omitted
       )
       WeeklySessionRow(
         session: PlannedSession(
