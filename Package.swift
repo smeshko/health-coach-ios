@@ -42,6 +42,11 @@ let package = Package(
     // swift-clocks — `TestClock` to advance the APIClient retry backoff instantly in tests. The
     // `\.continuousClock` dependency key itself is in swift-dependencies; only the test clock is here.
     .package(url: "https://github.com/pointfreeco/swift-clocks", from: "1.0.0"),
+    // swift-sharing — `@Shared(.appStorage)` for `WeeklyFeature`'s persisted last-seen-ISO-week
+    // watermark (Epic 9, DECISIONS #2). Promoted from transitive to a DIRECT dep so a literal
+    // `import Sharing` resolves; TCA `@_exported`s it, so the build would compile without this entry —
+    // it is for the explicit import, not a build requirement. Pinned to the transitively-resolved 2.8.0.
+    .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.8.0"),
     // Test-only: SwiftUI image snapshots. Used only by CoachTestSupport + the snapshot test target.
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
   ],
@@ -1087,6 +1092,76 @@ let package = Package(
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
       path: "Sources/Features/TodayFeature/Tests/TodayFeatureSnapshotTests",
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The "This Week" feature (Epic 9) — the menu-with-budgets weekly plan screen (the 2026-06-10 design).
+    // Mirrors TodayFeature's universal-lifecycle-enum shape (`WeeklyViewState`). Depends ONLY on the repo
+    // INTERFACES (`BriefRepository`/`ProfileRepository`) + `DesignSystem` + `DomainModels` + `CoachCore`
+    // (the §3 feature dependency rule) + `Sharing` (the persisted last-seen-week watermark, DECISIONS #2)
+    // — never a `*Live`, data-source client, GRDB, HealthKit, or WireModels.
+    .target(
+      name: "WeeklyFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        // `Sharing` (a DIRECT dep so a literal `import Sharing` resolves) backs the persisted
+        // `@Shared(.appStorage)` last-seen-ISO-week watermark. TCA `@_exported`s it, so the build would
+        // compile without this — the direct dep is for the explicit import (DECISIONS #2).
+        .product(name: "Sharing", package: "swift-sharing"),
+        // `BriefRepository` INTERFACE — `weeklyBrief(isoWeek:refresh:)` (get-or-cache, D9/4.2) + the typed
+        // `BriefError`. Interface only (feature dependency rule), never *Live.
+        "BriefRepository",
+        // `ProfileRepository` INTERFACE — `zones()`, resolved once by the fetch effect so 9.2's pure rows
+        // can render "Zone N · bpm" lines (DECISIONS #4, cross-plan with 9.2). Interface only, never *Live.
+        "ProfileRepository",
+        "DesignSystem",
+        "DomainModels",
+        "CoachCore",
+      ],
+      path: "Sources/Features/WeeklyFeature/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WeeklyFeature exhaustive TestStore (host) — new-ISO-week detection, the get-or-cache fetch effect,
+    // debounced refresh + cancellation, the rhythm derivation, and the UI toggles. Logic only — no
+    // snapshot/UIKit symbols (§4.6 split). `Clocks` (a DIRECT dep — a transitively-resolved package is not
+    // importable) supplies `TestClock` for the debounce; production injects the built-in `\.continuousClock`.
+    .testTarget(
+      name: "WeeklyFeatureTests",
+      dependencies: [
+        "WeeklyFeature",
+        "BriefRepository",
+        "ProfileRepository",
+        "DomainModels",
+        // `SampleData` vends the `WeeklyPlan` fixtures the fetch tests return from the stubbed repo.
+        "SampleData",
+        "CoachCore",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "Clocks", package: "swift-clocks"),
+      ],
+      path: "Sources/Features/WeeklyFeature/Tests/WeeklyFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WeeklyView snapshots (the shell — normal / deload / collapsed states, light + dark) — iOS 26
+    // simulator only, via `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty
+    // module on the host. `exclude: ["__Snapshots__"]` keeps the committed references out of the target.
+    .testTarget(
+      name: "WeeklyFeatureSnapshotTests",
+      dependencies: [
+        "WeeklyFeature",
+        "DomainModels",
+        "SampleData",
+        "CoachTestSupport",
+        "DesignSystem",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/WeeklyFeature/Tests/WeeklyFeatureSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
