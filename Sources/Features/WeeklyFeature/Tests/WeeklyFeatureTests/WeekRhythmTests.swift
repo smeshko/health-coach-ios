@@ -9,6 +9,10 @@ import Testing
 /// The week-rhythm derivation (TASK-004) + the pure UI toggles + the deload tone treatment. The derivation
 /// places the plan's suggested sessions onto the Mon…Sun dot-row with the pinned classification (the
 /// 2026-06-10 3-way legend folds strength into hard/easy by `isHardDay`; fill = core-vs-extra tier).
+///
+/// `.serialized` because the zones-retention case drives the `@Shared(.appStorage)` watermark (process
+/// -global app state) — serial execution + the per-test isolated suite keep it from racing.
+@Suite(.serialized)
 @MainActor
 struct WeekRhythmTests {
   // MARK: - Derivation
@@ -80,6 +84,37 @@ struct WeekRhythmTests {
   @Test func test_scheduleFraming_deloadSelectsEasyOnPurpose() {
     #expect(WeeklyFeature.scheduleFraming(deload: true) == "easy on purpose")
     #expect(WeeklyFeature.scheduleFraming(deload: false) == "a menu, not a schedule")
+  }
+
+  // MARK: - Zones merge (keep-last-known, review)
+
+  /// A later load whose `zones()` throws keeps the last-known zones (the TodayFeature `mergeZones`
+  /// semantics — zones are stable profile constants, so a transient read failure must not blank the bpm
+  /// ranges). `zonesResolved(nil)` is a deliberate no-op, not a clear.
+  @Test func test_zonesRetainedAcrossFailedRefresh() async throws {
+    let plan = try WeeklyTestSupport.deloadPlan()
+    let zones = WeeklyTestSupport.sampleZones()
+    let zonesThrows = LockIsolated(false)
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
+      $0.profileRepository.zones = {
+        if zonesThrows.value { throw WeeklyTestSupport.Boom() }
+        return zones
+      }
+      $0.briefRepository.weeklyBrief = { _, _ in plan }
+    }
+    await store.send(.task) { $0.weeklyState = .loading }
+    await store.receive(\.weeklyResolved) {
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.weeklyState = .ready(plan, .fresh)
+      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
+    }
+    await store.receive(\.zonesResolved) { $0.zones = zones }
+
+    zonesThrows.setValue(true)
+    await store.send(.task) { $0.weeklyState = .loading }
+    await store.receive(\.weeklyResolved) { $0.weeklyState = .ready(plan, .fresh) }
+    await store.receive(\.zonesResolved) // nil → no-op; the prior zones are retained
+    #expect(store.state.zones == zones, "a failed zones refresh keeps the last-known map")
   }
 
   // MARK: - Fixtures
