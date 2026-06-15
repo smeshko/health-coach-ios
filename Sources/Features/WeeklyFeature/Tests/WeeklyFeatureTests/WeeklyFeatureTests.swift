@@ -258,6 +258,44 @@ struct WeeklyFeatureTests {
     await store.receive(\.zonesResolved) { $0.zones = zones }
   }
 
+  // MARK: - Session groups (Phase 9.2 TASK-003)
+
+  @Test func test_coreGroupToggled_flipsOnlyCore() async {
+    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) { _ in }
+    #expect(store.state.isCoreExpanded == true)
+    #expect(store.state.isExtrasExpanded == true)
+    await store.send(.coreGroupToggled) { $0.isCoreExpanded = false }
+    await store.send(.coreGroupToggled) { $0.isCoreExpanded = true }
+  }
+
+  @Test func test_extrasGroupToggled_flipsOnlyExtras() async {
+    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) { _ in }
+    await store.send(.extrasGroupToggled) { $0.isExtrasExpanded = false }
+    await store.send(.extrasGroupToggled) { $0.isExtrasExpanded = true }
+  }
+
+  @Test func test_groupFlags_surviveRefreshedPlan() async throws {
+    // The collapse flags are pure UI state held outside `WeeklyViewState`, so a re-supplied plan (a
+    // refreshed week landing a new `.ready`) leaves them untouched.
+    let plan = try Self.deloadPlan()
+    let zones = Self.sampleZones()
+    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+      $0.profileRepository.zones = { zones }
+      $0.briefRepository.weeklyBrief = { _, _ in plan }
+    }
+    await store.send(.coreGroupToggled) { $0.isCoreExpanded = false }
+    await store.send(.extrasGroupToggled) { $0.isExtrasExpanded = false }
+    await store.send(.task) { $0.weeklyState = .loading }
+    await store.receive(\.weeklyResolved) {
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.weeklyState = .ready(plan, .fresh)
+      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
+    }
+    await store.receive(\.zonesResolved) { $0.zones = zones }
+    #expect(store.state.isCoreExpanded == false, "group flags survive a re-supplied plan")
+    #expect(store.state.isExtrasExpanded == false)
+  }
+
   // MARK: - Helpers
 
   /// A test store with the Europe/Sofia frame pinned, a fresh appStorage suite (so the `@Shared` watermark
