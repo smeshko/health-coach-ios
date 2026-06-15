@@ -16,6 +16,7 @@
         "isHardDay": true,
         "flags": ["impact"],
         "suggestedDay": "tue",
+        "zoneTarget": "z4",
         "durationMinLow": 35,
         "durationMinHigh": 45
       },
@@ -36,6 +37,7 @@
         "isHardDay": false,
         "flags": ["impact"],
         "suggestedDay": "sat",
+        "zoneTarget": "z2",
         "durationMinLow": 65,
         "durationMinHigh": 80
       }
@@ -48,6 +50,7 @@
         "isHardDay": false,
         "flags": ["impact"],
         "suggestedDay": "thu",
+        "zoneTarget": "z2",
         "durationMinLow": 30,
         "durationMinHigh": 40
       },

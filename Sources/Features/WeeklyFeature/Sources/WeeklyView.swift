@@ -145,11 +145,112 @@ private struct WeeklyReadyContent: View {
         }
 
         // MARK: - Phase 9.2 core/extra sessions
+
+        SessionGroup(
+          title: "Do these", subtitle: "Core · the week's backbone",
+          count: plan.core.count, isExpanded: store.isCoreExpanded,
+          toggle: { store.send(.coreGroupToggled) },
+          content: { rows(plan.core) }
+        )
+        SessionGroup(
+          title: "Optional", subtitle: "Extras · only if you've got it",
+          count: plan.extras.count, isExpanded: store.isExtrasExpanded,
+          toggle: { store.send(.extrasGroupToggled) },
+          content: { rows(plan.extras) }
+        )
+        TargetsSection(targets: plan.targets)
       }
     case .nutrition:
       // MARK: - Phase 9.3 weekly nutrition
 
       Color.clear.frame(height: 0)
+    }
+  }
+
+  /// One inert `WeeklySessionRow` per session, its `ZoneRange` resolved once from the parent's `zones`
+  /// (9.1's shell owns the fetch — components never resolve zones).
+  @ViewBuilder
+  private func rows(_ sessions: [PlannedSession]) -> some View {
+    ForEach(Array(sessions.enumerated()), id: \.offset) { _, session in
+      WeeklySessionRow(session: session, zoneRange: Self.zoneRange(for: session, zones: store.zones))
+    }
+  }
+
+  /// Resolve a session's `zoneTarget` to its `ZoneRange` from the five-zone map (nil → no bpm line).
+  static func zoneRange(for session: PlannedSession, zones: Zones?) -> ZoneRange? {
+    guard let zones, let zone = session.zoneTarget else { return nil }
+    switch zone {
+    case .z1: return zones.z1
+    case .z2: return zones.z2
+    case .z3: return zones.z3
+    case .z4: return zones.z4
+    case .z5: return zones.z5
+    }
+  }
+}
+
+/// A collapsible session group — the header (title + sub-line + count chip + chevron, tappable to
+/// toggle) and, when expanded, the inert rows. The expand/collapse + chevron ride the `CoachMotion`
+/// disclosure token; only the header is pressable (the rows are inert).
+private struct SessionGroup<Content: View>: View {
+  let title: String
+  let subtitle: String
+  let count: Int
+  let isExpanded: Bool
+  let toggle: () -> Void
+  @ViewBuilder let content: Content
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+      Button(action: toggle) {
+        HStack(spacing: CoachSpacing.spaceSm) {
+          VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
+            Text(title)
+              .font(.coachText2xl)
+              .foregroundStyle(.coachForeground)
+            Text(subtitle)
+              .font(.coachTextSm)
+              .foregroundStyle(.coachForegroundMuted)
+          }
+          Spacer(minLength: CoachSpacing.spaceSm)
+          Pill("\(count)", tone: .accent)
+          Image(systemName: "chevron.right")
+            .font(.coachTextSm)
+            .foregroundStyle(.coachForegroundMuted)
+            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .buttonStyle(.coachPressable)
+      if isExpanded {
+        VStack(spacing: CoachSpacing.spaceMd) {
+          content
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+    }
+    .coachAnimation(.disclosure, value: isExpanded)
+  }
+}
+
+/// The "Weekly targets — What a good week adds up to" section: the lead + the `WeeklyTargetsStrip` on a
+/// card surface.
+private struct TargetsSection: View {
+  let targets: WeeklyTargets
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+      VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
+        Text("Weekly targets")
+          .font(.coachText2xl)
+          .foregroundStyle(.coachForeground)
+        Text("What a good week adds up to")
+          .font(.coachTextSm)
+          .foregroundStyle(.coachForegroundMuted)
+      }
+      WeeklyTargetsStrip(targets: targets)
+        .padding(CoachSpacing.spaceLg)
+        .background(CardSurface())
     }
   }
 }

@@ -49,19 +49,28 @@ public struct WeeklyFeature {
     public var selectedSection: WeeklySection = .exercise
     /// The "The plan this week" narrative card's chevron (local UI state) — expanded by default.
     public var isPlanCardExpanded: Bool = true
+    /// The "Do these — Core" group chevron (Phase 9.2, local UI state) — expanded by default. Pure UI,
+    /// held outside `WeeklyViewState`, so it survives a re-supplied plan (a refreshed week).
+    public var isCoreExpanded: Bool = true
+    /// The "Optional — Extras" group chevron (Phase 9.2, local UI state) — expanded by default.
+    public var isExtrasExpanded: Bool = true
 
     public init(
       weeklyState: WeeklyViewState = .idle,
       zones: Zones? = nil,
       rhythm: WeekRhythmComponent.State? = nil,
       selectedSection: WeeklySection = .exercise,
-      isPlanCardExpanded: Bool = true
+      isPlanCardExpanded: Bool = true,
+      isCoreExpanded: Bool = true,
+      isExtrasExpanded: Bool = true
     ) {
       self.weeklyState = weeklyState
       self.zones = zones
       self.rhythm = rhythm
       self.selectedSection = selectedSection
       self.isPlanCardExpanded = isPlanCardExpanded
+      self.isCoreExpanded = isCoreExpanded
+      self.isExtrasExpanded = isExtrasExpanded
     }
   }
 
@@ -76,6 +85,10 @@ public struct WeeklyFeature {
     case sectionSelected(WeeklySection)
     /// The "The plan this week" card chevron — pure UI, flips `isPlanCardExpanded`.
     case planCardToggled
+    /// The "Do these — Core" group header — pure UI, flips `isCoreExpanded` (Phase 9.2).
+    case coreGroupToggled
+    /// The "Optional — Extras" group header — pure UI, flips `isExtrasExpanded` (Phase 9.2).
+    case extrasGroupToggled
     /// Internal — fired once the refresh debounce window elapses; sets `.loading` + runs the `refresh: true`
     /// fetch. (Loading is delayed to here so a rapid double-tap doesn't flash a loading screen per tap.)
     case refreshRequested
@@ -135,6 +148,14 @@ public struct WeeklyFeature {
         state.isPlanCardExpanded.toggle()
         return .none
 
+      case .coreGroupToggled:
+        state.isCoreExpanded.toggle()
+        return .none
+
+      case .extrasGroupToggled:
+        state.isExtrasExpanded.toggle()
+        return .none
+
       case let .weeklyResolved(plan):
         // Render the plan + derived rhythm immediately (before optional zones). The `cached` flag drives
         // the freshness label (PRD §8.2) — made truthful by the scoped `WeeklyPlanPolicy` amendment (a
@@ -177,7 +198,7 @@ public struct WeeklyFeature {
         await send(.weeklyResolved(plan))
         // Hydrate zones afterward (a throw → nil, a silent degrade). This await is past the `.ready`
         // render, so a parked zones leaves the plan visible.
-        await send(.zonesResolved(await zonesResult))
+        await send(.zonesResolved(zonesResult))
       } catch is CancellationError {
         return
       } catch let error as BriefError {
