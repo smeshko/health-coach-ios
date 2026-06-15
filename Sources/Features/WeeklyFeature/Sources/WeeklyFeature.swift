@@ -41,10 +41,27 @@ public struct WeeklyFeature {
     /// 9.2's pure rows so a "Zone N · bpm" line resolves (DECISIONS #4, cross-plan with 9.2). `nil` until
     /// the fetch lands (or if it fails — a non-fatal degrade: the rows omit the bpm line).
     public var zones: Zones?
+    /// The week rhythm (the dot-row), derived once from the `ready` plan's suggested sessions. `nil` until a
+    /// plan resolves.
+    public var rhythm: WeekRhythmComponent.State?
+    /// The Exercise | Nutrition segmented toggle (local UI state) — the shared `SegTabs` selection. 9.2's
+    /// session groups render under `.exercise`, 9.3's nutrition under `.nutrition`.
+    public var selectedSection: WeeklySection = .exercise
+    /// The "The plan this week" narrative card's chevron (local UI state) — expanded by default.
+    public var isPlanCardExpanded: Bool = true
 
-    public init(weeklyState: WeeklyViewState = .idle, zones: Zones? = nil) {
+    public init(
+      weeklyState: WeeklyViewState = .idle,
+      zones: Zones? = nil,
+      rhythm: WeekRhythmComponent.State? = nil,
+      selectedSection: WeeklySection = .exercise,
+      isPlanCardExpanded: Bool = true
+    ) {
       self.weeklyState = weeklyState
       self.zones = zones
+      self.rhythm = rhythm
+      self.selectedSection = selectedSection
+      self.isPlanCardExpanded = isPlanCardExpanded
     }
   }
 
@@ -55,6 +72,10 @@ public struct WeeklyFeature {
     case refreshTapped
     /// Retry from the `.error` terminal — re-runs the `refresh: false` fetch.
     case retryTapped
+    /// The Exercise | Nutrition toggle — pure UI, flips `selectedSection`.
+    case sectionSelected(WeeklySection)
+    /// The "The plan this week" card chevron — pure UI, flips `isPlanCardExpanded`.
+    case planCardToggled
     /// Internal — fired once the refresh debounce window elapses; sets `.loading` + runs the `refresh: true`
     /// fetch. (Loading is delayed to here so a rapid double-tap doesn't flash a loading screen per tap.)
     case refreshRequested
@@ -104,11 +125,20 @@ public struct WeeklyFeature {
         state.weeklyState = .loading
         return fetchEffect(refresh: true)
 
+      case let .sectionSelected(section):
+        state.selectedSection = section
+        return .none
+
+      case .planCardToggled:
+        state.isPlanCardExpanded.toggle()
+        return .none
+
       case let .weeklyResolved(plan, zones):
-        // Hydrate zones + the ready plan from one payload. The `cached` flag drives the freshness label
-        // (PRD §8.2) — made truthful by the scoped `WeeklyPlanPolicy` amendment (a local-store hit is
-        // stamped `cached == true`).
+        // Hydrate zones + the ready plan + the derived rhythm from one payload. The `cached` flag drives the
+        // freshness label (PRD §8.2) — made truthful by the scoped `WeeklyPlanPolicy` amendment (a
+        // local-store hit is stamped `cached == true`).
         state.zones = zones
+        state.rhythm = WeekRhythmComponent.rhythm(from: plan)
         state.weeklyState = .ready(plan, plan.cached ? .cached : .fresh)
         recordSeenWeek(&state, isoWeek: plan.isoWeek)
         return .none
@@ -145,6 +175,19 @@ public struct WeeklyFeature {
       }
     }
     .cancellable(id: CancelID.weeklyFetch, cancelInFlight: true)
+  }
+}
+
+/// The Exercise | Nutrition segmented toggle's selection (the 2026-06-10 shell). Top-level (not nested in
+/// `WeeklyFeature`) to stay within the 1-level type-nesting lint rule, mirroring `TodaySection`.
+public enum WeeklySection: Equatable, Sendable { case exercise, nutrition }
+
+extension WeeklyFeature {
+  /// The week-shape framing in the header subtitle — the calm deload phrasing vs the default "menu, not a
+  /// schedule" (authored UX chrome gated on `deload`; the recovery *prose* is the server's `plan`
+  /// narrative, never authored here). The deload treatment is a tone, not an alarming badge.
+  static func scheduleFraming(deload: Bool) -> String {
+    deload ? "easy on purpose" : "a menu, not a schedule"
   }
 }
 

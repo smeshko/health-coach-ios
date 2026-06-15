@@ -87,6 +87,7 @@ struct WeeklyFeatureTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       $0.zones = zones
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -109,6 +110,7 @@ struct WeeklyFeatureTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       $0.zones = zones
+      $0.rhythm = WeekRhythmComponent.rhythm(from: cached)
       $0.weeklyState = .ready(cached, .cached) // the cached flag drives .cached
       $0.$lastSeenISOWeek.withLock { $0 = cached.isoWeek }
     }
@@ -134,6 +136,7 @@ struct WeeklyFeatureTests {
     await store.send(.retryTapped) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       $0.zones = zones
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -161,6 +164,7 @@ struct WeeklyFeatureTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       // zones nil (throw degraded) — the plan still lands ready.
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -193,6 +197,7 @@ struct WeeklyFeatureTests {
     }
     await store.receive(\.weeklyResolved) {
       $0.zones = zones
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
     }
     #expect(refreshArgs.value == [true], "two rapid refreshTapped collapse to one refresh: true fetch")
@@ -219,6 +224,7 @@ struct WeeklyFeatureTests {
     await store.send(.task) // already .loading; cancelInFlight cancels the first run
     await store.receive(\.weeklyResolved) { // only the second run's payload lands
       $0.zones = zones
+      $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
