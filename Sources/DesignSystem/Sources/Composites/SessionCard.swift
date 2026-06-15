@@ -67,8 +67,11 @@ public struct SessionCard: View {
       RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)
         .fill(.coachSurface)
         .overlay(
+          // `strokeBorder` (not `stroke`) keeps the line fully inside the bounds — a centered stroke has its
+          // outer half clipped by the view edge (and the `.coachPressable` scale rasterization), which thins
+          // the outline unevenly at the corners.
           RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)
-            .stroke(isSelected ? .coachAccent : .coachBorder, lineWidth: isSelected ? 2 : 1)
+            .strokeBorder(isSelected ? .coachAccent : .coachBorder, lineWidth: isSelected ? 2 : 1)
         )
     )
   }

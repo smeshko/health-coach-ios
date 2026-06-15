@@ -4,7 +4,7 @@ import DomainModels
 import SwiftUI
 
 /// The daily session surface (`Today · Exercise.png`) — a horizontal **paged carousel** of the candidate
-/// `SessionCard`s (`[session] + alternatives`): swipe to browse (a neighbour card peeks), **tap a card to
+/// `SessionCard`s (`[session] + alternatives`): swipe to browse (one full-width card per page), **tap a card to
 /// commit** it as today's pick (green outline), with pager dots tracking the scroll position. The primary is
 /// candidate 0 ("Suggested"); the rest are "Alternative".
 ///
@@ -29,37 +29,42 @@ public struct SessionFeatureView: View {
 
   public var body: some View {
     VStack(spacing: CoachSpacing.spaceMd) {
-      ScrollView(.horizontal) {
-        HStack(alignment: .top, spacing: CoachSpacing.spaceMd) {
-          ForEach(Array(store.candidates.enumerated()), id: \.offset) { index, block in
-            SessionCardButton(
-              block: block,
-              zoneRange: store.state.zoneRange(for: block),
-              narrative: store.narrative,
-              isSelected: index == store.selectedIndex,
-              roleLabel: roleLabel(at: index),
-              onSkip: store.skipOk ? { store.send(.skipTapped) } : nil,
-              onSelect: {
-                scrollPosition = index
-                store.send(.cardSelected(index: index))
-                tapCount += 1
-              }
-            )
-            // Each card spans ~90% of the carousel so the neighbour peeks on the trailing edge; a lone
-            // candidate spans the full width (no peek).
-            .containerRelativeFrame(
-              .horizontal, count: Metrics.columns,
-              span: store.candidates.count > 1 ? Metrics.cardSpan : Metrics.columns,
-              spacing: CoachSpacing.spaceMd
-            )
-            .id(index)
+      ScrollViewReader { proxy in
+        ScrollView(.horizontal) {
+          HStack(alignment: .top, spacing: CoachSpacing.spaceMd) {
+            ForEach(Array(store.candidates.enumerated()), id: \.offset) { index, block in
+              SessionCardButton(
+                block: block,
+                zoneRange: store.state.zoneRange(for: block),
+                narrative: store.narrative,
+                isSelected: index == store.selectedIndex,
+                roleLabel: roleLabel(at: index),
+                onSkip: store.skipOk ? { store.send(.skipTapped) } : nil,
+                onSelect: {
+                  scrollPosition = index
+                  store.send(.cardSelected(index: index))
+                  tapCount += 1
+                }
+              )
+              // Each card spans the full carousel width — no neighbour peek; paging snaps one full card at a time.
+              .containerRelativeFrame(.horizontal, count: 1, span: 1, spacing: CoachSpacing.spaceMd)
+              .id(index)
+            }
           }
+          .scrollTargetLayout()
         }
-        .scrollTargetLayout()
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $scrollPosition)
+        .scrollIndicators(.hidden)
+        // Open (and re-open after a re-seed) on today's committed pick. The restored `selectedIndex` and the
+        // carousel's candidates both arrive when the brief loads, which rebuilds the carousel and resets the
+        // offset to 0 on that render pass. `.scrollPosition`'s programmatic apply isn't honored across that
+        // rebuild, so command the scroll imperatively via the reader instead — deferred to the next runloop
+        // so the rebuilt cards are laid out before we jump. (Watch the candidate count too, in case the cards
+        // arrive after `selectedIndex` is already set.)
+        .onChange(of: store.selectedIndex, initial: true) { _, _ in restoreScroll(proxy) }
+        .onChange(of: store.candidates.count) { _, _ in restoreScroll(proxy) }
       }
-      .scrollTargetBehavior(.viewAligned)
-      .scrollPosition(id: $scrollPosition)
-      .scrollIndicators(.hidden)
 
       if store.candidates.count > 1 {
         PagerDots(count: store.candidates.count, active: scrollPosition ?? store.selectedIndex)
@@ -67,6 +72,16 @@ public struct SessionFeatureView: View {
     }
     // Selection haptic on every commit tap — user-action-scoped (positional token snaps under Reduce Motion).
     .sensoryFeedback(.selection, trigger: tapCount)
+  }
+
+  /// Jump the carousel to the committed pick on the next runloop, imperatively via the scroll reader — see
+  /// the `onChange` note above for why `.scrollPosition` alone doesn't suffice across the brief-load rebuild.
+  private func restoreScroll(_ proxy: ScrollViewProxy) {
+    let index = store.selectedIndex
+    Task { @MainActor in
+      proxy.scrollTo(index, anchor: .leading)
+      scrollPosition = index
+    }
   }
 
   /// The static role eyebrow for a candidate — index 0 is the coach's recommendation ("Suggested"), the rest
@@ -121,11 +136,8 @@ private struct PagerDots: View {
   }
 }
 
-/// Named carousel metrics — the peek grid (a candidate spans `cardSpan` of `columns` columns) and the pager
-/// dot sizes; no inline literals.
+/// Named carousel metrics — the pager dot sizes; no inline literals.
 private enum Metrics {
-  static let columns = 10
-  static let cardSpan = 9
   static let dotSize: CGFloat = 6
   static let activeDotWidth: CGFloat = 18
 }
