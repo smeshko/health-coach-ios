@@ -1,14 +1,15 @@
 import DomainModels
 import SwiftUI
 
-/// The daily session card (the 2026-06-10 anatomy) — **pure**: state in, view out. It renders only the
-/// **displayed** session plus footer **label** slots; the inline SWAP-TO list, the expand/select state,
-/// and the real swap/skip actions are the consuming feature's (8.4 `SessionFeature`, Decision 2). The
-/// feature injects `onSwap`/`onSkip` (default no-op / hidden) and draws the list around the card.
+/// The daily session card (the 2026-06-10 anatomy) — **pure**: state in, view out. It renders the session
+/// plus an optional **role eyebrow** ("Suggested"/"Alternative"), a selectable green-outline state, and the
+/// warm skip **label** slot; the carousel that lays one card per candidate, the tap-to-commit selection, and
+/// the real skip action are the consuming feature's (the carousel `SessionFeature`). The feature injects
+/// `roleLabel`/`isSelected`/`onSkip` (default nil / `false` / hidden).
 ///
 /// The session's `card` selects the layout:
 /// - **rest** (`card == .rest`) — the narrative, an authored optional-activity suggestion box, the "To
-///   help recovery along" recovery row, and the "Rest is training too." footer; no numeral/zone/swap.
+///   help recovery along" recovery row, and the "Rest is training too." footer; no numeral/zone.
 /// - **cardio** (a `zoneTarget`) — the duration numeral + the markerless `SegmentedBar.zones` bar.
 /// - **strength / no-zone** — the duration numeral + the `SegmentedBar.range` 1–10 effort scale with the
 ///   **derived** zone→RPE band (`effortBand(for:)`).
@@ -16,36 +17,47 @@ import SwiftUI
 /// Everything shown is model-backed or derived from the `SessionBlock`'s real fields (the category badge,
 /// the header icon, the duration, the zone/effort meter, the flags row, the prehab add-on). The only
 /// authored strings are short category chrome (the header sub-line, the rest-day suggestion + recovery
-/// copy, the effort-scale endpoints); no fabricated RPE / reserve / rest / lift / cue copy (Decision 3).
+/// copy, the effort-scale endpoints) and the parent-supplied `roleLabel`; no fabricated RPE / reserve /
+/// rest / lift / cue copy (Decision 3).
 public struct SessionCard: View {
   let block: SessionBlock
   let zoneRange: ZoneRange?
   let narrative: [NarrativeSection]
-  let onSwap: (() -> Void)?
+  /// The static role eyebrow above the header — "Suggested" (the primary) / "Alternative" (the rest); `nil`
+  /// renders no eyebrow (a lone-candidate day / the forced-REST card).
+  let roleLabel: String?
+  /// Whether this card is today's committed pick — draws the accent (green) outline instead of the muted
+  /// border. Mutable selection lives in the feature; the card only reflects it.
+  let isSelected: Bool
   let onSkip: (() -> Void)?
 
   public init(
     _ block: SessionBlock,
     zoneRange: ZoneRange? = nil,
     narrative: [NarrativeSection] = [],
-    onSwap: (() -> Void)? = nil,
+    roleLabel: String? = nil,
+    isSelected: Bool = false,
     onSkip: (() -> Void)? = nil
   ) {
     self.block = block
     self.zoneRange = zoneRange
     self.narrative = narrative
-    self.onSwap = onSwap
+    self.roleLabel = roleLabel
+    self.isSelected = isSelected
     self.onSkip = onSkip
   }
 
   public var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
+      if let roleLabel {
+        RoleEyebrow(label: roleLabel)
+      }
       SessionHeader(block: block)
       if block.card == .rest {
         RestDayBody(narrative: narrative)
       } else {
         ActiveSessionBody(
-          block: block, zoneRange: zoneRange, narrative: narrative, onSwap: onSwap, onSkip: onSkip
+          block: block, zoneRange: zoneRange, narrative: narrative, onSkip: onSkip
         )
       }
     }
@@ -55,10 +67,30 @@ public struct SessionCard: View {
       RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)
         .fill(.coachSurface)
         .overlay(
+          // `strokeBorder` (not `stroke`) keeps the line fully inside the bounds — a centered stroke has its
+          // outer half clipped by the view edge (and the `.coachPressable` scale rasterization), which thins
+          // the outline unevenly at the corners.
           RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)
-            .stroke(.coachBorder, lineWidth: 1)
+            .strokeBorder(isSelected ? .coachAccent : .coachBorder, lineWidth: isSelected ? 2 : 1)
         )
     )
+  }
+}
+
+/// The static role eyebrow — a small accent dot + the parent-supplied label ("Suggested"/"Alternative"),
+/// in title case (the role copy the design specifies), above the card header.
+private struct RoleEyebrow: View {
+  let label: String
+
+  var body: some View {
+    HStack(spacing: CoachSpacing.spaceXs) {
+      Circle()
+        .fill(.coachAccent)
+        .frame(width: Metrics.eyebrowDot, height: Metrics.eyebrowDot)
+      Text(label)
+        .font(.coachTextSm)
+        .foregroundStyle(.coachForeground)
+    }
   }
 }
 
@@ -129,7 +161,6 @@ private struct ActiveSessionBody: View {
   let block: SessionBlock
   let zoneRange: ZoneRange?
   let narrative: [NarrativeSection]
-  let onSwap: (() -> Void)?
   let onSkip: (() -> Void)?
 
   var body: some View {
@@ -198,7 +229,7 @@ private struct ActiveSessionBody: View {
         )
       }
 
-      SessionFooter(onSwap: onSwap, onSkip: onSkip)
+      SessionFooter(onSkip: onSkip)
     }
   }
 
@@ -288,31 +319,19 @@ private struct RecoveryItem: View {
   }
 }
 
-/// The footer affordance slots — "Skipping is fine today" (when `onSkip` is set) and "Swap" (when
-/// `onSwap` is set). The card only renders the labels + forwards taps; the actions are the feature's.
+/// The footer affordance slot — "Skipping is fine today" (when `onSkip` is set). The card only renders the
+/// label + forwards the tap; the action is the feature's. (The swap affordance moved to the carousel.)
 private struct SessionFooter: View {
-  let onSwap: (() -> Void)?
   let onSkip: (() -> Void)?
 
   var body: some View {
-    if onSwap != nil || onSkip != nil {
+    if let onSkip {
       HStack {
-        if let onSkip {
-          Button(action: onSkip) {
-            Label("Skipping is fine today", systemImage: "heart")
-              .font(.coachTextSm)
-          }
+        Button(action: onSkip) {
+          Label("Skipping is fine today", systemImage: "heart")
+            .font(.coachTextSm)
         }
         Spacer(minLength: CoachSpacing.spaceSm)
-        if let onSwap {
-          Button(action: onSwap) {
-            HStack(spacing: CoachSpacing.space2xs) {
-              Text("Swap")
-              Image(systemName: "chevron.right")
-            }
-            .font(.coachTextSm)
-          }
-        }
       }
       .buttonStyle(.coachPressable)
       .foregroundStyle(.coachAccent)
@@ -346,5 +365,6 @@ private extension Zone {
 /// Eyebrow tracking and the effort scale length — named constants, no inline literals.
 private enum Metrics {
   static let eyebrowTracking: CGFloat = 0.8
+  static let eyebrowDot: CGFloat = 6
   static let effortScale = 10
 }

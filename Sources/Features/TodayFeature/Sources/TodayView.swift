@@ -86,9 +86,22 @@ public struct TodayView: View {
             dateSubtitle: dateSubtitle,
             syncedLabel: syncedLabel,
             isBackgroundRefreshing: store.isBackgroundRefreshing,
-            // Pull-to-refresh runs the quiet background pass; `.finish()` keeps the system spinner up
-            // until the effect completes (Phase 12.1).
-            onRefresh: { await store.send(.pullToRefresh).finish() },
+            // Pull-to-refresh runs the quiet background pass. We deliberately avoid
+            // `store.send(.pullToRefresh).finish()`: `StoreTask.finish()` awaits `cancellableValue`, so
+            // SwiftUI cancelling this refresh task (the nested carousel scroll makes the gesture fragile —
+            // it cancels early) would propagate into the background-refresh effect and kill it mid-pass —
+            // `runBackgroundPass` hits `catch is CancellationError` before emitting a terminal action, so
+            // `isBackgroundRefreshing` is stranded on (the "Updating…" pill sticks and the brief never
+            // swaps). Instead we fire the action so the effect runs in the store independently of this task,
+            // then hold the spinner by polling the flag; a cancelled gesture just drops the spinner — the
+            // background pass still lands and clears the flag itself.
+            onRefresh: {
+              await store.send(.pullToRefresh)
+              while await MainActor.run(body: { store.isBackgroundRefreshing }) {
+                if Task.isCancelled { break }
+                try? await Task.sleep(for: .milliseconds(80))
+              }
+            },
             content: {
               TodayReadyContent(
                 store: store,

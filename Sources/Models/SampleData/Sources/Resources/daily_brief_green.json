@@ -24,6 +24,13 @@
         "durationMinLow": 20,
         "durationMinHigh": 30,
         "flags": []
+      },
+      {
+        "card": "strength_full",
+        "intensity": "quality",
+        "durationMinLow": 30,
+        "durationMinHigh": 45,
+        "flags": []
       }
     ],
     "skipOk": true,

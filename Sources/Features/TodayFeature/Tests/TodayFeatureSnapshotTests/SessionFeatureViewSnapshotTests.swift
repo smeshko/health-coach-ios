@@ -1,12 +1,13 @@
-// SessionFeatureView snapshots (ARCHITECTURE D16) — the `Row.png` card variants and the inline-swap states,
+// SessionFeatureView snapshots (ARCHITECTURE D16) — the `Today · Exercise.png` carousel states (primary
+// selected, an alternative selected, a lone candidate, plus the rest / strength / effort-based card types),
 // in light + dark on the single reference device, via the shared `CoachTestSupport` harness. The whole body
 // is `#if canImport(UIKit)`-guarded so this target compiles to an empty module on the macOS host (`swift
 // test` stays green); it runs on the pinned iOS 26 simulator via `make test-snapshots`.
 //
 // Fixtures are **inline `DomainModels` literals**: the `SampleData` briefs carry ≤1 alternative, no
 // alternative with a `zoneTarget`, no `.session`-typed narrative, and only forced-REST rest fixtures with
-// `skipOk: true`, so they cannot drive these cases. The card is framed on `.coachBackground` to mirror the
-// real screen.
+// `skipOk: true`, so they cannot drive these cases. The carousel is framed on `.coachBackground` to mirror
+// the real screen.
 
 #if canImport(UIKit)
   import CoachTestSupport
@@ -73,37 +74,39 @@
         .background(Color.coachBackground)
     }
 
-    // MARK: - The Row.png variants + swap states
+    // MARK: - Carousel states
 
-    /// Collapsed: primary easy run, 2 alternatives + `skipOk` (footer "♡ Skipping is fine today" + "Swap ›"),
-    /// the in-card session narrative, zone bar on Z2.
-    @Test func test_easyRun_collapsed() {
+    /// Primary selected (default): an easy Z2 run + 2 alternatives + `skipOk`, the in-card session narrative,
+    /// zone bar on Z2. Card 0 carries the green outline + "Suggested" eyebrow; the next card peeks on the
+    /// trailing edge; the pager dots sit beneath (first dot active).
+    @Test func test_carousel_primarySelected() {
       assertCoachSnapshot(of: framed(SessionFeature.State(
         session: easyRun(), alternatives: [altLowImpact(), altStrength()],
         skipOk: true, narrative: sessionNarrative(), zones: zones()
       )))
     }
 
-    /// Swap expanded — the SWAP TO header + the two alternative rows beneath the card.
-    @Test func test_easyRun_swapExpanded() {
+    /// An alternative committed (`selectedIndex: 1`): selection and scroll are **decoupled** (DECISIONS D1) —
+    /// the committed card (candidate 1) carries the green outline while the pager dots advance to position 1.
+    /// (A static snapshot renders the leading card; the seeded `scrollPosition` only physically scrolls to the
+    /// pick at runtime, so here candidate 1 appears outlined as the peeking neighbour.)
+    @Test func test_carousel_alternativeSelected() {
       assertCoachSnapshot(of: framed(SessionFeature.State(
         session: easyRun(), alternatives: [altLowImpact(), altStrength()],
-        skipOk: true, zones: zones(), isSwapExpanded: true
+        skipOk: true, narrative: sessionNarrative(), zones: zones(), selectedIndex: 1
       )))
     }
 
-    /// Swap selected — SWAPPED TO header, the first row highlighted, and the card showing the **alternative**
-    /// with **its** zone (Z1) highlighted/captioned (the first alternative carries a different `zoneTarget`
-    /// than the primary — locks DECISIONS #4).
-    @Test func test_easyRun_swapSelected() {
+    /// A lone candidate — one full-width card, **no** pager dots and **no** role eyebrow (RESEARCH
+    /// resolution); the green outline still marks it as today's pick.
+    @Test func test_carousel_singleCandidate() {
       assertCoachSnapshot(of: framed(SessionFeature.State(
-        session: easyRun(), alternatives: [altLowImpact(), altStrength()],
-        skipOk: true, zones: zones(), selectedAlternativeIndex: 0, isSwapExpanded: true
+        session: easyRun(), skipOk: true, narrative: sessionNarrative(), zones: zones()
       )))
     }
 
-    /// The rest-day card — a coach-chosen rest session, no alternatives/skip (suggestion box + recovery icon
-    /// row + "Rest is training too." footer; no zone bar / numeral / swap).
+    /// The rest-day card — a coach-chosen rest session, lone candidate (suggestion box + recovery icon row +
+    /// "Rest is training too." footer; no zone bar / numeral / eyebrow / dots).
     @Test func test_restDay() {
       let rest = SessionBlock(card: .rest, intensity: .recovery, durationMinLow: 0, durationMinHigh: 0)
       assertCoachSnapshot(of: framed(SessionFeature.State(
@@ -116,7 +119,7 @@
     }
 
     /// A strength session — the 1–10 effort scale with the derived band (quality → high band) and a prehab
-    /// add-on chip from the `prehabFoot` flag.
+    /// add-on chip from the `prehabFoot` flag. Lone candidate.
     @Test func test_strength() {
       let strength = SessionBlock(
         card: .strengthFull, intensity: .quality,
@@ -125,28 +128,14 @@
       assertCoachSnapshot(of: framed(SessionFeature.State(session: strength, skipOk: true)))
     }
 
-    /// An `effort_based` long run — the flag in the meta row, the HR ceiling de-emphasized (bpm line present).
+    /// An `effort_based` long run — the flag in the meta row, the HR ceiling de-emphasized (bpm line
+    /// present). Lone candidate.
     @Test func test_longRun_effortBased() {
       let longRun = SessionBlock(
         card: .longRun, intensity: .easy, zoneTarget: .z2,
         durationMinLow: 75, durationMinHigh: 90, hrCapBpm: 150, flags: [.effortBased]
       )
       assertCoachSnapshot(of: framed(SessionFeature.State(session: longRun, zones: zones())))
-    }
-
-    /// An `append_to_easy` easy run — the flag's `DisplayLabel` in the meta row, attached to the run (no
-    /// invented stride count).
-    @Test func test_easyRun_appendToEasy() {
-      let block = SessionBlock(
-        card: .easyRun, intensity: .easy, zoneTarget: .z2,
-        durationMinLow: 35, durationMinHigh: 45, hrCapBpm: 146, cadenceSpm: 170, flags: [.appendToEasy]
-      )
-      assertCoachSnapshot(of: framed(SessionFeature.State(session: block, zones: zones())))
-    }
-
-    /// No alternatives + no skip — the collapsed footer-less layout (a PLAN risk mitigation, not optional).
-    @Test func test_noAlternatives_noSkip() {
-      assertCoachSnapshot(of: framed(SessionFeature.State(session: easyRun(), zones: zones())))
     }
   }
 #endif

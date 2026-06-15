@@ -11,6 +11,10 @@ import SyncRepository
 // instant render + quiet background refresh), `backgroundRefreshEffect` (pull-to-refresh / scene
 // staleness), and the pure state helpers (`hydrate` / `mergeZones` / `contentEquals` / `isStale`).
 extension TodayFeature {
+  /// Today in the Europe/Sofia frame (the pinned `\.calendar`/`\.date`, CoachCore) — the key the
+  /// orchestration reads the check-in / persisted pick for.
+  var today: Date { calendar.startOfDay(for: date.now) }
+
   /// The morning orchestration as **one** chained, cancellable effect (D15/§11): the check-in **gate**
   /// (no check-in saved today → `.checkInRequired`, **STOP** — no sync; "Save & build today's brief"
   /// re-enters) → `sync()` (must precede the brief; on failure set `.syncFailed` and **STOP** — the
@@ -21,7 +25,8 @@ extension TodayFeature {
   /// §13/D13), so the catch-all maps any unexpected throw to a terminal retryable state.
   func orchestrationEffect(refresh: Bool) -> Effect<Action> {
     let day = today
-    return .run { [checkInRepository, syncRepository, briefRepository, profileRepository, clock] send in
+    let deps = OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
+    return .run { [checkInRepository, sessionSelectionRepository, clock] send in
       // 1. The check-in gates the chain (2026-06-10 design): nothing saved today → show the check-in
       //    screen and stop. A read error degrades to the same gate (the user saves their way through).
       let existing = await (try? checkInRepository.current(day)) ?? nil
@@ -32,10 +37,12 @@ extension TodayFeature {
         await send(._checkInRequired)
         return
       }
-      await runBlockingChain(
-        refresh: refresh, send: send, clock: clock,
-        deps: OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
-      )
+      // Restore the day's persisted pick before the brief hydrates, so the carousel opens on it (DECISIONS
+      // D4/D5). Sent only when present; a read error / no pick is a silent no-op (the primary stays selected).
+      if let restored = await (try? sessionSelectionRepository.current(day)) ?? nil {
+        await send(._selectionLoaded(restored))
+      }
+      await runBlockingChain(refresh: refresh, send: send, clock: clock, deps: deps)
     }
     .cancellable(id: CancelID.orchestration, cancelInFlight: true)
   }
@@ -49,7 +56,8 @@ extension TodayFeature {
   /// One `CancelID.orchestration` covers the whole open path (D7).
   func cacheFirstOpenEffect() -> Effect<Action> {
     let day = today
-    return .run { [checkInRepository, briefRepository, syncRepository, profileRepository, clock] send in
+    let deps = OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
+    return .run { [checkInRepository, sessionSelectionRepository, briefRepository, clock] send in
       // The check-in gates the chain (unchanged) — a read error degrades to the gate, exactly as before.
       let existing = await (try? checkInRepository.current(day)) ?? nil
       try Task.checkCancellation()
@@ -57,22 +65,21 @@ extension TodayFeature {
         await send(._checkInRequired)
         return
       }
+      // Restore the day's persisted pick before any hydration, so both the cache-hit and miss branches seed
+      // the carousel on it (DECISIONS D4/D5). Sent only when present; no pick is a silent no-op.
+      if let restored = await (try? sessionSelectionRepository.current(day)) ?? nil {
+        await send(._selectionLoaded(restored))
+      }
       // The pure same-day peek (DECISIONS D1) — a throw is treated as a cache miss (the blocking path
       // will surface any real failure honestly).
       guard let cached = try? await briefRepository.cachedDailyBrief() else {
         // MISS → the blocking sync→generate chain, unchanged.
-        await runBlockingChain(
-          refresh: false, send: send, clock: clock,
-          deps: OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
-        )
+        await runBlockingChain(refresh: false, send: send, clock: clock, deps: deps)
         return
       }
       // HIT → render immediately + start the background refresh in this same effect.
       await send(._cachedBriefLoaded(cached, startBackgroundRefresh: true))
-      await runBackgroundPass(
-        send: send,
-        deps: OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
-      )
+      await runBackgroundPass(send: send, deps: deps)
     }
     .cancellable(id: CancelID.orchestration, cancelInFlight: true)
   }
@@ -90,6 +97,16 @@ extension TodayFeature {
     .cancellable(id: CancelID.orchestration, cancelInFlight: true)
   }
 
+  /// Persist the committed workout pick by value for today (DECISIONS D4/D5) — a fire-and-forget local
+  /// write. Best-effort: a failure is swallowed (`try?`) so it never breaks the UI; the live session child's
+  /// `selectedSession` already carries the pick for any in-session background re-seed.
+  func persistSelectionEffect(_ block: SessionBlock) -> Effect<Action> {
+    let day = today
+    return .run { [sessionSelectionRepository] _ in
+      try? await sessionSelectionRepository.save(block, day)
+    }
+  }
+
   // MARK: - Reducer helpers (Phase 12.1)
 
   /// Hydrate `.ready(brief, freshness)` + the readiness/session children from a resolved brief — the
@@ -100,15 +117,25 @@ extension TodayFeature {
   func hydrate(_ state: inout State, from brief: DomainModels.DailyBrief, freshness: Freshness) {
     state.briefState = .ready(brief, freshness)
     state.readiness = ReadinessComponent.State(readiness: brief.readiness)
-    state.session = brief.safetyGate.triggered
-      ? nil
-      : SessionFeature.State(
-        session: brief.session,
-        alternatives: brief.alternatives,
-        skipOk: brief.skipOk,
-        narrative: brief.narrative.filter { $0.type == .session },
-        zones: state.zones
-      )
+    guard !brief.safetyGate.triggered else {
+      state.session = nil
+      return
+    }
+    // Seed the committed pick by value (DECISIONS D4): prefer the live child's current selection so a
+    // background re-seed of a changed brief preserves a still-valid choice; on the first hydrate (no child
+    // yet) fall back to the app-open `restoredSelection`. A block no longer among the candidates falls back
+    // to the primary (index 0) — the same degrade `selectedSession` applies to a stale index.
+    let candidates = [brief.session] + brief.alternatives
+    let preferred = state.session?.selectedSession ?? state.restoredSelection
+    let selectedIndex = preferred.flatMap { candidates.firstIndex(of: $0) } ?? 0
+    state.session = SessionFeature.State(
+      session: brief.session,
+      alternatives: brief.alternatives,
+      skipOk: brief.skipOk,
+      narrative: brief.narrative.filter { $0.type == .session },
+      zones: state.zones,
+      selectedIndex: selectedIndex
+    )
   }
 
   /// Merge a non-nil zones into the parent + the live session child IN PLACE (DECISIONS D3), preserving

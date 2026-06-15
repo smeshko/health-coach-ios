@@ -105,11 +105,17 @@ private func dueStrengthTest(
   return test
 }
 
+/// First-sync backfill floor. The first-ever sync would otherwise read from `.distantPast` and upload
+/// the device's entire HealthKit history; instead it uploads only entries on/after this cutoff. Later
+/// syncs anchor to the last read instant (always newer than the floor) and are unaffected.
+/// 2026-05-23 00:00 Europe/Sofia — earlier history was exported separately and is intentionally skipped.
+let backfillFloor = Date(timeIntervalSince1970: 1_779_483_600)
+
 /// The HK read anchor as a `Date`. The watermark stores it as a lossless `timeIntervalSince1970`
-/// string (the 2.3 record's `anchor` column is `String?`); an absent/garbage value → `.distantPast`
-/// (first-ever sync backfills historical data, PRD §7.1).
+/// string (the 2.3 record's `anchor` column is `String?`); an absent/garbage value → the
+/// `backfillFloor` (first-ever sync backfills bounded historical data, PRD §7.1).
 func anchorDate(_ string: String?) -> Date {
-  guard let string, let interval = TimeInterval(string) else { return .distantPast }
+  guard let string, let interval = TimeInterval(string) else { return backfillFloor }
   return Date(timeIntervalSince1970: interval)
 }
 

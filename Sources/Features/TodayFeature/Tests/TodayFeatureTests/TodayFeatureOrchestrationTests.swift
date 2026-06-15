@@ -262,11 +262,19 @@ struct TodayFeatureOrchestrationTests {
     }
   }
 
-  /// Re-hydration resets the swap selection: a second `_briefResolved` re-seeds the session child, so a
-  /// stale `selectedAlternativeIndex` is cleared (the doc-comment claims it; this asserts it).
-  @Test func test_reHydration_resetsSwapSelection() async {
+  /// Re-hydration PRESERVES a still-valid carousel selection (DECISIONS D4/D5): a second `_briefResolved`
+  /// re-seeds the session child, but the committed pick (candidate 1) is still among the new candidates, so
+  /// `selectedIndex` survives the re-seed rather than resetting to the primary.
+  @Test func test_reHydration_preservesValidSelection() async {
+    let now = sofiaInstant()
     let fresh = sampleBrief(cached: false)
-    let store = TestStore(initialState: TodayFeature.State()) { TodayFeature() }
+    let store = TestStore(initialState: TodayFeature.State()) {
+      TodayFeature()
+    } withDependencies: {
+      // The selection write-through reads `today` (calendar/date); the save itself is the no-op `testValue`.
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
+    }
 
     await store.send(._briefResolved(fresh, .fresh, sampleZones())) {
       $0.briefState = .ready(fresh, .fresh)
@@ -274,15 +282,16 @@ struct TodayFeatureOrchestrationTests {
       $0.readiness = ReadinessComponent.State(readiness: fresh.readiness)
       $0.session = expectedSessionState(fresh, zones: sampleZones())
     }
-    // The athlete swaps to the first alternative via the child reducer.
-    await store.send(.session(.alternativeTapped(index: 0))) {
-      $0.session?.selectedAlternativeIndex = 0
+    // The athlete commits the first alternative (candidate 1) via the child reducer; the child tells the
+    // parent, which persists the pick (best-effort, no-op `testValue` repository here).
+    await store.send(.session(.cardSelected(index: 1))) {
+      $0.session?.selectedIndex = 1
     }
-    // A second resolve (e.g. a re-save) re-seeds the child from the brief, clearing the selection.
-    await store.send(._briefResolved(fresh, .fresh, sampleZones())) {
-      $0.session = expectedSessionState(fresh, zones: sampleZones())
-    }
-    #expect(store.state.session?.selectedAlternativeIndex == nil)
+    await store.receive(\.session.delegate, .selectionChanged(fresh.alternatives[0]))
+    // A second resolve of the same brief re-seeds the child but keeps the still-valid pick — selectedIndex
+    // stays 1 and everything else is identical, so there is NO observable state change here.
+    await store.send(._briefResolved(fresh, .fresh, sampleZones()))
+    #expect(store.state.session?.selectedIndex == 1)
   }
 
   /// The Exercise/Nutrition segmented toggle (`sectionSelected`) is a pure-UI reducer arm — the one
