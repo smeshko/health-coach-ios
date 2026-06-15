@@ -211,10 +211,10 @@ struct WeeklyFeatureTests {
     let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
       $0.continuousClock = clock
       $0.profileRepository.zones = {
-        let n = zonesCalls.withValue { $0 += 1; return $0 }
+        let callIndex = zonesCalls.withValue { $0 += 1; return $0 }
         // The first run parks here so a newer trigger cancels it mid-flight before it sends anything;
         // the cancelled clock.sleep throws, the run aborts, and TCA drops its (would-be) sends.
-        if n == 1 { try await clock.sleep(for: .seconds(60)) }
+        if callIndex == 1 { try await clock.sleep(for: .seconds(60)) }
         return zones
       }
       $0.briefRepository.weeklyBrief = { _, _ in plan }

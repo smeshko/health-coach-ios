@@ -143,10 +143,12 @@ private struct WeeklyReadyContent: View {
             .padding(CoachSpacing.spaceLg)
             .background(CardSurface())
         }
+
         // MARK: - Phase 9.2 core/extra sessions
       }
     case .nutrition:
       // MARK: - Phase 9.3 weekly nutrition
+
       Color.clear.frame(height: 0)
     }
   }
