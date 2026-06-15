@@ -85,12 +85,12 @@ struct WeeklyFeatureTests {
     }
 
     await store.send(.task) { $0.weeklyState = .loading }
-    await store.receive(\.weeklyResolved) {
-      $0.zones = zones
+    await store.receive(\.weeklyResolved) { // the plan renders first (before zones)
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
+    await store.receive(\.zonesResolved) { $0.zones = zones } // then zones hydrate
     #expect(refreshArgs.value == [false], "the appear path calls weeklyBrief once with refresh: false")
     #expect(store.state.lastSeenISOWeek == plan.isoWeek)
   }
@@ -109,11 +109,11 @@ struct WeeklyFeatureTests {
 
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
-      $0.zones = zones
       $0.rhythm = WeekRhythmComponent.rhythm(from: cached)
       $0.weeklyState = .ready(cached, .cached) // the cached flag drives .cached
       $0.$lastSeenISOWeek.withLock { $0 = cached.isoWeek }
     }
+    await store.receive(\.zonesResolved) { $0.zones = zones }
     #expect(refreshArgs.value == [false], "a same-week open is refresh: false — never refresh: true")
   }
 
@@ -135,11 +135,11 @@ struct WeeklyFeatureTests {
     shouldFail.setValue(false)
     await store.send(.retryTapped) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
-      $0.zones = zones
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
+    await store.receive(\.zonesResolved) { $0.zones = zones }
   }
 
   @Test func test_weeklyBrief_nonBriefErrorThrow_landsTerminalError_noHang() async throws {
@@ -163,11 +163,12 @@ struct WeeklyFeatureTests {
 
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
-      // zones nil (throw degraded) — the plan still lands ready.
+      // The plan lands ready regardless of zones.
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
+    await store.receive(\.zonesResolved) // nil (throw degraded) → merge no-op, zones stays nil
     #expect(store.state.zones == nil, "a throwing zones read is non-fatal — the plan still lands ready")
   }
 
@@ -196,10 +197,10 @@ struct WeeklyFeatureTests {
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.weeklyResolved) {
-      $0.zones = zones
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
     }
+    await store.receive(\.zonesResolved) { $0.zones = zones }
     #expect(refreshArgs.value == [true], "two rapid refreshTapped collapse to one refresh: true fetch")
   }
 
@@ -207,27 +208,27 @@ struct WeeklyFeatureTests {
     let plan = try Self.deloadPlan()
     let zones = Self.sampleZones()
     let clock = TestClock()
-    let zonesCalls = LockIsolated(0)
+    let weeklyCalls = LockIsolated(0)
     let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
       $0.continuousClock = clock
-      $0.profileRepository.zones = {
-        let callIndex = zonesCalls.withValue { $0 += 1; return $0 }
-        // The first run parks here so a newer trigger cancels it mid-flight before it sends anything;
-        // the cancelled clock.sleep throws, the run aborts, and TCA drops its (would-be) sends.
+      $0.profileRepository.zones = { zones }
+      $0.briefRepository.weeklyBrief = { _, _ in
+        let callIndex = weeklyCalls.withValue { $0 += 1; return $0 }
+        // The first run parks in weeklyBrief (before sending the plan) so a newer trigger cancels it
+        // mid-flight; the cancelled clock.sleep throws, the run aborts, and TCA drops its (would-be) sends.
         if callIndex == 1 { try await clock.sleep(for: .seconds(60)) }
-        return zones
+        return plan
       }
-      $0.briefRepository.weeklyBrief = { _, _ in plan }
     }
 
-    await store.send(.task) { $0.weeklyState = .loading } // first run parks in zones()
+    await store.send(.task) { $0.weeklyState = .loading } // first run parks in weeklyBrief()
     await store.send(.task) // already .loading; cancelInFlight cancels the first run
-    await store.receive(\.weeklyResolved) { // only the second run's payload lands
-      $0.zones = zones
+    await store.receive(\.weeklyResolved) { // only the second run's plan lands
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
+    await store.receive(\.zonesResolved) { $0.zones = zones }
   }
 
   // MARK: - Helpers

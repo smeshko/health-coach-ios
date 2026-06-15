@@ -79,11 +79,13 @@ public struct WeeklyFeature {
     /// Internal — fired once the refresh debounce window elapses; sets `.loading` + runs the `refresh: true`
     /// fetch. (Loading is delayed to here so a rapid double-tap doesn't flash a loading screen per tap.)
     case refreshRequested
-    /// Internal — the resolved plan + its (non-fatal) HR zones in **one** payload (the TodayFeature 11.4
-    /// precedent — zones land alongside the resolved plan, not via a separate mirror action). Lands
-    /// `.ready(plan, freshness)`, hydrates `state.zones`, and writes the watermark. `zones == nil` is a
-    /// silent degrade (the rows omit the bpm line).
-    case weeklyResolved(DomainModels.WeeklyPlan, Zones?)
+    /// Internal — the resolved plan. Lands `.ready(plan, freshness)` + the derived rhythm + the watermark
+    /// **immediately** (before optional zones), so a slow profile read never blocks the primary plan
+    /// (review #2 / the TodayFeature 12.1 render-then-hydrate pattern).
+    case weeklyResolved(DomainModels.WeeklyPlan)
+    /// Internal — the (non-fatal) HR zones, hydrated into `state.zones` **after** the plan renders. A nil
+    /// (a throwing/absent read) is a silent degrade — the rows omit the bpm line; a prior non-nil map is kept.
+    case zonesResolved(Zones?)
     /// Internal — the fetch failed; lands the terminal `.error` (a non-`BriefError` throw is mapped upstream).
     case weeklyFailed(BriefError)
   }
@@ -133,14 +135,19 @@ public struct WeeklyFeature {
         state.isPlanCardExpanded.toggle()
         return .none
 
-      case let .weeklyResolved(plan, zones):
-        // Hydrate zones + the ready plan + the derived rhythm from one payload. The `cached` flag drives the
-        // freshness label (PRD §8.2) — made truthful by the scoped `WeeklyPlanPolicy` amendment (a
+      case let .weeklyResolved(plan):
+        // Render the plan + derived rhythm immediately (before optional zones). The `cached` flag drives
+        // the freshness label (PRD §8.2) — made truthful by the scoped `WeeklyPlanPolicy` amendment (a
         // local-store hit is stamped `cached == true`).
-        state.zones = zones
         state.rhythm = WeekRhythmComponent.rhythm(from: plan)
         state.weeklyState = .ready(plan, plan.cached ? .cached : .fresh)
         recordSeenWeek(&state, isoWeek: plan.isoWeek)
+        return .none
+
+      case let .zonesResolved(zones):
+        // Merge — a failed/absent read (nil) leaves any prior map in place (mirrors TodayFeature's
+        // `mergeZones`); never clobbers good zones with nil.
+        if let zones { state.zones = zones }
         return .none
 
       case let .weeklyFailed(error):
@@ -159,16 +166,18 @@ public struct WeeklyFeature {
   /// `.ready`/`.error` lands.
   private func fetchEffect(refresh: Bool) -> Effect<Action> {
     .run { [briefRepository, profileRepository] send in
-      // Zones runs **concurrently** with the plan (mirroring the TodayFeature precedent's `async let`):
-      // it is optional (non-fatal — a throw degrades to nil; the rows omit the bpm line), so a slow/hung
-      // profile read must never block the primary weekly plan (review #2). Both land on one
-      // `weeklyResolved` payload. A cancelled run aborts before sending.
+      // Zones starts **concurrently** with the plan, but the plan renders the moment it resolves — the
+      // optional, non-fatal zones await is moved OFF the critical path (review #2 / TodayFeature 12.1
+      // render-then-hydrate): a slow/hung profile read can never block `.ready`. A cancelled run aborts
+      // before sending the plan.
       async let zonesResult = try? await profileRepository.zones()
       do {
         try Task.checkCancellation()
         let plan = try await briefRepository.weeklyBrief(nil, refresh)
-        let zones = await zonesResult
-        await send(.weeklyResolved(plan, zones))
+        await send(.weeklyResolved(plan))
+        // Hydrate zones afterward (a throw → nil, a silent degrade). This await is past the `.ready`
+        // render, so a parked zones leaves the plan visible.
+        await send(.zonesResolved(await zonesResult))
       } catch is CancellationError {
         return
       } catch let error as BriefError {
