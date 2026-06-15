@@ -6,7 +6,7 @@
 # `test-snapshots` / `record-snapshots` targets so every run uses the same device.
 SNAPSHOT_DEVICE = platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0
 SNAPSHOT_WORKSPACE = .swiftpm/xcode/package.xcworkspace
-SNAPSHOT_TARGETS = -only-testing:DesignSystemSnapshotTests -only-testing:AppFeatureSnapshotTests -only-testing:OnboardingFeatureSnapshotTests -only-testing:SettingsFeatureSnapshotTests -only-testing:TodayFeatureSnapshotTests
+SNAPSHOT_TARGETS = -only-testing:DesignSystemSnapshotTests -only-testing:AppFeatureSnapshotTests -only-testing:OnboardingFeatureSnapshotTests -only-testing:SettingsFeatureSnapshotTests -only-testing:TodayFeatureSnapshotTests -only-testing:WeeklyFeatureSnapshotTests
 
 # Format all Swift sources in place (idempotent).
 format:

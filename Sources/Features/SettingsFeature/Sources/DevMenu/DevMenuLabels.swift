@@ -19,6 +19,7 @@
       case .dailyBriefRestIllness: "Rest — illness"
       case .dailyBriefRestKnee: "Rest — knee"
       case .dailyBriefNoFood: "No food logged"
+      case .weeklyPlanNormal: "Normal week"
       case .weeklyPlanDeload: "Deload week"
       case .profile: "Profile"
       case .syncResponse: "Sync response"

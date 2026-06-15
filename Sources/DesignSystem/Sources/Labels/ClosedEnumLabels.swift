@@ -98,4 +98,18 @@ extension Weekday: DisplayLabel {
     case .sun: "Sun"
     }
   }
+
+  /// The single-letter form for the compact week-rhythm row (`WeekRhythmRow`): M T W T F S S. DesignSystem
+  /// owns labels (D19), and `label` ("Mon"/"Tue") has no one-letter form — this is the sanctioned site.
+  public var shortLabel: String {
+    switch self {
+    case .mon: "M"
+    case .tue: "T"
+    case .wed: "W"
+    case .thu: "T"
+    case .fri: "F"
+    case .sat: "S"
+    case .sun: "S"
+    }
+  }
 }

@@ -1,0 +1,104 @@
+{
+  "data": {
+    "isoWeek": "2026-W23",
+    "weekStart": "2026-06-01",
+    "budgets": {
+      "hardDays": 2,
+      "strengthSessions": 2,
+      "longRunKm": 11.0,
+      "deload": false
+    },
+    "core": [
+      {
+        "card": "threshold",
+        "tier": "core",
+        "intensity": "quality",
+        "isHardDay": true,
+        "flags": ["impact"],
+        "suggestedDay": "tue",
+        "durationMinLow": 35,
+        "durationMinHigh": 45
+      },
+      {
+        "card": "strength_lower",
+        "tier": "core",
+        "intensity": "quality",
+        "isHardDay": true,
+        "flags": [],
+        "suggestedDay": "wed",
+        "durationMinLow": 40,
+        "durationMinHigh": 50
+      },
+      {
+        "card": "long_run",
+        "tier": "core",
+        "intensity": "easy",
+        "isHardDay": false,
+        "flags": ["impact"],
+        "suggestedDay": "sat",
+        "durationMinLow": 65,
+        "durationMinHigh": 80
+      }
+    ],
+    "extras": [
+      {
+        "card": "easy_run",
+        "tier": "extra",
+        "intensity": "easy",
+        "isHardDay": false,
+        "flags": ["impact"],
+        "suggestedDay": "thu",
+        "durationMinLow": 30,
+        "durationMinHigh": 40
+      },
+      {
+        "card": "strength_push",
+        "tier": "extra",
+        "intensity": "recovery",
+        "isHardDay": false,
+        "flags": [],
+        "suggestedDay": "fri",
+        "durationMinLow": 30,
+        "durationMinHigh": 40
+      }
+    ],
+    "targets": {
+      "totalRunKm": 38.0,
+      "easyRunRatio": 0.8,
+      "strengthSessions": 2,
+      "hardDays": 2,
+      "cadenceSpm": 180
+    },
+    "nutrition": {
+      "proteinG": 175,
+      "fatGLow": 65,
+      "fatGHigh": 85,
+      "hydrationLLow": 2.5,
+      "hydrationLHigh": 3.5,
+      "avgCaloriesKcal": 2600,
+      "dayTypePattern": [
+        { "suggestedDay": "tue", "dayType": "hard", "caloriesKcal": 2800, "carbsG": 340 },
+        { "suggestedDay": "sat", "dayType": "hard", "caloriesKcal": 2850, "carbsG": 350 },
+        { "suggestedDay": "thu", "dayType": "moderate", "caloriesKcal": 2600, "carbsG": 300 }
+      ],
+      "restDay": { "caloriesKcal": 2300, "carbsG": 230 },
+      "lastWeek": {
+        "avgCaloriesKcal": 2620,
+        "avgProteinG": 172,
+        "proteinHitDays": 6,
+        "daysOverTarget": 1,
+        "daysUnderTarget": 1
+      }
+    },
+    "constantsRecomputed": false,
+    "generatedAt": "2026-05-30T07:30:00+03:00",
+    "cached": false
+  },
+  "narrative": [
+    {
+      "type": "plan",
+      "heading": "",
+      "body": "A build week — we nudge volume up about 10%. Two quality days, spaced wide: a threshold run and a long run around 11 km. Everything else is easy on purpose; that's where the aerobic base is built."
+    }
+  ]
+}

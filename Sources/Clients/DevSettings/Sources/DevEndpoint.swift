@@ -17,8 +17,7 @@ public enum DevEndpoint: String, CaseIterable, Sendable, Hashable {
   public var defaultScenario: SampleScenario {
     switch self {
     case .dailyBrief: .dailyBriefGreen
-    // `.weeklyPlanDeload` is the only weekly fixture Phase 2.3 ships (no non-deload weekly scenario).
-    case .weeklyPlan: .weeklyPlanDeload
+    case .weeklyPlan: .weeklyPlanNormal
     case .profile: .profile
     case .sync: .syncResponse
     }
@@ -35,7 +34,7 @@ public enum DevEndpoint: String, CaseIterable, Sendable, Hashable {
         .dailyBriefGreen, .dailyBriefAmber, .dailyBriefRed, .dailyBriefRestGIFlare,
         .dailyBriefRestIllness, .dailyBriefRestKnee, .dailyBriefNoFood,
       ]
-    case .weeklyPlan: [.weeklyPlanDeload]
+    case .weeklyPlan: [.weeklyPlanNormal, .weeklyPlanDeload]
     case .profile: [.profile]
     case .sync: [.syncResponse]
     }

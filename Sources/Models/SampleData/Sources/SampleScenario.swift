@@ -10,6 +10,7 @@ public enum SampleScenario: String, CaseIterable, Sendable {
   case dailyBriefRestIllness = "daily_brief_rest_illness"
   case dailyBriefRestKnee = "daily_brief_rest_knee"
   case dailyBriefNoFood = "daily_brief_no_food"
+  case weeklyPlanNormal = "weekly_plan_normal"
   case weeklyPlanDeload = "weekly_plan_deload"
   case profile
   case syncResponse = "sync_response"
