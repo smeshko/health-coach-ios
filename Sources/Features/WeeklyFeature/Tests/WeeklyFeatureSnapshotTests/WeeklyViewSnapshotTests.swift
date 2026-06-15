@@ -35,14 +35,17 @@
     }
 
     private func readyState(
-      _ scenario: SampleScenario, expanded: Bool = true
+      _ scenario: SampleScenario, expanded: Bool = true, coreExpanded: Bool = true
     ) throws -> WeeklyFeature.State {
       let plan = try SampleData.weeklyPlan(scenario).domain
       return WeeklyFeature.State(
+        // `zones` is supplied (9.1's shell fetches it) so the session rows resolve "Zone N · bpm" lines.
         weeklyState: .ready(plan, .fresh),
+        zones: SampleData.sampleProfile.zones,
         rhythm: WeekRhythmComponent.rhythm(from: plan),
         selectedSection: .exercise,
-        isPlanCardExpanded: expanded
+        isPlanCardExpanded: expanded,
+        isCoreExpanded: coreExpanded
       )
     }
 
@@ -72,6 +75,18 @@
 
     @Test func test_planCardCollapsed() throws {
       let state = try readyState(.weeklyPlanNormal, expanded: false)
+      withDependencies {
+        $0.calendar = .europeSofia
+        $0.date = .constant(fixedInstant())
+      } operation: {
+        assertCoachSnapshot(of: view(state))
+      }
+    }
+
+    /// The "Do these — Core" group collapsed (header + count chip only), the Optional group + targets
+    /// still expanded (Phase 9.2).
+    @Test func test_coreGroupCollapsed() throws {
+      let state = try readyState(.weeklyPlanNormal, coreExpanded: false)
       withDependencies {
         $0.calendar = .europeSofia
         $0.date = .constant(fixedInstant())
