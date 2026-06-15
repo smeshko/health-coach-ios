@@ -32,12 +32,12 @@ private func dailyScenario(_ scenario: SampleScenario) -> SampleScenario {
   }
 }
 
-/// The only weekly fixture is deload; any other scenario falls back to it.
+/// Weekly scenarios pass through; any non-weekly scenario falls back to the normal-week default.
 private func weeklyScenario(_ scenario: SampleScenario) -> SampleScenario {
   switch scenario {
-  case .weeklyPlanDeload:
+  case .weeklyPlanNormal, .weeklyPlanDeload:
     scenario
   default:
-    .weeklyPlanDeload
+    .weeklyPlanNormal
   }
 }

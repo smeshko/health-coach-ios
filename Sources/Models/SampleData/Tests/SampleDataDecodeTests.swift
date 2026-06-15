@@ -12,7 +12,7 @@ struct SampleDataDecodeTests {
         try SampleData.jsonData(for: scenario)
       }
       switch scenario {
-      case .weeklyPlanDeload:
+      case .weeklyPlanNormal, .weeklyPlanDeload:
         #expect(throws: Never.self, "\(scenario)") { try SampleData.weeklyPlan(scenario) }
       case .profile:
         #expect(throws: Never.self, "\(scenario)") { try SampleData.profile() }

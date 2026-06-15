@@ -1158,6 +1158,8 @@ let package = Package(
         "SampleData",
         "CoachTestSupport",
         "DesignSystem",
+        // `Calendar.europeSofia` (the fixed-instant snapshot pin) lives in CoachCore.
+        "CoachCore",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
