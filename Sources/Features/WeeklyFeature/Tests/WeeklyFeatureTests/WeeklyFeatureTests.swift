@@ -87,6 +87,8 @@ struct WeeklyFeatureTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) { // the plan renders first (before zones)
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -110,6 +112,8 @@ struct WeeklyFeatureTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       $0.rhythm = WeekRhythmComponent.rhythm(from: cached)
+      $0.nutrition = WeeklyNutritionComponent.make(from: cached)
+      $0.adherence = AdherenceComponent.make(from: cached.nutrition)
       $0.weeklyState = .ready(cached, .cached) // the cached flag drives .cached
       $0.$lastSeenISOWeek.withLock { $0 = cached.isoWeek }
     }
@@ -136,6 +140,8 @@ struct WeeklyFeatureTests {
     await store.send(.retryTapped) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -165,6 +171,8 @@ struct WeeklyFeatureTests {
     await store.receive(\.weeklyResolved) {
       // The plan lands ready regardless of zones.
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -198,6 +206,8 @@ struct WeeklyFeatureTests {
     }
     await store.receive(\.weeklyResolved) {
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
     }
     await store.receive(\.zonesResolved) { $0.zones = zones }
@@ -225,6 +235,8 @@ struct WeeklyFeatureTests {
     await store.send(.task) // already .loading; cancelInFlight cancels the first run
     await store.receive(\.weeklyResolved) { // only the second run's plan lands
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -250,6 +262,8 @@ struct WeeklyFeatureTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) { // the plan renders WHILE zones is still parked
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
@@ -288,6 +302,8 @@ struct WeeklyFeatureTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }

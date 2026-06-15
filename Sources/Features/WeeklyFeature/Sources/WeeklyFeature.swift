@@ -54,6 +54,11 @@ public struct WeeklyFeature {
     public var isCoreExpanded: Bool = true
     /// The "Optional — Extras" group chevron (Phase 9.2, local UI state) — expanded by default.
     public var isExtrasExpanded: Bool = true
+    /// The weekly-nutrition content (Phase 9.3), derived once from the `ready` plan (`nil` until then) —
+    /// like `rhythm`, a parent-held sub-state, not an enum-case payload (so the `ready` case stays bare).
+    public var nutrition: WeeklyNutritionComponent.State?
+    /// The last-week adherence content (Phase 9.3) — derived once from the `ready` plan's nutrition.
+    public var adherence: AdherenceComponent.State?
 
     public init(
       weeklyState: WeeklyViewState = .idle,
@@ -62,7 +67,9 @@ public struct WeeklyFeature {
       selectedSection: WeeklySection = .exercise,
       isPlanCardExpanded: Bool = true,
       isCoreExpanded: Bool = true,
-      isExtrasExpanded: Bool = true
+      isExtrasExpanded: Bool = true,
+      nutrition: WeeklyNutritionComponent.State? = nil,
+      adherence: AdherenceComponent.State? = nil
     ) {
       self.weeklyState = weeklyState
       self.zones = zones
@@ -71,6 +78,8 @@ public struct WeeklyFeature {
       self.isPlanCardExpanded = isPlanCardExpanded
       self.isCoreExpanded = isCoreExpanded
       self.isExtrasExpanded = isExtrasExpanded
+      self.nutrition = nutrition
+      self.adherence = adherence
     }
   }
 
@@ -161,6 +170,8 @@ public struct WeeklyFeature {
         // the freshness label (PRD §8.2) — made truthful by the scoped `WeeklyPlanPolicy` amendment (a
         // local-store hit is stamped `cached == true`).
         state.rhythm = WeekRhythmComponent.rhythm(from: plan)
+        state.nutrition = WeeklyNutritionComponent.make(from: plan)
+        state.adherence = AdherenceComponent.make(from: plan.nutrition)
         state.weeklyState = .ready(plan, plan.cached ? .cached : .fresh)
         recordSeenWeek(&state, isoWeek: plan.isoWeek)
         return .none
