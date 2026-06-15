@@ -35,7 +35,10 @@
     }
 
     private func readyState(
-      _ scenario: SampleScenario, expanded: Bool = true, coreExpanded: Bool = true
+      _ scenario: SampleScenario,
+      section: WeeklySection = .exercise,
+      expanded: Bool = true,
+      coreExpanded: Bool = true
     ) throws -> WeeklyFeature.State {
       let plan = try SampleData.weeklyPlan(scenario).domain
       return WeeklyFeature.State(
@@ -43,9 +46,11 @@
         weeklyState: .ready(plan, .fresh),
         zones: SampleData.sampleProfile.zones,
         rhythm: WeekRhythmComponent.rhythm(from: plan),
-        selectedSection: .exercise,
+        selectedSection: section,
         isPlanCardExpanded: expanded,
-        isCoreExpanded: coreExpanded
+        isCoreExpanded: coreExpanded,
+        nutrition: WeeklyNutritionComponent.make(from: plan),
+        adherence: AdherenceComponent.make(from: plan.nutrition)
       )
     }
 
@@ -87,6 +92,18 @@
     /// still expanded (Phase 9.2).
     @Test func test_coreGroupCollapsed() throws {
       let state = try readyState(.weeklyPlanNormal, coreExpanded: false)
+      withDependencies {
+        $0.calendar = .europeSofia
+        $0.date = .constant(fixedInstant())
+      } operation: {
+        assertCoachSnapshot(of: view(state))
+      }
+    }
+
+    /// The Nutrition segment (Phase 9.3): the carb-cycling card + the nutrition narrative, the "Steady
+    /// all week" constants, and the present "Last week" adherence scorecard.
+    @Test func test_nutritionWeek() throws {
+      let state = try readyState(.weeklyPlanNormal, section: .nutrition)
       withDependencies {
         $0.calendar = .europeSofia
         $0.date = .constant(fixedInstant())
