@@ -145,20 +145,19 @@ private struct WeeklyReadyContent: View {
         }
 
         // MARK: - Phase 9.2 core/extra sessions
+
         SessionGroup(
           title: "Do these", subtitle: "Core · the week's backbone",
           count: plan.core.count, isExpanded: store.isCoreExpanded,
-          toggle: { store.send(.coreGroupToggled) }
-        ) {
-          rows(plan.core)
-        }
+          toggle: { store.send(.coreGroupToggled) },
+          content: { rows(plan.core) }
+        )
         SessionGroup(
           title: "Optional", subtitle: "Extras · only if you've got it",
           count: plan.extras.count, isExpanded: store.isExtrasExpanded,
-          toggle: { store.send(.extrasGroupToggled) }
-        ) {
-          rows(plan.extras)
-        }
+          toggle: { store.send(.extrasGroupToggled) },
+          content: { rows(plan.extras) }
+        )
         TargetsSection(targets: plan.targets)
       }
     case .nutrition:

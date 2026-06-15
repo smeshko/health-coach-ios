@@ -37,13 +37,13 @@ struct WeeklyFeatureTests {
     // Two instants on different Sofia ISO weeks → two distinct keys (deterministic).
     let w24 = withDependencies {
       $0.useEuropeSofia()
-      $0.date = .constant(Self.sofiaMidday(2026, 6, 8)) // Monday of 2026-W24
+      $0.date = .constant(WeeklyTestSupport.sofiaMidday(2026, 6, 8)) // Monday of 2026-W24
     } operation: {
       WeeklyFeature().currentISOWeekKey
     }
     let w25 = withDependencies {
       $0.useEuropeSofia()
-      $0.date = .constant(Self.sofiaMidday(2026, 6, 15)) // Monday of 2026-W25
+      $0.date = .constant(WeeklyTestSupport.sofiaMidday(2026, 6, 15)) // Monday of 2026-W25
     } operation: {
       WeeklyFeature().currentISOWeekKey
     }
@@ -57,7 +57,7 @@ struct WeeklyFeatureTests {
       // A fresh in-memory appStorage suite so the watermark never leaks between tests / real UserDefaults.
       $0.defaultAppStorage = UserDefaults(suiteName: "weekly-isnewweek-\(UUID().uuidString)")!
       $0.useEuropeSofia()
-      $0.date = .constant(Self.sofiaMidday(2026, 6, 8))
+      $0.date = .constant(WeeklyTestSupport.sofiaMidday(2026, 6, 8))
     } operation: {
       let feature = WeeklyFeature()
       let state = WeeklyFeature.State()
@@ -73,10 +73,10 @@ struct WeeklyFeatureTests {
   // MARK: - Get-or-cache fetch effect (TASK-003)
 
   @Test func test_task_fetchOnNewWeek_landsReadyFresh() async throws {
-    let plan = try Self.deloadPlan() // cached == false, isoWeek "2026-W24"
-    let zones = Self.sampleZones()
+    let plan = try WeeklyTestSupport.deloadPlan() // cached == false, isoWeek "2026-W24"
+    let zones = WeeklyTestSupport.sampleZones()
     let refreshArgs = LockIsolated<[Bool]>([])
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.profileRepository.zones = { zones }
       $0.briefRepository.weeklyBrief = { _, refresh in
         refreshArgs.withValue { $0.append(refresh) }
@@ -96,10 +96,10 @@ struct WeeklyFeatureTests {
   }
 
   @Test func test_task_sameWeek_servesCache_neverRefreshTrue() async throws {
-    let cached = try Self.deloadPlan(cached: true) // the repo stamps a same-week local hit
-    let zones = Self.sampleZones()
+    let cached = try WeeklyTestSupport.deloadPlan(cached: true) // the repo stamps a same-week local hit
+    let zones = WeeklyTestSupport.sampleZones()
     let refreshArgs = LockIsolated<[Bool]>([])
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.profileRepository.zones = { zones }
       $0.briefRepository.weeklyBrief = { _, refresh in
         refreshArgs.withValue { $0.append(refresh) }
@@ -118,10 +118,10 @@ struct WeeklyFeatureTests {
   }
 
   @Test func test_weeklyBrief_throwsBriefError_landsError_thenRetrySucceeds() async throws {
-    let plan = try Self.deloadPlan()
-    let zones = Self.sampleZones()
+    let plan = try WeeklyTestSupport.deloadPlan()
+    let zones = WeeklyTestSupport.sampleZones()
     let shouldFail = LockIsolated(true)
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.profileRepository.zones = { zones }
       $0.briefRepository.weeklyBrief = { _, _ in
         if shouldFail.value { throw BriefError.transientGenerationFailed }
@@ -143,10 +143,10 @@ struct WeeklyFeatureTests {
   }
 
   @Test func test_weeklyBrief_nonBriefErrorThrow_landsTerminalError_noHang() async throws {
-    let zones = Self.sampleZones()
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let zones = WeeklyTestSupport.sampleZones()
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.profileRepository.zones = { zones }
-      $0.briefRepository.weeklyBrief = { _, _ in throw Self.Boom() }
+      $0.briefRepository.weeklyBrief = { _, _ in throw WeeklyTestSupport.Boom() }
     }
 
     await store.send(.task) { $0.weeklyState = .loading }
@@ -155,9 +155,9 @@ struct WeeklyFeatureTests {
   }
 
   @Test func test_zonesThrows_leavesNil_planStillReady() async throws {
-    let plan = try Self.deloadPlan()
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
-      $0.profileRepository.zones = { throw Self.Boom() }
+    let plan = try WeeklyTestSupport.deloadPlan()
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
+      $0.profileRepository.zones = { throw WeeklyTestSupport.Boom() }
       $0.briefRepository.weeklyBrief = { _, _ in plan }
     }
 
@@ -173,11 +173,11 @@ struct WeeklyFeatureTests {
   }
 
   @Test func test_refreshTapped_debounces_singleRefreshTrueFetch() async throws {
-    let plan = try Self.deloadPlan()
-    let zones = Self.sampleZones()
+    let plan = try WeeklyTestSupport.deloadPlan()
+    let zones = WeeklyTestSupport.sampleZones()
     let clock = TestClock()
     let refreshArgs = LockIsolated<[Bool]>([])
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.continuousClock = clock
       $0.profileRepository.zones = { zones }
       $0.briefRepository.weeklyBrief = { _, refresh in
@@ -205,11 +205,11 @@ struct WeeklyFeatureTests {
   }
 
   @Test func test_newTask_cancelsInFlightFetch_onlySecondLands() async throws {
-    let plan = try Self.deloadPlan()
-    let zones = Self.sampleZones()
+    let plan = try WeeklyTestSupport.deloadPlan()
+    let zones = WeeklyTestSupport.sampleZones()
     let clock = TestClock()
     let weeklyCalls = LockIsolated(0)
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.continuousClock = clock
       $0.profileRepository.zones = { zones }
       $0.briefRepository.weeklyBrief = { _, _ in
@@ -235,10 +235,10 @@ struct WeeklyFeatureTests {
     // Review #2 regression lock: a parked profile read must NOT block the primary plan. weeklyBrief
     // returns immediately while zones() sleeps "forever"; the plan must land `.ready` with zones still
     // nil, and zones only hydrate once the parked read resumes.
-    let plan = try Self.deloadPlan()
-    let zones = Self.sampleZones()
+    let plan = try WeeklyTestSupport.deloadPlan()
+    let zones = WeeklyTestSupport.sampleZones()
     let clock = TestClock()
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.continuousClock = clock
       $0.profileRepository.zones = {
         try await clock.sleep(for: .seconds(3600)) // parked until the test releases it
@@ -261,7 +261,7 @@ struct WeeklyFeatureTests {
   // MARK: - Session groups (Phase 9.2 TASK-003)
 
   @Test func test_coreGroupToggled_flipsOnlyCore() async {
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) { _ in }
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) { _ in }
     #expect(store.state.isCoreExpanded == true)
     #expect(store.state.isExtrasExpanded == true)
     await store.send(.coreGroupToggled) { $0.isCoreExpanded = false }
@@ -269,7 +269,7 @@ struct WeeklyFeatureTests {
   }
 
   @Test func test_extrasGroupToggled_flipsOnlyExtras() async {
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) { _ in }
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) { _ in }
     await store.send(.extrasGroupToggled) { $0.isExtrasExpanded = false }
     await store.send(.extrasGroupToggled) { $0.isExtrasExpanded = true }
   }
@@ -277,9 +277,9 @@ struct WeeklyFeatureTests {
   @Test func test_groupFlags_surviveRefreshedPlan() async throws {
     // The collapse flags are pure UI state held outside `WeeklyViewState`, so a re-supplied plan (a
     // refreshed week landing a new `.ready`) leaves them untouched.
-    let plan = try Self.deloadPlan()
-    let zones = Self.sampleZones()
-    let store = Self.makeStore(date: Self.sofiaMidday(2026, 6, 8)) {
+    let plan = try WeeklyTestSupport.deloadPlan()
+    let zones = WeeklyTestSupport.sampleZones()
+    let store = WeeklyTestSupport.makeStore(date: WeeklyTestSupport.sofiaMidday(2026, 6, 8)) {
       $0.profileRepository.zones = { zones }
       $0.briefRepository.weeklyBrief = { _, _ in plan }
     }
@@ -294,58 +294,5 @@ struct WeeklyFeatureTests {
     await store.receive(\.zonesResolved) { $0.zones = zones }
     #expect(store.state.isCoreExpanded == false, "group flags survive a re-supplied plan")
     #expect(store.state.isExtrasExpanded == false)
-  }
-
-  // MARK: - Helpers
-
-  /// A test store with the Europe/Sofia frame pinned, a fresh appStorage suite (so the `@Shared` watermark
-  /// never leaks between parallel tests / real UserDefaults), and an `ImmediateClock` by default (tests
-  /// that drive the debounce/cancellation override `\.continuousClock` with a `TestClock`).
-  ///
-  /// The unique suite is bound around the **initialState** evaluation too: `TestStore` evaluates its
-  /// `initialState` autoclosure outside its own `withDependencies`, so `WeeklyFeature.State()`'s
-  /// `@Shared(.appStorage)` would otherwise bind to the ambient (process-shared) store and contaminate
-  /// across parallel tests. Wrapping the whole construction in `withDependencies { defaultAppStorage }`
-  /// pins both the initial state and the reducer to the same isolated suite.
-  private static func makeStore(
-    date: Date,
-    _ prepare: @escaping (inout DependencyValues) -> Void
-  ) -> TestStoreOf<WeeklyFeature> {
-    // A unique suite per test isolates the `@Shared(.appStorage)` watermark (distinct `AppStorageKeyID`).
-    // `TestStore` evaluates its `initialState` autoclosure inside this same `withDependencies` scope, so
-    // the initial state and the reducer share one dependency context (and one `PersistentReferences`
-    // cache) bound to this suite — no split-context contamination.
-    let suiteName = "weekly-tests-\(UUID().uuidString)"
-    let suite = UserDefaults(suiteName: suiteName)!
-    suite.removePersistentDomain(forName: suiteName)
-    return TestStore(initialState: WeeklyFeature.State()) {
-      WeeklyFeature()
-    } withDependencies: {
-      $0.defaultAppStorage = suite
-      $0.useEuropeSofia()
-      $0.date = .constant(date)
-      $0.continuousClock = ImmediateClock()
-      prepare(&$0)
-    }
-  }
-
-  private static func deloadPlan(cached: Bool = false) throws -> DomainModels.WeeklyPlan {
-    var plan = try SampleData.weeklyPlan(.weeklyPlanDeload).domain
-    plan.cached = cached
-    return plan
-  }
-
-  private static func sampleZones() -> DomainModels.Zones {
-    SampleData.sampleProfile.zones
-  }
-
-  /// A non-`BriefError` error to exercise the fetch catch-all (a propagated 401 / unexpected throw).
-  private struct Boom: Error {}
-
-  /// A Europe/Sofia midday instant, host-timezone-independent (mirrors WeeklyCachePolicyTests' helper).
-  private static func sofiaMidday(_ year: Int, _ month: Int, _ day: Int) -> Date {
-    var cal = Calendar(identifier: .iso8601)
-    cal.timeZone = TimeZone(identifier: "Europe/Sofia")!
-    return cal.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
   }
 }

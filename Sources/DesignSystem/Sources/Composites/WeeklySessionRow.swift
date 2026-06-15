@@ -70,8 +70,8 @@ public struct WeeklySessionRow: View {
   /// "35–45 min" / "45 min" from the optional durations; nil (no chip) when either bound is absent.
   private var durationText: String? {
     guard let low = session.durationMinLow, let high = session.durationMinHigh else { return nil }
-    let lo = min(low, high), hi = max(low, high)
-    return lo == hi ? "\(lo) min" : "\(lo)–\(hi) min"
+    let lower = min(low, high), upper = max(low, high)
+    return lower == upper ? "\(lower) min" : "\(lower)–\(upper) min"
   }
 }
 

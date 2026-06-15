@@ -18,8 +18,8 @@ public struct WeeklyTargetsStrip: View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
       EasyHardSplit(easyRatio: targets.easyRunRatio)
       HStack(alignment: .top, spacing: CoachSpacing.spaceMd) {
-        if let km = targets.totalRunKm {
-          MetricCell(value: Self.km(km), label: "Total")
+        if let totalRunKm = targets.totalRunKm {
+          MetricCell(value: Self.kmText(totalRunKm), label: "Total")
         }
         MetricCell(value: "\(targets.strengthSessions)", label: "Strength")
         MetricCell(value: "\(targets.hardDays)", label: "Hard days")
@@ -30,7 +30,7 @@ public struct WeeklyTargetsStrip: View {
   }
 
   /// "38 km" / "11.5 km" — drop a trailing `.0` (whole km read cleaner) without a locale-variant decimal.
-  private static func km(_ value: Double) -> String {
+  private static func kmText(_ value: Double) -> String {
     value == value.rounded() ? "\(Int(value)) km" : "\(value) km"
   }
 }

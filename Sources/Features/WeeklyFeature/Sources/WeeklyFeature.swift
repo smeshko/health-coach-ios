@@ -198,7 +198,7 @@ public struct WeeklyFeature {
         await send(.weeklyResolved(plan))
         // Hydrate zones afterward (a throw → nil, a silent degrade). This await is past the `.ready`
         // render, so a parked zones leaves the plan visible.
-        await send(.zonesResolved(await zonesResult))
+        await send(.zonesResolved(zonesResult))
       } catch is CancellationError {
         return
       } catch let error as BriefError {
