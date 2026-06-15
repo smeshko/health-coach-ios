@@ -105,6 +105,8 @@ struct WeekRhythmTests {
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) {
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
+      $0.nutrition = WeeklyNutritionComponent.make(from: plan)
+      $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
       $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }

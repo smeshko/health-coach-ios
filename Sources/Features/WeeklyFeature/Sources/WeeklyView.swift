@@ -163,7 +163,13 @@ private struct WeeklyReadyContent: View {
     case .nutrition:
       // MARK: - Phase 9.3 weekly nutrition
 
-      Color.clear.frame(height: 0)
+      if let nutrition = store.nutrition, let adherence = store.adherence {
+        WeeklyNutritionView(
+          nutrition: nutrition,
+          adherence: adherence,
+          constantsRecomputed: plan.constantsRecomputed
+        )
+      }
     }
   }
 
@@ -321,7 +327,7 @@ private struct WeeklyErrorContent: View {
 }
 
 /// The shared "This Week" card surface — a rounded `.coachSurface` rect with a hairline border.
-private struct CardSurface: View {
+struct CardSurface: View {
   var body: some View {
     RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)
       .fill(.coachSurface)
