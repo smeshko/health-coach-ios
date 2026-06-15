@@ -26,6 +26,7 @@ extension GalleryComponent {
     GalleryComponent(name: "Narrative") { AnyView(NarrativePage()) },
     GalleryComponent(name: "NutritionGauge") { AnyView(NutritionGaugePage()) },
     GalleryComponent(name: "SessionCard") { AnyView(SessionCardPage()) },
+    GalleryComponent(name: "WeeklySessionRow") { AnyView(WeeklySessionRowPage()) },
     GalleryComponent(name: "SyncProgress") { AnyView(SyncProgressPage()) },
   ]
 }
