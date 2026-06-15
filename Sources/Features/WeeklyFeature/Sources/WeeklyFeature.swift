@@ -3,6 +3,7 @@ import CoachCore
 import ComposableArchitecture
 import DomainModels
 import Foundation
+import ProfileRepository
 import Sharing
 
 /// The "This Week" tab's root reducer (ARCHITECTURE §4.5/§8/§11, PRD §7.5) — the menu-with-budgets weekly
@@ -23,9 +24,8 @@ public struct WeeklyFeature {
   @ObservableState
   public struct State: Equatable {
     /// The screen lifecycle — the one source of truth (DECISIONS #1). No sibling `isLoading`/`error`
-    /// bools; the enum is exhaustive. (`zones` + the fetch land in TASK-003, the `rhythm` child + the
-    /// `selectedSection`/`isPlanCardExpanded` UI flags in TASK-004, and the 9.2/9.3 child slots as their
-    /// phases land.)
+    /// bools; the enum is exhaustive. (The `rhythm` child + the `selectedSection`/`isPlanCardExpanded` UI
+    /// flags land in TASK-004, and the 9.2/9.3 child slots as their phases land.)
     public var weeklyState: WeeklyViewState = .idle
     /// The persisted new-ISO-week watermark (DECISIONS #2) — the canonical `YYYY-Www` of the last week we
     /// successfully resolved a plan for. **Feature-local persisted state** (read by no other feature),
@@ -37,28 +37,114 @@ public struct WeeklyFeature {
     /// rejects `.` for efficient key-value observation, and the dot was only namespacing cosmetics for a
     /// brand-new key with no prior persisted data — the watermark semantics are unchanged.
     @Shared(.appStorage("weeklyLastSeenISOWeek")) public var lastSeenISOWeek: String?
+    /// The five-zone bpm map (`ProfileRepository.zones()`), resolved once by the fetch effect and handed to
+    /// 9.2's pure rows so a "Zone N · bpm" line resolves (DECISIONS #4, cross-plan with 9.2). `nil` until
+    /// the fetch lands (or if it fails — a non-fatal degrade: the rows omit the bpm line).
+    public var zones: Zones?
 
-    public init() {}
+    public init(weeklyState: WeeklyViewState = .idle, zones: Zones? = nil) {
+      self.weeklyState = weeklyState
+      self.zones = zones
+    }
   }
 
   public enum Action {
-    /// Sent on tab appear (`task`/`onAppear`) — drives the get-or-cache fetch (TASK-003).
+    /// Sent on tab appear (`task`/`onAppear`) — runs the get-or-cache fetch (`refresh: false`, DECISIONS #4).
     case task
-    /// Debounced manual refresh from `.ready` — forces a network regeneration (TASK-003).
+    /// Manual refresh from `.ready` — debounced, then forces a network regeneration (`refresh: true`).
     case refreshTapped
-    /// Retry from the `.error` terminal — re-runs the fetch (TASK-003).
+    /// Retry from the `.error` terminal — re-runs the `refresh: false` fetch.
     case retryTapped
+    /// Internal — fired once the refresh debounce window elapses; sets `.loading` + runs the `refresh: true`
+    /// fetch. (Loading is delayed to here so a rapid double-tap doesn't flash a loading screen per tap.)
+    case refreshRequested
+    /// Internal — the resolved plan + its (non-fatal) HR zones in **one** payload (the TodayFeature 11.4
+    /// precedent — zones land alongside the resolved plan, not via a separate mirror action). Lands
+    /// `.ready(plan, freshness)`, hydrates `state.zones`, and writes the watermark. `zones == nil` is a
+    /// silent degrade (the rows omit the bpm line).
+    case weeklyResolved(DomainModels.WeeklyPlan, Zones?)
+    /// Internal — the fetch failed; lands the terminal `.error` (a non-`BriefError` throw is mapped upstream).
+    case weeklyFailed(BriefError)
   }
 
-  /// Cancellation namespace. `.weeklyFetch` owns the get-or-cache `.run` (`cancelInFlight`), `.refreshDebounce`
-  /// the debounced refresh sleep — both declared now so TASK-003/004 don't reference an undefined case.
+  /// Cancellation namespace. `.weeklyFetch` owns the get-or-cache `.run` (`cancelInFlight` — a stale fetch
+  /// can't land after a newer request, §11); `.refreshDebounce` owns the debounced refresh window.
   public enum CancelID: Hashable, Sendable { case weeklyFetch, refreshDebounce }
+
+  /// The manual-refresh debounce window (PRD §8.6 / §11). A named constant so tests advance a `TestClock`
+  /// exactly past it; production injects the real `\.continuousClock`.
+  static let refreshDebounceDuration: Duration = .milliseconds(300)
+
+  @Dependency(\.briefRepository) var briefRepository
+  @Dependency(\.profileRepository) var profileRepository
+  @Dependency(\.continuousClock) var clock
 
   public init() {}
 
   public var body: some ReducerOf<Self> {
-    // The fetch/orchestration effect lands in TASK-003; the shell is a no-op until then.
-    Reduce { _, _ in .none }
+    Reduce { state, action in
+      switch action {
+      case .task, .retryTapped:
+        // The appear / retry path is always `refresh: false` (DECISIONS #4) — the repo serves cache or
+        // generates; the feature must NOT branch on `isNewWeek` to choose `refresh: true`.
+        state.weeklyState = .loading
+        return fetchEffect(refresh: false)
+
+      case .refreshTapped:
+        // Debounce (sleep + cancelInFlight — the canonical TCA idiom): a second rapid tap cancels the
+        // first sleep, so only the last fires `refreshRequested` (which sets `.loading` + the `refresh:
+        // true` fetch).
+        return .run { [clock] send in
+          try await clock.sleep(for: Self.refreshDebounceDuration)
+          await send(.refreshRequested)
+        }
+        .cancellable(id: CancelID.refreshDebounce, cancelInFlight: true)
+
+      case .refreshRequested:
+        state.weeklyState = .loading
+        return fetchEffect(refresh: true)
+
+      case let .weeklyResolved(plan, zones):
+        // Hydrate zones + the ready plan from one payload. The `cached` flag drives the freshness label
+        // (PRD §8.2) — made truthful by the scoped `WeeklyPlanPolicy` amendment (a local-store hit is
+        // stamped `cached == true`).
+        state.zones = zones
+        state.weeklyState = .ready(plan, plan.cached ? .cached : .fresh)
+        recordSeenWeek(&state, isoWeek: plan.isoWeek)
+        return .none
+
+      case let .weeklyFailed(error):
+        state.weeklyState = .error(error)
+        return .none
+      }
+    }
+  }
+
+  /// The single cancellable get-or-cache fetch. Resolves `zones()` first (non-fatal, deterministic order so
+  /// the exhaustive `TestStore` receives `zonesResolved` then `weeklyResponse`), then `weeklyBrief(nil,
+  /// refresh)`. A `BriefError` lands the typed terminal; a propagated non-`BriefError` (e.g. a 401, which
+  /// 4.x says is **not** a `BriefError`) is mapped to a retryable `.transientGenerationFailed` so the
+  /// screen never wedges on `.loading` (global 401→Connect routing stays AppFeature's job, §13/D13).
+  /// `cancelInFlight` cancels an earlier run; a cancelled run's `await send` is dropped by TCA, so no stale
+  /// `.ready`/`.error` lands.
+  private func fetchEffect(refresh: Bool) -> Effect<Action> {
+    .run { [briefRepository, profileRepository] send in
+      // Zones first (non-fatal — a throw degrades to nil; the rows omit the bpm line), then the plan, both
+      // carried on one `weeklyResolved` payload. A cancelled run aborts before the plan request.
+      let zones = try? await profileRepository.zones()
+      do {
+        try Task.checkCancellation()
+        let plan = try await briefRepository.weeklyBrief(nil, refresh)
+        await send(.weeklyResolved(plan, zones))
+      } catch is CancellationError {
+        return
+      } catch let error as BriefError {
+        await send(.weeklyFailed(error))
+      } catch {
+        await send(.weeklyFailed(.transientGenerationFailed))
+      }
+    }
+    .cancellable(id: CancelID.weeklyFetch, cancelInFlight: true)
   }
 }
 
@@ -85,7 +171,7 @@ extension WeeklyFeature {
   }
 
   /// Record a just-resolved plan's ISO week as "seen" (DECISIONS #2) so subsequent opens the same week
-  /// are not "new". Written on a successful `.ready` (exercised end-to-end in TASK-003).
+  /// are not "new". Written on a successful `.ready`.
   func recordSeenWeek(_ state: inout State, isoWeek: String) {
     state.$lastSeenISOWeek.withLock { $0 = isoWeek }
   }

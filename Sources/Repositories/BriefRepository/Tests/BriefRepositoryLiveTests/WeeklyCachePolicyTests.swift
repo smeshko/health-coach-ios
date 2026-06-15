@@ -37,7 +37,12 @@ struct WeeklyCachePolicyTests {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
 
-    #expect(result == domain)
+    // A same-week local-store hit is stamped `cached == true` (Epic 9.1 amendment) — otherwise the stored
+    // server generation-time flag (false) would mislabel a GRDB hit as fresh.
+    var cachedDomain = domain
+    cachedDomain.cached = true
+    #expect(result == cachedDomain)
+    #expect(result.cached == true, "a local-store hit is stamped cached == true")
     #expect(stub.weeklyCallCount == 0, "a same-week cache hit must not hit the network")
   }
 
@@ -71,8 +76,11 @@ struct WeeklyCachePolicyTests {
       try await BriefRepository.live.weeklyBrief(week, false)
     }
 
+    // `first` is the generate (cached flag verbatim from the DTO); `second` is the local hit, stamped cached.
+    var cachedDomain = domain
+    cachedDomain.cached = true
     #expect(first == domain)
-    #expect(second == domain)
+    #expect(second == cachedDomain)
     #expect(stub.weeklyCallCount == 1, "a specific-week generate then re-read is a cache hit (key↔PK agree)")
     #expect(stub.lastWeeklyArg == .some("2026-W24"), "a specific week passes the formatted key as the API arg")
   }
@@ -98,7 +106,10 @@ struct WeeklyCachePolicyTests {
     let second = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
       try await BriefRepository.live.weeklyBrief(nil, false)
     }
-    #expect(second == domain)
+    // The second same-week read is a local hit, stamped cached (Epic 9.1 amendment).
+    var cachedDomain = domain
+    cachedDomain.cached = true
+    #expect(second == cachedDomain)
     #expect(stub.weeklyCallCount == 1, "the second same-week call must be a cache hit (key↔PK agree)")
   }
 
