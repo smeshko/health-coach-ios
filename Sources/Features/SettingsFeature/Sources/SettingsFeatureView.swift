@@ -20,6 +20,10 @@ public struct SettingsFeatureView: View {
 
   public var body: some View {
     List {
+      // Phase 10.2 production sections. REMINDERS ("Good morning check-in" toggle) is Phase 10.3.
+      ConnectionSection(store: store)
+      AppleHealthSection(store: store)
+      ProfileConstantsSection(store: store)
       #if DEBUG
         Section("Dev") {
           // The dev menu is TCA-routed (state-driven), so it's a Button with a manual disclosure chevron
@@ -51,6 +55,7 @@ public struct SettingsFeatureView: View {
       #endif
     }
     .navigationTitle("Settings")
+    .onAppear { store.send(.onAppear) }
     // Push (not a sheet): SettingsFeatureView is the You-tab stack root, so this pushes onto it. No
     // wrapping `NavigationStack` — DevMenuView's own pushes (the log viewer) ride the same stack.
     #if DEBUG
