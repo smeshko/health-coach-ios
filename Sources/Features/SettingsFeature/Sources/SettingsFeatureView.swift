@@ -67,10 +67,10 @@ public struct SettingsFeatureView: View {
 }
 
 #Preview {
-    SettingsFeatureView(
-        store: .init(
-            initialState: .init(),
-            reducer: SettingsFeature.init
-        )
+  SettingsFeatureView(
+    store: .init(
+      initialState: .init(),
+      reducer: SettingsFeature.init
     )
+  )
 }
