@@ -22,6 +22,7 @@ let package = Package(
     .library(name: "Database", targets: ["Database"]),
     .library(name: "HealthKitClientLive", targets: ["HealthKitClientLive"]),
     .library(name: "NotificationClient", targets: ["NotificationClient"]),
+    .library(name: "NotificationClientLive", targets: ["NotificationClientLive"]),
     .library(name: "DevSettings", targets: ["DevSettings"]),
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
     .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
@@ -355,6 +356,20 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/NotificationClient/Interface",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // NotificationClient.liveValue over UNUserNotificationCenter. The ONLY target importing
+    // `UserNotifications` (§15); all framework code is `#if canImport(UserNotifications)`-guarded so the
+    // macOS host build collapses to the `#else` stub. Imported only by the composition root.
+    .target(
+      name: "NotificationClientLive",
+      dependencies: [
+        "NotificationClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/NotificationClient/Live",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
