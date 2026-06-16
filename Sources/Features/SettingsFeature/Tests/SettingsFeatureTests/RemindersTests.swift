@@ -171,6 +171,33 @@ struct RemindersTests {
     #expect(store.state.showEnableInSettingsHint)
   }
 
+  @Test func testOnAppear_whenEnabledAndGranted_reschedules() async {
+    // Reconcile (review #1.1/#1.3): intent ON + granted on appear re-schedules both reminders (idempotent),
+    // healing an interrupted enable or a grant made in iOS Settings.
+    let suite = SettingsTestFixtures.freshAppStorage()
+    suite.set(true, forKey: "settingsRemindersEnabled")
+    let (client, recorder) = recordingClient(authorizationStatus: { .authorized })
+    let store = TestStore(initialState: {
+      var state = SettingsFeature.State()
+      state.load = .loaded
+      return state
+    }()) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.defaultAppStorage = suite
+      $0.notificationClient = client
+      $0.syncRepository.lastSync = { throw Boom() } // preserve last-sync → only the auth action arrives
+    }
+
+    await store.send(.onAppear)
+    await store.receive(\.authorizationStatusLoaded, .authorized) {
+      $0.notificationAuthorization = .authorized
+    }
+    await store.finish()
+
+    #expect(Set(await recorder.scheduledRequests().map(\.id)) == Set(ReminderID.all))
+  }
+
   @Test func testOpenNotificationSettings_callsOpenURL() async {
     let opened = LockIsolated<URL?>(nil)
     let store = TestStore(initialState: SettingsFeature.State()) {
