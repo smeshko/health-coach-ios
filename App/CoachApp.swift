@@ -9,6 +9,7 @@ import HealthKitClientLive
 import LocalRepositories
 import LogClient
 import LogClientLive
+import NotificationClient
 import NotificationClientLive
 import ProfileRepositoryLive
 import SwiftUI
