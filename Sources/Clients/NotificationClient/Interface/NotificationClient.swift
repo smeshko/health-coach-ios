@@ -35,16 +35,27 @@ public struct NotificationClient: Sendable {
 }
 
 extension NotificationClient: TestDependencyKey {
-  /// Stubbed here so the interface compiles; the **recording** test value (which captures
-  /// `schedule`/`cancel` calls for host tests + Epic 10.3's `TestStore`) is wired in TASK-002.
+  /// A **recording** test value: `schedule`/`cancel`/`pendingIdentifiers` route through one shared
+  /// `RecordingNotificationCenter` so host tests can assert what was scheduled/cancelled — **without
+  /// touching `UserNotifications`**. Authorization is canned `.authorized`. To read the recorder back
+  /// in a test, build the value via `NotificationClient.recording()` (which returns the recorder too).
   public static var testValue: NotificationClient {
-    NotificationClient(
+    recording().client
+  }
+
+  /// Builds a recording `NotificationClient` paired with the `RecordingNotificationCenter` its closures
+  /// route through, so a host test / `TestStore` can drive `schedule`/`cancel` and then assert via the
+  /// recorder's read accessors (or `pendingIdentifiers()`).
+  public static func recording() -> (client: NotificationClient, recorder: RecordingNotificationCenter) {
+    let recorder = RecordingNotificationCenter()
+    let client = NotificationClient(
       requestAuthorization: { .authorized },
-      authorizationStatus: { .notDetermined },
-      schedule: { _ in },
-      cancel: { _ in },
-      pendingIdentifiers: { [] }
+      authorizationStatus: { .authorized },
+      schedule: { await recorder.schedule($0) },
+      cancel: { await recorder.cancel($0) },
+      pendingIdentifiers: { await recorder.pendingIdentifiers() }
     )
+    return (client, recorder)
   }
 
   /// A benign always-`.authorized`, no-op value for SwiftUI previews (no recorder needed).
