@@ -71,6 +71,9 @@ public struct SettingsFeature {
     Reduce { state, action in
       switch action {
       case .onAppear:
+        // Idempotent: don't re-run the load when already loading/loaded (re-entering the tab, or a
+        // snapshot seeded to `.loaded`). A prior `.failed` may retry.
+        guard state.load == .idle || state.load == .failed else { return .none }
         state.load = .loading
         state.connectionResolved = false
         state.lastSyncResolved = false
