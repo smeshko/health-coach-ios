@@ -220,41 +220,50 @@ public struct SettingsFeature {
       case let .remindersToggled(isOn):
         if isOn {
           // Optimistic UI is avoided: request authorization first, then schedule/persist only if granted
-          // (the response handler does the work). A thrown request is treated as not-granted. (A stale
-          // in-flight onAppear auth read landing after this is a near-unreachable race — the async read
-          // completes in ms, before any human tap — so it is accepted rather than cancelling the load,
-          // review #2.1.)
-          return .run { [notificationClient] send in
-            let status = await (try? notificationClient.requestAuthorization()) ?? .denied
-            await send(.authorizationResponse(status))
-          }
-          .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          // (the response handler does the work). A thrown request is treated as not-granted. `.cancel`
+          // the background reconcile so a stale in-flight reconcile can't override this explicit intent
+          // (review #4) — but it keeps its OWN ID, so it never cancels THIS user flow (review #3).
+          return .merge(
+            .cancel(id: CancelID.reconcile),
+            .run { [notificationClient] send in
+              let status = await (try? notificationClient.requestAuthorization()) ?? .denied
+              await send(.authorizationResponse(status))
+            }
+            .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          )
         } else {
-          // Off needs no authorization — cancel both reminders and persist the intent.
+          // Off needs no authorization — cancel both reminders and persist the intent (+ the reconcile).
           state.$remindersEnabled.withLock { $0 = false }
-          return .run { [notificationClient] _ in
-            await ReminderScheduler().disable(notificationClient)
-          }
-          .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          return .merge(
+            .cancel(id: CancelID.reconcile),
+            .run { [notificationClient] _ in
+              await ReminderScheduler().disable(notificationClient)
+            }
+            .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          )
         }
 
       case let .authorizationResponse(status):
         state.notificationAuthorization = status
         guard status.isGranted else {
-          // Denied/not-determined (or a thrown request): keep the toggle OFF and surface the hint.
+          // Denied/not-determined (or a thrown request): keep the toggle OFF, surface the hint, and stop
+          // any stale reconcile that might re-schedule against the now-OFF intent (review #4).
           state.$remindersEnabled.withLock { $0 = false }
-          return .none
+          return .cancel(id: CancelID.reconcile)
         }
         state.$remindersEnabled.withLock { $0 = true }
-        return .run { [notificationClient] send in
-          do {
-            try await ReminderScheduler().enable(notificationClient)
-          } catch {
-            // A rare on-device schedule failure → revert intent like the denied path (no half-on state).
-            await send(.remindersToggled(false))
+        return .merge(
+          .cancel(id: CancelID.reconcile),
+          .run { [notificationClient] send in
+            do {
+              try await ReminderScheduler().enable(notificationClient)
+            } catch {
+              // A rare on-device schedule failure → revert intent like the denied path (no half-on state).
+              await send(.remindersToggled(false))
+            }
           }
-        }
-        .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          .cancellable(id: CancelID.reminders, cancelInFlight: true)
+        )
 
       case let .authorizationStatusLoaded(status):
         state.notificationAuthorization = status

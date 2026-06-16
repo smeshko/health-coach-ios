@@ -1,6 +1,7 @@
 import DomainModels
 import Foundation
 import HealthKitClient
+import NotificationClient
 
 @testable import SettingsFeature
 
@@ -20,6 +21,18 @@ enum SettingsTestFixtures {
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     return defaults
+  }
+
+  /// A recording `NotificationClient` (10.1's value) with overridable authorization closures, paired with
+  /// the recorder so reminders tests can assert what was scheduled/cancelled.
+  static func recordingClient(
+    requestAuthorization: @escaping @Sendable () async throws -> NotificationAuthorizationStatus = { .authorized },
+    authorizationStatus: @escaping @Sendable () async -> NotificationAuthorizationStatus = { .authorized }
+  ) -> (NotificationClient, RecordingNotificationCenter) {
+    var (client, recorder) = NotificationClient.recording()
+    client.requestAuthorization = requestAuthorization
+    client.authorizationStatus = authorizationStatus
+    return (client, recorder)
   }
 
   static func sampleProfile(recomputeWeek: String? = nil) -> DomainModels.Profile {
