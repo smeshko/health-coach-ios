@@ -63,6 +63,7 @@ public struct SettingsFeature {
   @Dependency(\.syncRepository) var syncRepository
   @Dependency(\.healthKitClient) var healthKitClient
   @Dependency(\.tokenClient) var tokenClient
+  @Dependency(\.openURL) var openURL
 
   public init() {}
 
@@ -79,14 +80,15 @@ public struct SettingsFeature {
         // order so the merged load is deterministic to assert in a TestStore (the slices still load in
         // parallel — only the delivery order is pinned). The HK probe is stubbed here (yields a default);
         // its real empty-delta inference lands in TASK-003.
-        return .run { [tokenClient, syncRepository, profileRepository] send in
+        return .run { [tokenClient, syncRepository, profileRepository, healthKitClient] send in
           async let token = try? await tokenClient.read()
           async let lastSyncDate = try? await syncRepository.lastSync()
           async let constants = loadConstants(profileRepository)
+          async let health = loadHealthStatus(healthKitClient)
           await send(.connectionLoaded(await token))
           await send(.lastSyncLoaded(await lastSyncDate))
           await send(.constantsLoaded(await constants))
-          await send(.healthStatusLoaded(HealthKitStatusState()))
+          await send(.healthStatusLoaded(await health))
         }
 
       case let .connectionLoaded(token):
@@ -134,8 +136,10 @@ public struct SettingsFeature {
         return .send(.delegate(.tokenReset))
 
       case .openHealthSettingsTapped:
-        // The Health deep link is wired in TASK-003.
-        return .none
+        return .run { [openURL] _ in
+          guard let url = URL(string: "x-apple-health://") else { return }
+          await openURL(url)
+        }
 
       case .delegate:
         return .none
@@ -179,4 +183,18 @@ private func loadConstants(
   } catch {
     return .failure(.failed)
   }
+}
+
+/// Probes HealthKit for the shared/missing status. When HK is unavailable, returns the all-missing
+/// state **without** a delta read. Otherwise reduces a `deltaSamples(since: .distantPast)` probe per
+/// category (emptiness ⇒ not shared — HK masks read grants, §3.3/6.3). A free function so the
+/// `async let` in `onAppear` captures no `self`.
+private func loadHealthStatus(
+  _ client: HealthKitClient
+) async -> SettingsFeature.HealthKitStatusState {
+  guard client.isHealthDataAvailable() else {
+    return HealthStatusInference.healthStatus(from: .empty, status: [:], available: false)
+  }
+  let set = (try? await client.deltaSamples(.distantPast)) ?? .empty
+  return HealthStatusInference.healthStatus(from: set, status: client.authorizationStatus(), available: true)
 }
