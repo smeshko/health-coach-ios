@@ -198,6 +198,41 @@ struct RemindersTests {
     #expect(Set(await recorder.scheduledRequests().map(\.id)) == Set(ReminderID.all))
   }
 
+  @Test func testReconcile_doesNotCancelInFlightUserEnable() async {
+    // A background reconcile (authorizationStatusLoaded) must NOT cancel a user enable in flight: they use
+    // distinct cancel IDs (review #3). Gate `requestAuthorization` so the enable is suspended while the
+    // reconcile lands, then release it and assert the enable still schedules both reminders.
+    let gate = AsyncStream.makeStream(of: Void.self)
+    var (client, recorder) = NotificationClient.recording()
+    client.requestAuthorization = {
+      for await _ in gate.stream { break }
+      return .authorized
+    }
+    let store = TestStore(initialState: SettingsFeature.State()) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.defaultAppStorage = SettingsTestFixtures.freshAppStorage()
+      $0.notificationClient = client
+    }
+
+    await store.send(.remindersToggled(true)) // requestAuthorization suspends on the gate
+    // A background reconcile lands while the enable is suspended (intent still false → cancel branch).
+    await store.send(.authorizationStatusLoaded(.authorized)) {
+      $0.notificationAuthorization = .authorized
+    }
+    gate.continuation.yield() // release the auth prompt
+    gate.continuation.finish()
+    await store.receive(\.authorizationResponse, .authorized) {
+      $0.$remindersEnabled.withLock { $0 = true }
+    }
+    await store.finish()
+
+    #expect(
+      Set(await recorder.scheduledRequests().map(\.id)) == Set(ReminderID.all),
+      "the user enable still scheduled both reminders despite the concurrent reconcile"
+    )
+  }
+
   @Test func testOnAppear_whenDisabledButPending_cancels() async {
     // Reconcile heals an interrupted disable (review #2.2): intent OFF on appear cancels any leftover
     // pending reminders so a repeating notification can't keep firing while the toggle shows OFF.

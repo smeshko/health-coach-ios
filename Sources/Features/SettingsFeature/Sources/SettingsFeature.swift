@@ -88,7 +88,9 @@ public struct SettingsFeature {
   @Dependency(\.openURL) var openURL
   @Dependency(\.date) var date
 
-  private enum CancelID { case load, reminders }
+  // `reminders` = explicit user enable/disable; `reconcile` = the background appear/scene-active heal.
+  // Distinct so a background reconcile can never cancel an in-flight user enable (review #3).
+  private enum CancelID { case load, reminders, reconcile }
 
   /// The HealthKit presence-probe window. The status read only needs "did this category produce any
   /// sample recently", so it reads a bounded recent window rather than the whole history (review #2.2) —
@@ -270,7 +272,8 @@ public struct SettingsFeature {
             await ReminderScheduler().disable(notificationClient)
           }
         }
-        .cancellable(id: CancelID.reminders, cancelInFlight: true)
+        // Own ID (not CancelID.reminders) so this background heal can't cancel a user enable/disable.
+        .cancellable(id: CancelID.reconcile, cancelInFlight: true)
 
       case .delegate:
         return .none
