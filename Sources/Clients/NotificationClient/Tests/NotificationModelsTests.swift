@@ -34,9 +34,9 @@ struct NotificationModelsTests {
       dateComponents: NotificationDateComponents(weekday: 2, hour: 18, minute: 0),
       repeats: true
     )
-    let a = NotificationRequest(id: "a", title: "T", body: "B", trigger: trigger)
-    let b = NotificationRequest(id: "b", title: "T", body: "B", trigger: trigger)
-    #expect(a != b, "differing ids compare unequal")
+    let reqA = NotificationRequest(id: "a", title: "T", body: "B", trigger: trigger)
+    let reqB = NotificationRequest(id: "b", title: "T", body: "B", trigger: trigger)
+    #expect(reqA != reqB, "differing ids compare unequal")
   }
 
   @Test func test_notificationDateComponents_defaultsAreNil() {
