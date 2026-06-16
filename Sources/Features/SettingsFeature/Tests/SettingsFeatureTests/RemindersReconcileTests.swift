@@ -175,4 +175,25 @@ struct RemindersReconcileTests {
     #expect(await recorder.pendingIdentifiers() == [], "leftover reminders are cancelled when intent is OFF")
     #expect(Set(await recorder.cancelledIdentifiers()) == Set(ReminderID.all))
   }
+  @Test func testEnableDenied_cancelsExistingPending() async {
+    // A denied enable is authoritative for OFF — it cancels reminders that may already be pending
+    // (review #5), so a repeating reminder can't keep firing while the toggle ends up OFF.
+    let (client, recorder) = SettingsTestFixtures.recordingClient(requestAuthorization: { .denied })
+    try? await ReminderScheduler().enable(client) // pre-seed pending, as if from a prior session
+    let store = TestStore(initialState: SettingsFeature.State()) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.defaultAppStorage = SettingsTestFixtures.freshAppStorage()
+      $0.notificationClient = client
+    }
+
+    await store.send(.remindersToggled(true))
+    await store.receive(\.authorizationResponse, .denied) {
+      $0.notificationAuthorization = .denied
+    }
+    await store.finish()
+
+    #expect(await recorder.pendingIdentifiers() == [], "a denied enable cancels existing pending reminders")
+  }
+
 }

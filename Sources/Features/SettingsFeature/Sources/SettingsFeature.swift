@@ -246,10 +246,18 @@ public struct SettingsFeature {
       case let .authorizationResponse(status):
         state.notificationAuthorization = status
         guard status.isGranted else {
-          // Denied/not-determined (or a thrown request): keep the toggle OFF, surface the hint, and stop
-          // any stale reconcile that might re-schedule against the now-OFF intent (review #4).
+          // Denied/not-determined (or a thrown request): keep the toggle OFF, surface the hint, stop any
+          // stale reconcile (review #4), AND cancel both reminders — this arm is authoritative for the
+          // OFF invariant, so it must clean up reminders that may already be pending (e.g. a rapid
+          // OFF→ON-denied where the ON cancelled the OFF's disable, review #5).
           state.$remindersEnabled.withLock { $0 = false }
-          return .cancel(id: CancelID.reconcile)
+          return .merge(
+            .cancel(id: CancelID.reconcile),
+            .run { [notificationClient] _ in
+              await ReminderScheduler().disable(notificationClient)
+            }
+            .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          )
         }
         state.$remindersEnabled.withLock { $0 = true }
         return .merge(
