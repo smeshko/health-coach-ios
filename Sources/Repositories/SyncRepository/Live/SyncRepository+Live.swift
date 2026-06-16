@@ -19,7 +19,17 @@ extension SyncRepository: DependencyKey {
   /// success only** advances the watermark + stores `serverTime` in one `Database.write`. On failure
   /// the watermark is untouched (idempotent, freely retryable; zero-upsert = success).
   public static var live: SyncRepository {
-    SyncRepository(sync: { try await runSync() })
+    SyncRepository(sync: { try await runSync() }, lastSync: { try await runLastSync() })
+  }
+}
+
+/// The last-sync time: the persisted watermark `serverTime`, or `nil` when no watermark row exists yet
+/// (never synced). A single `Database.read` reusing the same `SyncWatermarkRecord` row `runSync()`
+/// advances — **no** `APIClient`/`HealthKitClient` call, so opening Settings never triggers a sync.
+private func runLastSync() async throws -> Date? {
+  @Dependency(\.database) var database
+  return try await database.read { db in
+    try SyncWatermarkRecord.fetchOne(db, key: 1)?.serverTime
   }
 }
 

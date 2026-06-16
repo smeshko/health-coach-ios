@@ -11,13 +11,22 @@ public extension SyncRepository {
     #if DEBUG
       let live = Self.live
       let mock = Self.mock()
-      return SyncRepository(sync: {
-        try await devRoute(
-          dev, .sync,
-          live: { try await live.sync() },
-          mock: { _ in try await mock.sync() }
-        )
-      })
+      return SyncRepository(
+        sync: {
+          try await devRoute(
+            dev, .sync,
+            live: { try await live.sync() },
+            mock: { _ in try await mock.sync() }
+          )
+        },
+        lastSync: {
+          try await devRoute(
+            dev, .sync,
+            live: { try await live.lastSync() },
+            mock: { _ in try await mock.lastSync() }
+          )
+        }
+      )
     #else
       return .live
     #endif
