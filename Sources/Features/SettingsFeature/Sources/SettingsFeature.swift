@@ -218,17 +218,15 @@ public struct SettingsFeature {
       case let .remindersToggled(isOn):
         if isOn {
           // Optimistic UI is avoided: request authorization first, then schedule/persist only if granted
-          // (the response handler does the work). A thrown request is treated as not-granted. `.cancel`
-          // drops any in-flight onAppear auth-refresh so a stale read can't clobber the response we're
-          // about to receive (review #1.2).
-          return .merge(
-            .cancel(id: CancelID.load),
-            .run { [notificationClient] send in
-              let status = await (try? notificationClient.requestAuthorization()) ?? .denied
-              await send(.authorizationResponse(status))
-            }
-            .cancellable(id: CancelID.reminders, cancelInFlight: true)
-          )
+          // (the response handler does the work). A thrown request is treated as not-granted. (A stale
+          // in-flight onAppear auth read landing after this is a near-unreachable race — the async read
+          // completes in ms, before any human tap — so it is accepted rather than cancelling the load,
+          // review #2.1.)
+          return .run { [notificationClient] send in
+            let status = await (try? notificationClient.requestAuthorization()) ?? .denied
+            await send(.authorizationResponse(status))
+          }
+          .cancellable(id: CancelID.reminders, cancelInFlight: true)
         } else {
           // Off needs no authorization — cancel both reminders and persist the intent.
           state.$remindersEnabled.withLock { $0 = false }
@@ -258,12 +256,19 @@ public struct SettingsFeature {
 
       case let .authorizationStatusLoaded(status):
         state.notificationAuthorization = status
-        // Reconcile the schedule with the persisted intent + live permission (review #1.1/#1.3): when the
-        // user wants reminders AND the OS permits them, (re-)schedule both — idempotent (id-keyed replace),
-        // so an interrupted enable or a permission granted in iOS Settings becomes consistent on appear.
-        guard state.remindersEnabled, status.isGranted else { return .none }
-        return .run { [notificationClient] _ in
-          try? await ReminderScheduler().enable(notificationClient)
+        // Reconcile the schedule with the persisted intent + live permission on every appear/scene-active
+        // (review #1.1/#1.3, #2.2) — BIDIRECTIONAL, so the schedule never disagrees with the toggle:
+        //  • intent ON  ∧ granted  → (re-)schedule both (idempotent id-keyed replace) — heals an
+        //    interrupted enable / a permission granted in iOS Settings.
+        //  • otherwise (intent OFF, or not granted) → cancel both — heals an interrupted disable / a
+        //    permission revoked while reminders were on, so a *repeating* reminder can't keep firing
+        //    while the toggle shows OFF.
+        return .run { [notificationClient, enabled = state.remindersEnabled, granted = status.isGranted] _ in
+          if enabled, granted {
+            try? await ReminderScheduler().enable(notificationClient)
+          } else {
+            await ReminderScheduler().disable(notificationClient)
+          }
         }
         .cancellable(id: CancelID.reminders, cancelInFlight: true)
 

@@ -198,6 +198,33 @@ struct RemindersTests {
     #expect(Set(await recorder.scheduledRequests().map(\.id)) == Set(ReminderID.all))
   }
 
+  @Test func testOnAppear_whenDisabledButPending_cancels() async {
+    // Reconcile heals an interrupted disable (review #2.2): intent OFF on appear cancels any leftover
+    // pending reminders so a repeating notification can't keep firing while the toggle shows OFF.
+    let (client, recorder) = recordingClient(authorizationStatus: { .authorized })
+    try? await ReminderScheduler().enable(client) // simulate leftover pending from a prior session
+    let store = TestStore(initialState: {
+      var state = SettingsFeature.State()
+      state.load = .loaded
+      return state
+    }()) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.defaultAppStorage = SettingsTestFixtures.freshAppStorage() // remindersEnabled defaults false
+      $0.notificationClient = client
+      $0.syncRepository.lastSync = { throw Boom() }
+    }
+
+    await store.send(.onAppear)
+    await store.receive(\.authorizationStatusLoaded, .authorized) {
+      $0.notificationAuthorization = .authorized
+    }
+    await store.finish()
+
+    #expect(await recorder.pendingIdentifiers() == [], "leftover reminders are cancelled when intent is OFF")
+    #expect(Set(await recorder.cancelledIdentifiers()) == Set(ReminderID.all))
+  }
+
   @Test func testOpenNotificationSettings_callsOpenURL() async {
     let opened = LockIsolated<URL?>(nil)
     let store = TestStore(initialState: SettingsFeature.State()) {
