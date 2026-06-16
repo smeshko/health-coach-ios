@@ -20,10 +20,11 @@ public struct SettingsFeatureView: View {
 
   public var body: some View {
     List {
-      // Phase 10.2 production sections. REMINDERS ("Good morning check-in" toggle) is Phase 10.3.
+      // Production sections (Phase 10.2 CONNECTION/APPLE HEALTH/PROFILE + Phase 10.3 REMINDERS).
       ConnectionSection(store: store)
       AppleHealthSection(store: store)
       ProfileConstantsSection(store: store)
+      RemindersSection(store: store)
       #if DEBUG
         Section("Dev") {
           // The dev menu is TCA-routed (state-driven), so it's a Button with a manual disclosure chevron

@@ -1061,6 +1061,9 @@ let package = Package(
         "DomainModels",
         "HealthKitClient",
         "SyncRepository",
+        // Phase 10.3 reminders snapshots seed the auth status + the @Shared(.appStorage) toggle.
+        "NotificationClient",
+        .product(name: "Sharing", package: "swift-sharing"),
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],

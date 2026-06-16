@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import Foundation
 import NotificationClient
 import Sharing
 import Testing
@@ -168,6 +169,21 @@ struct RemindersTests {
     #expect(store.state.remindersEnabled, "intent stays ON")
     #expect(!store.state.remindersEffectivelyOn, "but effective OFF — permission revoked")
     #expect(store.state.showEnableInSettingsHint)
+  }
+
+  @Test func testOpenNotificationSettings_callsOpenURL() async {
+    let opened = LockIsolated<URL?>(nil)
+    let store = TestStore(initialState: SettingsFeature.State()) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.defaultAppStorage = SettingsTestFixtures.freshAppStorage()
+      $0.openURL = OpenURLEffect { url in
+        opened.setValue(url)
+        return true
+      }
+    }
+    await store.send(.openNotificationSettingsTapped)
+    #expect(opened.value?.absoluteString == "app-settings:")
   }
 
   @Test func testPersistenceSurvivesRelaunch() {

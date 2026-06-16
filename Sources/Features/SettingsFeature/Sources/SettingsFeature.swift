@@ -69,6 +69,7 @@ public struct SettingsFeature {
     case reconnectTapped
     case openHealthSettingsTapped
     // Phase 10.3 reminders.
+    case openNotificationSettingsTapped
     case remindersToggled(Bool)
     case authorizationResponse(NotificationAuthorizationStatus)
     case authorizationStatusLoaded(NotificationAuthorizationStatus)
@@ -203,6 +204,14 @@ public struct SettingsFeature {
       case .openHealthSettingsTapped:
         return .run { [openURL] _ in
           guard let url = URL(string: "x-apple-health://") else { return }
+          await openURL(url)
+        }
+
+      case .openNotificationSettingsTapped:
+        // "app-settings:" (UIApplication.openSettingsURLString) opens this app's iOS Settings page, where
+        // notification permission can be re-enabled. Kept host-safe (no UIKit) via @Dependency(\.openURL).
+        return .run { [openURL] _ in
+          guard let url = URL(string: "app-settings:") else { return }
           await openURL(url)
         }
 
