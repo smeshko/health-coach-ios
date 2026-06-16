@@ -2,7 +2,9 @@ import ComposableArchitecture
 import DomainModels
 import Foundation
 import HealthKitClient
+import NotificationClient
 import ProfileRepository
+import Sharing
 import SyncRepository
 import TokenClient
 
@@ -37,6 +39,20 @@ public struct SettingsFeature {
     var constantsResolved = false
     var healthResolved = false
 
+    // Phase 10.3 reminders. `remindersEnabled` is the user's persisted **intent** (feature-local
+    // appStorage; the key is dotless — swift-sharing rejects `.` for key-value observation, per the
+    // WeeklyFeature precedent). `notificationAuthorization` mirrors the live OS status. The effective
+    // toggle is `intent ∧ isGranted`, so a system-revoked permission shows OFF without a lying ON.
+    @Shared(.appStorage("settingsRemindersEnabled")) public var remindersEnabled = false
+    public var notificationAuthorization: NotificationAuthorizationStatus = .notDetermined
+
+    /// The toggle's effective ON state — the user wants reminders AND the OS permits them.
+    public var remindersEffectivelyOn: Bool { remindersEnabled && notificationAuthorization.isGranted }
+    /// Show the "allow notifications in Settings" hint whenever notifications are **explicitly denied**
+    /// (covers both a just-denied enable attempt — where `remindersEnabled` reverts to false — and a
+    /// permission revoked while reminders were on). `.notDetermined` (never asked) shows no hint.
+    public var showEnableInSettingsHint: Bool { notificationAuthorization == .denied }
+
     #if DEBUG
       /// The presented DEBUG dev menu (DEV section → "Dev Menu" row). Absent in RELEASE.
       @Presents public var devMenu: DevMenuFeature.State?
@@ -52,6 +68,11 @@ public struct SettingsFeature {
     case healthStatusLoaded(HealthKitStatusState)
     case reconnectTapped
     case openHealthSettingsTapped
+    // Phase 10.3 reminders.
+    case openNotificationSettingsTapped
+    case remindersToggled(Bool)
+    case authorizationResponse(NotificationAuthorizationStatus)
+    case authorizationStatusLoaded(NotificationAuthorizationStatus)
     case delegate(Delegate)
     #if DEBUG
       case devMenuTapped
@@ -63,10 +84,13 @@ public struct SettingsFeature {
   @Dependency(\.syncRepository) var syncRepository
   @Dependency(\.healthKitClient) var healthKitClient
   @Dependency(\.tokenClient) var tokenClient
+  @Dependency(\.notificationClient) var notificationClient
   @Dependency(\.openURL) var openURL
   @Dependency(\.date) var date
 
-  private enum CancelID { case load }
+  // `reminders` = explicit user enable/disable; `reconcile` = the background appear/scene-active heal.
+  // Distinct so a background reconcile can never cancel an in-flight user enable (review #3).
+  private enum CancelID { case load, reminders, reconcile }
 
   /// The HealthKit presence-probe window. The status read only needs "did this category produce any
   /// sample recently", so it reads a bounded recent window rather than the whole history (review #2.2) —
@@ -90,10 +114,13 @@ public struct SettingsFeature {
           // intentionally NOT repeated here (it runs only on the first load — review #1.3). On a transient
           // read error PRESERVE the displayed value (only update on a successful read) rather than blanking
           // it to "Never synced" (review #2.3).
-          return .run { [syncRepository] send in
+          // Also re-read the live notification authorization so a permission revoked while the app was
+          // backgrounded flips the reminders toggle OFF (review/AC: the toggle never lies).
+          return .run { [syncRepository, notificationClient] send in
             if let date = try? await syncRepository.lastSync() {
               await send(.lastSyncLoaded(date))
             }
+            await send(.authorizationStatusLoaded(notificationClient.authorizationStatus()))
           }
           .cancellable(id: CancelID.load, cancelInFlight: true)
         case .idle, .failed:
@@ -107,15 +134,17 @@ public struct SettingsFeature {
           // order so the merged load is deterministic to assert in a TestStore (the slices still load in
           // parallel — only the delivery order is pinned).
           let probeSince = date.now.addingTimeInterval(-Self.healthProbeWindow)
-          return .run { [tokenClient, syncRepository, profileRepository, healthKitClient] send in
+          return .run { [tokenClient, syncRepository, profileRepository, healthKitClient, notificationClient] send in
             async let token = try? await tokenClient.read()
             async let lastSyncDate = try? await syncRepository.lastSync()
             async let constants = loadConstants(profileRepository)
             async let health = loadHealthStatus(healthKitClient, since: probeSince)
-            await send(.connectionLoaded(await token))
-            await send(.lastSyncLoaded(await lastSyncDate))
-            await send(.constantsLoaded(await constants))
-            await send(.healthStatusLoaded(await health))
+            async let auth = notificationClient.authorizationStatus()
+            await send(.connectionLoaded(token))
+            await send(.lastSyncLoaded(lastSyncDate))
+            await send(.constantsLoaded(constants))
+            await send(.healthStatusLoaded(health))
+            await send(.authorizationStatusLoaded(auth))
           }
           .cancellable(id: CancelID.load, cancelInFlight: true)
         }
@@ -180,6 +209,95 @@ public struct SettingsFeature {
           await openURL(url)
         }
 
+      case .openNotificationSettingsTapped:
+        // "app-settings:" (UIApplication.openSettingsURLString) opens this app's iOS Settings page, where
+        // notification permission can be re-enabled. Kept host-safe (no UIKit) via @Dependency(\.openURL).
+        return .run { [openURL] _ in
+          guard let url = URL(string: "app-settings:") else { return }
+          await openURL(url)
+        }
+
+      case let .remindersToggled(isOn):
+        if isOn {
+          // Optimistic UI is avoided: request authorization first, then schedule/persist only if granted
+          // (the response handler does the work). A thrown request is treated as not-granted. `.cancel`
+          // the background reconcile so a stale in-flight reconcile can't override this explicit intent
+          // (review #4) — but it keeps its OWN ID, so it never cancels THIS user flow (review #3).
+          return .merge(
+            .cancel(id: CancelID.reconcile),
+            .run { [notificationClient] send in
+              let status = await (try? notificationClient.requestAuthorization()) ?? .denied
+              await send(.authorizationResponse(status))
+            }
+            .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          )
+        } else {
+          // Off needs no authorization — cancel both reminders and persist the intent (+ the reconcile).
+          state.$remindersEnabled.withLock { $0 = false }
+          return .merge(
+            .cancel(id: CancelID.reconcile),
+            .run { [notificationClient] _ in
+              await ReminderScheduler().disable(notificationClient)
+            }
+            .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          )
+        }
+
+      case let .authorizationResponse(status):
+        state.notificationAuthorization = status
+        guard status.isGranted else {
+          // Denied/not-determined (or a thrown request): keep the toggle OFF, surface the hint, stop any
+          // stale reconcile (review #4), AND cancel both reminders — this arm is authoritative for the
+          // OFF invariant, so it must clean up reminders that may already be pending (e.g. a rapid
+          // OFF→ON-denied where the ON cancelled the OFF's disable, review #5).
+          state.$remindersEnabled.withLock { $0 = false }
+          return .merge(
+            .cancel(id: CancelID.reconcile),
+            .run { [notificationClient] _ in
+              await ReminderScheduler().disable(notificationClient)
+            }
+            .cancellable(id: CancelID.reminders, cancelInFlight: true)
+          )
+        }
+        state.$remindersEnabled.withLock { $0 = true }
+        return .merge(
+          .cancel(id: CancelID.reconcile),
+          .run { [notificationClient] send in
+            do {
+              try await ReminderScheduler().enable(notificationClient)
+            } catch {
+              // A rare on-device schedule failure → revert intent like the denied path (no half-on state).
+              await send(.remindersToggled(false))
+            }
+          }
+          .cancellable(id: CancelID.reminders, cancelInFlight: true)
+        )
+
+      case let .authorizationStatusLoaded(status):
+        state.notificationAuthorization = status
+        // Reconcile the schedule with the persisted intent + live permission on every appear/scene-active
+        // (review #1.1/#1.3, #2.2) — BIDIRECTIONAL, so the schedule never disagrees with the toggle:
+        //  • intent ON  ∧ granted  → (re-)schedule both (idempotent id-keyed replace) — heals an
+        //    interrupted enable / a permission granted in iOS Settings.
+        //  • otherwise (intent OFF, or not granted) → cancel both — heals an interrupted disable / a
+        //    permission revoked while reminders were on, so a *repeating* reminder can't keep firing
+        //    while the toggle shows OFF.
+        return .run { [notificationClient, enabled = state.remindersEnabled, granted = status.isGranted] send in
+          if enabled, granted {
+            do {
+              try await ReminderScheduler().enable(notificationClient)
+            } catch {
+              // A partial schedule failure (e.g. the 2nd add throws after the 1st succeeds) must not leave
+              // a half-on state — revert to OFF like the explicit enable path, which cancels both (review #6).
+              await send(.remindersToggled(false))
+            }
+          } else {
+            await ReminderScheduler().disable(notificationClient)
+          }
+        }
+        // Own ID (not CancelID.reminders) so this background heal can't cancel a user enable/disable.
+        .cancellable(id: CancelID.reconcile, cancelInFlight: true)
+
       case .delegate:
         return .none
 
@@ -218,7 +336,7 @@ private func loadConstants(
   _ repository: ProfileRepository
 ) async -> Result<DomainModels.Profile, SettingsFeature.ProfileLoadFailure> {
   do {
-    return .success(try await repository.profile())
+    return try await .success(repository.profile())
   } catch {
     return .failure(.failed)
   }
@@ -236,6 +354,6 @@ private func loadHealthStatus(
   guard client.isHealthDataAvailable() else {
     return HealthStatusInference.healthStatus(from: .empty, status: [:], available: false)
   }
-  let set = (try? await client.deltaSamples(since)) ?? .empty
+  let set = await (try? client.deltaSamples(since)) ?? .empty
   return HealthStatusInference.healthStatus(from: set, status: client.authorizationStatus(), available: true)
 }

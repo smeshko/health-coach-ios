@@ -13,6 +13,7 @@ import SwiftUI
 /// in a `NavigationStack` (Phase 7.1), so this item-driven destination pushes/pops with no extra nav host.
 public struct SettingsFeatureView: View {
   @Bindable var store: StoreOf<SettingsFeature>
+  @Environment(\.scenePhase) private var scenePhase
 
   public init(store: StoreOf<SettingsFeature>) {
     self.store = store
@@ -20,10 +21,11 @@ public struct SettingsFeatureView: View {
 
   public var body: some View {
     List {
-      // Phase 10.2 production sections. REMINDERS ("Good morning check-in" toggle) is Phase 10.3.
+      // Production sections (Phase 10.2 CONNECTION/APPLE HEALTH/PROFILE + Phase 10.3 REMINDERS).
       ConnectionSection(store: store)
       AppleHealthSection(store: store)
       ProfileConstantsSection(store: store)
+      RemindersSection(store: store)
       #if DEBUG
         Section("Dev") {
           // The dev menu is TCA-routed (state-driven), so it's a Button with a manual disclosure chevron
@@ -56,10 +58,16 @@ public struct SettingsFeatureView: View {
     }
     .navigationTitle("Settings")
     .onAppear { store.send(.onAppear) }
+    // Returning from iOS Settings (the "allow notifications" hint) backgrounds the app without
+    // unmounting this view, so `.onAppear` won't re-fire — refresh on scene re-activation so a
+    // permission granted/revoked there is reflected (and reminders reconciled) (review #1.1).
+    .onChange(of: scenePhase) { _, newPhase in
+      if newPhase == .active { store.send(.onAppear) }
+    }
     // Push (not a sheet): SettingsFeatureView is the You-tab stack root, so this pushes onto it. No
     // wrapping `NavigationStack` — DevMenuView's own pushes (the log viewer) ride the same stack.
     #if DEBUG
-      .navigationDestination(item: $store.scope(state: \.devMenu, action: \.devMenu)) { devStore in
+    .navigationDestination(item: $store.scope(state: \.devMenu, action: \.devMenu)) { devStore in
         DevMenuView(store: devStore)
       }
     #endif

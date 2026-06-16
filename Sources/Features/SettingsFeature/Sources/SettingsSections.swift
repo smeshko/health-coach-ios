@@ -171,6 +171,53 @@ struct HRZonesRow: View {
   }
 }
 
+/// The REMINDERS section (Phase 10.3) — the "Good morning check-in" toggle bound to the **effective**
+/// state (so a denied/revoked permission shows OFF, never a lying ON) + an "allow notifications in
+/// Settings" hint when notifications are denied.
+struct RemindersSection: View {
+  let store: StoreOf<SettingsFeature>
+
+  var body: some View {
+    Section {
+      Toggle(
+        isOn: Binding(
+          get: { store.remindersEffectivelyOn },
+          set: { store.send(.remindersToggled($0)) }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
+          Text("Good morning check-in")
+            .foregroundStyle(.coachForeground)
+          Text("A gentle nudge at 7:00 AM")
+            .font(.coachTextSm)
+            .foregroundStyle(.coachForegroundSubtle)
+        }
+      }
+      .tint(.coachAccent)
+      .sensoryFeedback(.selection, trigger: store.remindersEffectivelyOn)
+
+      if store.showEnableInSettingsHint {
+        Button {
+          store.send(.openNotificationSettingsTapped)
+        } label: {
+          HStack {
+            Text("Allow notifications in Settings to get reminders")
+              .foregroundStyle(.coachAccent)
+            Spacer(minLength: CoachSpacing.spaceSm)
+            Image(systemName: "arrow.up.right")
+              .font(.coachTextSm)
+              .foregroundStyle(.coachAccent)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.coachPressable)
+      }
+    } header: {
+      Text("Reminders")
+    }
+  }
+}
+
 /// The connection status badge — a colored dot + label (green/Connected, muted/Not connected, —).
 struct ConnectionStatusBadge: View {
   let status: SettingsFeature.ConnectionStatus

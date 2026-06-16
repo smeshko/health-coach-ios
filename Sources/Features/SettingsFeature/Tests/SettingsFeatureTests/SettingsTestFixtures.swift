@@ -1,6 +1,7 @@
 import DomainModels
 import Foundation
 import HealthKitClient
+import NotificationClient
 
 @testable import SettingsFeature
 
@@ -12,6 +13,27 @@ enum SettingsTestFixtures {
   /// A fixed "now" for pinning `\.date` (the HK probe window is computed from it).
   static let now = Date(timeIntervalSince1970: 1_780_900_000)
   private static let epoch = Date(timeIntervalSince1970: 0)
+
+  /// A fresh per-test appStorage suite so the `@Shared(.appStorage)` reminders toggle never leaks between
+  /// tests / real UserDefaults (process-global state — suites are `.serialized`, mirroring WeeklyFeature).
+  static func freshAppStorage() -> UserDefaults {
+    let suiteName = "settings-tests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    return defaults
+  }
+
+  /// A recording `NotificationClient` (10.1's value) with overridable authorization closures, paired with
+  /// the recorder so reminders tests can assert what was scheduled/cancelled.
+  static func recordingClient(
+    requestAuthorization: @escaping @Sendable () async throws -> NotificationAuthorizationStatus = { .authorized },
+    authorizationStatus: @escaping @Sendable () async -> NotificationAuthorizationStatus = { .authorized }
+  ) -> (NotificationClient, RecordingNotificationCenter) {
+    var (client, recorder) = NotificationClient.recording()
+    client.requestAuthorization = requestAuthorization
+    client.authorizationStatus = authorizationStatus
+    return (client, recorder)
+  }
 
   static func sampleProfile(recomputeWeek: String? = nil) -> DomainModels.Profile {
     DomainModels.Profile(
