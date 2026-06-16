@@ -147,6 +147,10 @@ let package = Package(
         "ProfileRepository",
         "SyncRepository",
         "HealthKitClient",
+        // Phase 10.3 reminders: the NotificationClient INTERFACE (D21 data source, no repo wraps it) +
+        // Sharing for the persisted @Shared(.appStorage) reminders toggle. Never NotificationClientLive.
+        "NotificationClient",
+        .product(name: "Sharing", package: "swift-sharing"),
       ],
       path: "Sources/Features/SettingsFeature/Sources",
       swiftSettings: [
@@ -987,6 +991,8 @@ let package = Package(
         "SyncRepository",
         "HealthKitClient",
         "DomainModels",
+        // Phase 10.3: ReminderScheduler/reminders TestStore drive the NotificationClient recorder.
+        "NotificationClient",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/SettingsFeature/Tests/SettingsFeatureTests",
