@@ -282,9 +282,15 @@ public struct SettingsFeature {
         //  • otherwise (intent OFF, or not granted) → cancel both — heals an interrupted disable / a
         //    permission revoked while reminders were on, so a *repeating* reminder can't keep firing
         //    while the toggle shows OFF.
-        return .run { [notificationClient, enabled = state.remindersEnabled, granted = status.isGranted] _ in
+        return .run { [notificationClient, enabled = state.remindersEnabled, granted = status.isGranted] send in
           if enabled, granted {
-            try? await ReminderScheduler().enable(notificationClient)
+            do {
+              try await ReminderScheduler().enable(notificationClient)
+            } catch {
+              // A partial schedule failure (e.g. the 2nd add throws after the 1st succeeds) must not leave
+              // a half-on state — revert to OFF like the explicit enable path, which cancels both (review #6).
+              await send(.remindersToggled(false))
+            }
           } else {
             await ReminderScheduler().disable(notificationClient)
           }

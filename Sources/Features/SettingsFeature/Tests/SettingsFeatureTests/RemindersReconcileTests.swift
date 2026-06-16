@@ -196,4 +196,48 @@ struct RemindersReconcileTests {
     #expect(await recorder.pendingIdentifiers() == [], "a denied enable cancels existing pending reminders")
   }
 
+  @Test func testReconcileEnable_partialScheduleFailure_revertsToOff() async {
+    // A partial schedule failure during the background reconcile-enable must not leave a half-on state
+    // (review #6): it reverts to OFF (cancelling the one that succeeded).
+    let calls = LockIsolated(0)
+    let recorder = RecordingNotificationCenter()
+    let client = NotificationClient(
+      requestAuthorization: { .authorized },
+      authorizationStatus: { .authorized },
+      schedule: { request in
+        let scheduleCount = calls.withValue { value -> Int in value += 1; return value }
+        if scheduleCount == 2 { throw Boom() } // the 2nd add fails after the 1st succeeds
+        await recorder.schedule(request)
+      },
+      cancel: { ids in await recorder.cancel(ids) },
+      pendingIdentifiers: { await recorder.pendingIdentifiers() }
+    )
+    let suite = SettingsTestFixtures.freshAppStorage()
+    suite.set(true, forKey: "settingsRemindersEnabled") // intent ON → reconcile takes the enable branch
+
+    let store = TestStore(initialState: {
+      var state = SettingsFeature.State()
+      state.load = .loaded
+      return state
+    }()) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.defaultAppStorage = suite
+      $0.notificationClient = client
+      $0.syncRepository.lastSync = { throw Boom() }
+    }
+    // Non-exhaustive: this interleave (reconcile-enable → partial-failure → self-sent revert) churns
+    // @Shared state in a way that's awkward to diff per-action; assert the end state instead.
+    store.exhaustivity = .off
+
+    await store.send(.onAppear)
+    await store.receive(\.authorizationStatusLoaded)
+    // The reconcile-enable's 2nd schedule throws → it reverts intent to OFF (cancelling the 1st).
+    await store.receive(\.remindersToggled)
+    await store.finish()
+
+    #expect(await recorder.pendingIdentifiers() == [], "a partial schedule failure leaves no half-on state")
+    #expect(!store.state.remindersEnabled, "intent reverted to OFF")
+  }
+
 }
