@@ -1,23 +1,42 @@
 import ComposableArchitecture
+import DomainModels
+import Foundation
+import HealthKitClient
+import ProfileRepository
+import SyncRepository
+import TokenClient
 
-/// The You-tab root reducer (ARCHITECTURE §4.5 / §10). **Minimal in Phase 7.4**: its only production
-/// surface is a `tokenReset` delegate seam (the route-to-onboarding the shell owns — D7), and the only
-/// *rendered* content is a `#if DEBUG` **DEV** section (see `SettingsFeatureView`) that presents the
-/// `DevMenuFeature`. Phase 10.2 expands this same target with the production CONNECTION / APPLE HEALTH /
-/// PROFILE / REMINDERS sections; this phase keeps the DEV slice self-contained so 10.2 leaves it
-/// untouched.
+/// The You-tab root reducer (ARCHITECTURE §4.5 / §10). Created minimal in Phase 7.4 (the `tokenReset`
+/// delegate seam + a `#if DEBUG` DEV section); **expanded in Phase 10.2** with the production CONNECTION
+/// / APPLE HEALTH / PROFILE sections — read-only display slices loaded once on `onAppear` from the
+/// repository/data-source **interfaces** (DECISIONS #3/#5). The REMINDERS section is Phase 10.3. The
+/// `#if DEBUG` DEV slice (dev menu + log viewer) is retained unchanged.
 @Reducer
 public struct SettingsFeature {
   /// Delegate actions the shell (`MainTabs` → `AppFeature`) listens for. `tokenReset` asks the root to
-  /// clear the session and return to onboarding. In this phase it is fired only by the DEBUG dev menu's
-  /// reset action; it is also the seam Phase 10.2's production "Disconnect / Sign out" row reuses, so it
-  /// (and the shell routing it drives) lives in production — only the dev-menu *trigger* is `#if DEBUG`.
+  /// clear the session and return to onboarding. It is fired both by the DEBUG dev menu's reset action
+  /// and by the production **Re-connect** row (DECISIONS #2 — the same §13 route a 401 takes); no
+  /// parallel `reconnectRequested` seam is added.
   public enum Delegate: Equatable {
     case tokenReset
   }
 
   @ObservableState
   public struct State: Equatable {
+    public var load: LoadState = .idle
+    public var connection: ConnectionState = .init()
+    public var health: HealthKitStatusState = .init()
+    public var lastSync: LastSyncState = .init()
+    public var constants: ConstantsState = .init()
+
+    // Load-gate bookkeeping: each of the four `onAppear` effects flips its flag; `settleLoad` sets
+    // `load = .loaded` once all four are resolved and none failed — so the transition lives in one
+    // place and is independent of which effect resolves last (the merged effects arrive out of order).
+    var connectionResolved = false
+    var lastSyncResolved = false
+    var constantsResolved = false
+    var healthResolved = false
+
     #if DEBUG
       /// The presented DEBUG dev menu (DEV section → "Dev Menu" row). Absent in RELEASE.
       @Presents public var devMenu: DevMenuFeature.State?
@@ -26,6 +45,13 @@ public struct SettingsFeature {
   }
 
   public enum Action {
+    case onAppear
+    case connectionLoaded(String?)
+    case lastSyncLoaded(Date?)
+    case constantsLoaded(Result<DomainModels.Profile, ProfileLoadFailure>)
+    case healthStatusLoaded(HealthKitStatusState)
+    case reconnectTapped
+    case openHealthSettingsTapped
     case delegate(Delegate)
     #if DEBUG
       case devMenuTapped
@@ -33,13 +59,87 @@ public struct SettingsFeature {
     #endif
   }
 
+  @Dependency(\.profileRepository) var profileRepository
+  @Dependency(\.syncRepository) var syncRepository
+  @Dependency(\.healthKitClient) var healthKitClient
+  @Dependency(\.tokenClient) var tokenClient
+
   public init() {}
 
   public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
+      case .onAppear:
+        state.load = .loading
+        state.connectionResolved = false
+        state.lastSyncResolved = false
+        state.constantsResolved = false
+        state.healthResolved = false
+        // Read all four slices CONCURRENTLY (`async let`), then send the result actions in a FIXED
+        // order so the merged load is deterministic to assert in a TestStore (the slices still load in
+        // parallel — only the delivery order is pinned). The HK probe is stubbed here (yields a default);
+        // its real empty-delta inference lands in TASK-003.
+        return .run { [tokenClient, syncRepository, profileRepository] send in
+          async let token = try? await tokenClient.read()
+          async let lastSyncDate = try? await syncRepository.lastSync()
+          async let constants = loadConstants(profileRepository)
+          await send(.connectionLoaded(await token))
+          await send(.lastSyncLoaded(await lastSyncDate))
+          await send(.constantsLoaded(await constants))
+          await send(.healthStatusLoaded(HealthKitStatusState()))
+        }
+
+      case let .connectionLoaded(token):
+        // Never store the full bearer token — only the last-4 masked suffix (DECISIONS #4).
+        if let token, !token.isEmpty {
+          state.connection.status = .connected(tokenSuffix: String(token.suffix(4)))
+        } else {
+          state.connection.status = .notConnected
+        }
+        state.connectionResolved = true
+        settleLoad(&state)
+        return .none
+
+      case let .lastSyncLoaded(date):
+        state.lastSync.lastSyncAt = date
+        state.lastSyncResolved = true
+        settleLoad(&state)
+        return .none
+
+      case let .constantsLoaded(.success(profile)):
+        state.constants = ConstantsState(
+          age: profile.athlete.age,
+          zones: profile.zones,
+          restingHrBpm: profile.thresholds.rhrBaseline,
+          hrvBaselineMs: profile.thresholds.hrvBaselineMs,
+          recomputeNoticeWeek: profile.meta.constantsRecomputedWeek
+        )
+        state.constantsResolved = true
+        settleLoad(&state)
+        return .none
+
+      case .constantsLoaded(.failure):
+        state.constantsResolved = true
+        state.load = .failed
+        return .none
+
+      case let .healthStatusLoaded(status):
+        state.health = status
+        state.healthResolved = true
+        settleLoad(&state)
+        return .none
+
+      case .reconnectTapped:
+        // Reuse the existing reserved seam (DECISIONS #2) — the parent routes it to onboarding/.connect.
+        return .send(.delegate(.tokenReset))
+
+      case .openHealthSettingsTapped:
+        // The Health deep link is wired in TASK-003.
+        return .none
+
       case .delegate:
         return .none
+
       #if DEBUG
         case .devMenuTapped:
           state.devMenu = DevMenuFeature.State()
@@ -57,5 +157,26 @@ public struct SettingsFeature {
     #if DEBUG
     .ifLet(\.$devMenu, action: \.devMenu) { DevMenuFeature() }
     #endif
+  }
+
+  /// Sets `load = .loaded` once every slice has resolved and none failed. Order-independent: each of the
+  /// four load result handlers calls this after flipping its own slice's resolved flag.
+  private func settleLoad(_ state: inout State) {
+    guard state.load != .failed else { return }
+    if state.connectionResolved, state.lastSyncResolved, state.constantsResolved, state.healthResolved {
+      state.load = .loaded
+    }
+  }
+}
+
+/// Loads the profile constants as a `Result`, mapping any repository error to the feature-local opaque
+/// `ProfileLoadFailure` (a free function so the `async let` in `onAppear` captures no `self`).
+private func loadConstants(
+  _ repository: ProfileRepository
+) async -> Result<DomainModels.Profile, SettingsFeature.ProfileLoadFailure> {
+  do {
+    return .success(try await repository.profile())
+  } catch {
+    return .failure(.failed)
   }
 }
