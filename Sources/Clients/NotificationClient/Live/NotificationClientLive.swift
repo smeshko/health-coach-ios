@@ -5,6 +5,14 @@ import NotificationClient
   import Foundation
   import UserNotifications
 
+  /// A scheduling failure surfaced as a **catchable** Swift error. `UNTimeIntervalNotificationTrigger`
+  /// raises an uncatchable Obj-C `NSException` for a non-positive interval (or a sub-60s *repeating*
+  /// interval); we validate first and throw this instead so a caller's `try await schedule(_:)` can
+  /// recover rather than crashing the app (review #1.2).
+  enum NotificationSchedulingError: Error, Equatable {
+    case invalidTimeInterval(seconds: TimeInterval, repeats: Bool)
+  }
+
   /// The live `NotificationClient` over `UNUserNotificationCenter`. This is the **only** target that
   /// imports `UserNotifications` (§15) — it maps the interface's framework-free value types to/from the
   /// `UN*`/Foundation `DateComponents` types. All framework code sits under
@@ -24,7 +32,7 @@ import NotificationClient
         content.title = request.title
         content.body = request.body
         content.sound = .default
-        let req = UNNotificationRequest(
+        let req = try UNNotificationRequest(
           identifier: request.id,
           content: content,
           trigger: makeTrigger(request.trigger)
@@ -52,7 +60,7 @@ import NotificationClient
       }
     }
 
-    private static func makeTrigger(_ trigger: NotificationTrigger) -> UNNotificationTrigger {
+    private static func makeTrigger(_ trigger: NotificationTrigger) throws -> UNNotificationTrigger {
       switch trigger {
       case let .calendar(components, repeats):
         var dateComponents = DateComponents()
@@ -61,6 +69,11 @@ import NotificationClient
         dateComponents.minute = components.minute
         return UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: repeats)
       case let .timeInterval(seconds, repeats):
+        // UNTimeIntervalNotificationTrigger raises an uncatchable NSException for a non-positive
+        // interval, or for a repeating interval under 60s. Validate first and throw a catchable error.
+        guard seconds.isFinite, seconds > 0, !(repeats && seconds < 60) else {
+          throw NotificationSchedulingError.invalidTimeInterval(seconds: seconds, repeats: repeats)
+        }
         return UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: repeats)
       }
     }
