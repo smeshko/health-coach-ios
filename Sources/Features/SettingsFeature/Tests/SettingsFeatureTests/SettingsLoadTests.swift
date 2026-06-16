@@ -180,11 +180,44 @@ struct SettingsLoadTests {
     }
   }
 
-  @Test func test_reconnectTapped_emitsDelegate() async {
+  @Test func test_reconnectTapped_clearsTokenThenEmitsDelegate() async {
+    // The production reconnect must clear the bearer token before bubbling tokenReset (review #1.1) —
+    // AppFeature's handler only routes and assumes the session was already cleared.
+    let cleared = LockIsolated(false)
     let store = TestStore(initialState: SettingsFeature.State()) {
       SettingsFeature()
+    } withDependencies: {
+      $0.tokenClient.clear = { cleared.setValue(true) }
     }
     await store.send(.reconnectTapped)
     await store.receive(\.delegate, .tokenReset)
+    #expect(cleared.value, "the stored token is cleared on re-connect")
+  }
+
+  @Test func test_onAppear_whenAlreadyLoaded_refreshesLastSyncOnly() async {
+    // Re-entering a loaded Settings refreshes the (stale-prone) last-sync time but does NOT re-run the
+    // full load / the expensive HK probe (review #1.3 + #1.2 mitigation).
+    var initial = SettingsFeature.State()
+    initial.load = .loaded
+    initial.connection.status = .connected(tokenSuffix: "6f2a")
+    initial.connectionResolved = true
+    initial.lastSync.lastSyncAt = SettingsTestFixtures.syncedAt
+    initial.lastSyncResolved = true
+    initial.constants = SettingsTestFixtures.loadedConstants
+    initial.constantsResolved = true
+    initial.health = SettingsTestFixtures.fullGrant
+    initial.healthResolved = true
+
+    let refreshed = Date(timeIntervalSince1970: 1_790_000_000)
+    let store = TestStore(initialState: initial) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.syncRepository.lastSync = { refreshed }
+    }
+
+    await store.send(.onAppear)
+    await store.receive(\.lastSyncLoaded) {
+      $0.lastSync.lastSyncAt = refreshed
+    }
   }
 }

@@ -1050,9 +1050,11 @@ let package = Package(
         "SampleData",
         "LogClient",
         "CoachTestSupport",
-        // Phase 10.2 SettingsView snapshots seed DomainModels constants + HealthDataCategory missing sets.
+        // Phase 10.2 SettingsView snapshots seed DomainModels constants + HealthDataCategory missing sets,
+        // and pin the SyncRepository.lastSync reappear-refresh read.
         "DomainModels",
         "HealthKitClient",
+        "SyncRepository",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],

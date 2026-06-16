@@ -65,33 +65,49 @@ public struct SettingsFeature {
   @Dependency(\.tokenClient) var tokenClient
   @Dependency(\.openURL) var openURL
 
+  private enum CancelID { case load }
+
   public init() {}
 
   public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
       case .onAppear:
-        // Idempotent: don't re-run the load when already loading/loaded (re-entering the tab, or a
-        // snapshot seeded to `.loaded`). A prior `.failed` may retry.
-        guard state.load == .idle || state.load == .failed else { return .none }
-        state.load = .loading
-        state.connectionResolved = false
-        state.lastSyncResolved = false
-        state.constantsResolved = false
-        state.healthResolved = false
-        // Read all four slices CONCURRENTLY (`async let`), then send the result actions in a FIXED
-        // order so the merged load is deterministic to assert in a TestStore (the slices still load in
-        // parallel — only the delivery order is pinned). The HK probe is stubbed here (yields a default);
-        // its real empty-delta inference lands in TASK-003.
-        return .run { [tokenClient, syncRepository, profileRepository, healthKitClient] send in
-          async let token = try? await tokenClient.read()
-          async let lastSyncDate = try? await syncRepository.lastSync()
-          async let constants = loadConstants(profileRepository)
-          async let health = loadHealthStatus(healthKitClient)
-          await send(.connectionLoaded(await token))
-          await send(.lastSyncLoaded(await lastSyncDate))
-          await send(.constantsLoaded(await constants))
-          await send(.healthStatusLoaded(await health))
+        switch state.load {
+        case .loading:
+          // A first load is already in flight — don't disturb it.
+          return .none
+        case .loaded:
+          // Re-entering the tab: refresh only the last-sync time — the one slice that goes stale after
+          // each sync (a cheap watermark read). Token/constants rarely change, and the HK probe is
+          // intentionally NOT repeated here: it's an unbounded HealthKit history read (review #1.2/#1.3),
+          // so it runs only on the first load. (HK-status refresh after a permission change is a deferred
+          // follow-up tied to a bounded presence API.)
+          return .run { [syncRepository] send in
+            await send(.lastSyncLoaded(try? await syncRepository.lastSync()))
+          }
+          .cancellable(id: CancelID.load, cancelInFlight: true)
+        case .idle, .failed:
+          // First load (or a retry after failure): load all four slices, including the one-time HK probe.
+          state.load = .loading
+          state.connectionResolved = false
+          state.lastSyncResolved = false
+          state.constantsResolved = false
+          state.healthResolved = false
+          // Read all four slices CONCURRENTLY (`async let`), then send the result actions in a FIXED
+          // order so the merged load is deterministic to assert in a TestStore (the slices still load in
+          // parallel — only the delivery order is pinned).
+          return .run { [tokenClient, syncRepository, profileRepository, healthKitClient] send in
+            async let token = try? await tokenClient.read()
+            async let lastSyncDate = try? await syncRepository.lastSync()
+            async let constants = loadConstants(profileRepository)
+            async let health = loadHealthStatus(healthKitClient)
+            await send(.connectionLoaded(await token))
+            await send(.lastSyncLoaded(await lastSyncDate))
+            await send(.constantsLoaded(await constants))
+            await send(.healthStatusLoaded(await health))
+          }
+          .cancellable(id: CancelID.load, cancelInFlight: true)
         }
 
       case let .connectionLoaded(token):
@@ -135,8 +151,14 @@ public struct SettingsFeature {
         return .none
 
       case .reconnectTapped:
-        // Reuse the existing reserved seam (DECISIONS #2) — the parent routes it to onboarding/.connect.
-        return .send(.delegate(.tokenReset))
+        // Clear the bearer token BEFORE bubbling the reset (mirroring the dev-menu reset, review #1.1):
+        // AppFeature's tokenReset handler only routes to onboarding and assumes the You tab already
+        // cleared the session, so without this a restart in the reconnect window would resurrect the
+        // stale token. Then reuse the existing reserved seam (DECISIONS #2) → the parent routes to .connect.
+        return .run { [tokenClient] send in
+          try? await tokenClient.clear()
+          await send(.delegate(.tokenReset))
+        }
 
       case .openHealthSettingsTapped:
         return .run { [openURL] _ in

@@ -11,6 +11,7 @@
   import HealthKitClient
   import SnapshotTesting
   import SwiftUI
+  import SyncRepository
   import Testing
 
   @testable import SettingsFeature
@@ -18,7 +19,7 @@
   @MainActor
   struct SettingsViewSnapshotTests {
     /// A fixed instant so the last-sync "Today, …" string is deterministic.
-    private static let now = Date(timeIntervalSince1970: 1_780_900_000)
+    nonisolated private static let now = Date(timeIntervalSince1970: 1_780_900_000)
     private static let total = HealthStatusInference.displayedCategories.count
 
     private static func zones() -> DomainModels.Zones {
@@ -59,6 +60,8 @@
       withDependencies {
         $0.calendar = .europeSofia
         $0.date = .constant(Self.now)
+        // Pin the reappear-refresh read so an onAppear during capture keeps the seeded last-sync.
+        $0.syncRepository.lastSync = { Self.now }
       } operation: {
         assertCoachSnapshot(of: NavigationStack {
           SettingsFeatureView(store: Store(initialState: state) { SettingsFeature() })
@@ -73,6 +76,7 @@
       withDependencies {
         $0.calendar = .europeSofia
         $0.date = .constant(Self.now)
+        $0.syncRepository.lastSync = { Self.now }
       } operation: {
         assertCoachSnapshot(of: NavigationStack {
           SettingsFeatureView(store: Store(initialState: state) { SettingsFeature() })
@@ -85,6 +89,7 @@
       withDependencies {
         $0.calendar = .europeSofia
         $0.date = .constant(Self.now)
+        $0.syncRepository.lastSync = { nil }
       } operation: {
         assertCoachSnapshot(of: NavigationStack {
           SettingsFeatureView(store: Store(initialState: state) { SettingsFeature() })
