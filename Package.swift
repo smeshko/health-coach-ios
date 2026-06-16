@@ -21,6 +21,7 @@ let package = Package(
     .library(name: "APIClientLive", targets: ["APIClientLive"]),
     .library(name: "Database", targets: ["Database"]),
     .library(name: "HealthKitClientLive", targets: ["HealthKitClientLive"]),
+    .library(name: "NotificationClient", targets: ["NotificationClient"]),
     .library(name: "DevSettings", targets: ["DevSettings"]),
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
     .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
@@ -338,6 +339,22 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/HealthKitClient/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The local-notifications data source INTERFACE (D21 / §6): pure `Sendable` value types
+    // (`NotificationRequest`/`NotificationTrigger`/`NotificationDateComponents`/
+    // `NotificationAuthorizationStatus`) + the closure struct + a recording test value. Imports NO
+    // `UserNotifications` (§15) — that framework lives only in NotificationClientLive. Consumers
+    // (10.2 Settings, 10.3 wiring) depend on this interface only.
+    .target(
+      name: "NotificationClient",
+      dependencies: [
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/NotificationClient/Interface",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -674,6 +691,19 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/HealthKitClient/Tests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // NotificationClient interface + recording-test-value tests — host (no UserNotifications, no
+    // simulator). Runs against the framework-free recording test value.
+    .testTarget(
+      name: "NotificationClientTests",
+      dependencies: [
+        "NotificationClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/NotificationClient/Tests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
