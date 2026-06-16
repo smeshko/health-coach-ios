@@ -47,6 +47,17 @@ struct SettingsHealthTests {
     #expect(status.sharedCount == 0)
   }
 
+  @Test func test_healthStatus_detectsEveryAppReadCategory() {
+    // The detection set is exhaustive (review #3): a revocation of any app-read category — including ones
+    // a curated display subset used to omit, e.g. .dietary / .runningDynamics — is surfaced as missing.
+    #expect(HealthStatusInference.displayedCategories.contains(.dietary))
+    #expect(HealthStatusInference.displayedCategories.contains(.runningDynamics))
+    let status = HealthStatusInference.healthStatus(
+      from: SettingsTestFixtures.sampleSet(missing: [.dietary]), status: [:], available: true
+    )
+    #expect(status.missingCategories == [.dietary])
+  }
+
   // MARK: - TestStore (HK probe via onAppear)
 
   @Test func test_onAppear_hkFullGrant_noMissing() async {

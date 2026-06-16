@@ -8,20 +8,10 @@ import HealthKitClient
 enum HealthStatusInference {
   /// The displayed category set, pinned to ONE constant (round-1 #7) so the "N of M" count, the missing
   /// list (which drives the "Manage in Health settings" deep link), and the snapshot seeds can never
-  /// drift. The cosmetic count derives from `count`; only the missing list drives behaviour.
-  static let displayedCategories: [HealthDataCategory] = [
-    .heartRate,
-    .hrv,
-    .restingHeartRate,
-    .sleep,
-    .steps,
-    .activeEnergy,
-    .vo2Max,
-    .bodyMass,
-    .respiratoryRate,
-    .workouts,
-    .activity,
-  ]
+  /// drift. **Exhaustive over every category the app reads** (`allCases`, review #3) — a curated subset
+  /// would hide the repair path when an *omitted* category is revoked (a false-healthy state). The count
+  /// is cosmetic; the missing list drives behaviour.
+  static let displayedCategories: [HealthDataCategory] = HealthDataCategory.allCases
 
   /// Reduce a delta probe into the displayed status. `available == false` ⇒ every displayed category is
   /// missing (HK unavailable). The `status` map is accepted for corroboration but the missing decision
