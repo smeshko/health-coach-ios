@@ -1,7 +1,11 @@
 import Dependencies
 import NotificationClient
 
-#if canImport(UserNotifications)
+// `os(iOS) &&` (not just `canImport`) so the macOS host build takes the no-op `#else` stub: unlike
+// HealthKit/UIKit, UserNotifications *does* compile on macOS, so a bare `canImport` guard would run the
+// real `UNUserNotificationCenter` on the host (where there is no app bundle) — the side effect the
+// interface/live split exists to avoid (review #3.2). The iOS app/simulator build keeps the real impl.
+#if os(iOS) && canImport(UserNotifications)
   import Foundation
   import UserNotifications
 
@@ -53,6 +57,11 @@ import NotificationClient
     }
 
     private static func makeTrigger(_ trigger: NotificationTrigger) throws -> UNNotificationTrigger {
+      // Validate via the shared interface rule (which the recording test value also enforces) before
+      // building any UN* trigger — both UNTimeIntervalNotificationTrigger (non-positive / sub-60s
+      // repeating) and UNCalendarNotificationTrigger (all-nil components) raise uncatchable NSExceptions
+      // otherwise. This turns those into a catchable Swift throw.
+      try trigger.validate()
       switch trigger {
       case let .calendar(components, repeats):
         var dateComponents = DateComponents()
@@ -61,10 +70,6 @@ import NotificationClient
         dateComponents.minute = components.minute
         return UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: repeats)
       case let .timeInterval(seconds, repeats):
-        // UNTimeIntervalNotificationTrigger raises an uncatchable NSException for a non-positive
-        // interval, or for a repeating interval under 60s. Validate via the shared interface rule
-        // (which the recording test value also enforces) and throw a catchable error first.
-        try trigger.validate()
         return UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: repeats)
       }
     }

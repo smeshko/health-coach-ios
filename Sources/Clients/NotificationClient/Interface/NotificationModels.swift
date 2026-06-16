@@ -66,23 +66,33 @@ public enum NotificationAuthorizationStatus: Sendable, Equatable {
 /// recoverable `throws`.
 public enum NotificationSchedulingError: Error, Equatable, Sendable {
   case invalidTimeInterval(seconds: TimeInterval, repeats: Bool)
+  case invalidCalendarComponents(NotificationDateComponents)
 }
 
 public extension NotificationTrigger {
-  /// Throws `NotificationSchedulingError` if this trigger cannot be scheduled. Mirrors the constraints
-  /// `UNTimeIntervalNotificationTrigger` enforces at runtime — a finite, positive interval, and ≥ 60s
-  /// when repeating — but as pure arithmetic with **no `UserNotifications` dependency**, so it runs on
-  /// the host. Both `NotificationClientLive` and the recording test value validate through this, so a
-  /// TestStore can't record a schedule that production would reject. Calendar triggers have no
-  /// host-checkable constraint here (their fire-time correctness is the TASK-004 manual check).
+  /// Throws `NotificationSchedulingError` if this trigger cannot be scheduled — as pure arithmetic
+  /// with **no `UserNotifications` dependency**, so it runs on the host. Both `NotificationClientLive`
+  /// and the recording test value validate through this, so a TestStore can't record a schedule that
+  /// production would reject. Mirrors the runtime constraints the `UN*` triggers enforce:
+  /// - `.timeInterval`: a finite, positive interval, and ≥ 60s when repeating.
+  /// - `.calendar`: each present component in range (weekday 1...7, hour 0...23, minute 0...59) and at
+  ///   least one component set — an all-nil `DateComponents` raises an uncatchable `NSException` from
+  ///   `UNCalendarNotificationTrigger` (Apple requires ≥ 1 component), and out-of-range values produce
+  ///   a trigger that never fires.
   func validate() throws {
     switch self {
     case let .timeInterval(seconds, repeats):
       guard seconds.isFinite, seconds > 0, !(repeats && seconds < 60) else {
         throw NotificationSchedulingError.invalidTimeInterval(seconds: seconds, repeats: repeats)
       }
-    case .calendar:
-      break
+    case let .calendar(components, _):
+      let weekdayOK = components.weekday.map { (1 ... 7).contains($0) } ?? true
+      let hourOK = components.hour.map { (0 ... 23).contains($0) } ?? true
+      let minuteOK = components.minute.map { (0 ... 59).contains($0) } ?? true
+      let hasAnyComponent = components.weekday != nil || components.hour != nil || components.minute != nil
+      guard weekdayOK, hourOK, minuteOK, hasAnyComponent else {
+        throw NotificationSchedulingError.invalidCalendarComponents(components)
+      }
     }
   }
 }

@@ -76,8 +76,13 @@ struct NotificationClientTests {
     NotificationTrigger.timeInterval(seconds: -5, repeats: false),
     NotificationTrigger.timeInterval(seconds: .nan, repeats: false),
     NotificationTrigger.timeInterval(seconds: 30, repeats: true),
+    // Invalid calendar shapes: all-nil (crashes UNCalendarNotificationTrigger), out-of-range values.
+    NotificationTrigger.calendar(dateComponents: NotificationDateComponents(), repeats: true),
+    NotificationTrigger.calendar(dateComponents: NotificationDateComponents(weekday: 8), repeats: true),
+    NotificationTrigger.calendar(dateComponents: NotificationDateComponents(hour: 25, minute: 0), repeats: true),
+    NotificationTrigger.calendar(dateComponents: NotificationDateComponents(hour: 7, minute: 99), repeats: true),
   ])
-  func test_scheduleInvalidTimeInterval_throwsAndRecordsNothing(_ trigger: NotificationTrigger) async {
+  func test_scheduleInvalidTrigger_throwsAndRecordsNothing(_ trigger: NotificationTrigger) async {
     let (client, recorder) = NotificationClient.recording()
     let req = NotificationRequest(id: "bad", title: "T", body: "B", trigger: trigger)
 

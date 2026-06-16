@@ -60,12 +60,28 @@ struct NotificationModelsTests {
     }
   }
 
+  @Test func test_triggerValidate_rejectsInvalidCalendarComponents() {
+    let allNil = NotificationDateComponents()
+    #expect(throws: NotificationSchedulingError.invalidCalendarComponents(allNil)) {
+      try NotificationTrigger.calendar(dateComponents: allNil, repeats: true).validate()
+    }
+    let badHour = NotificationDateComponents(hour: 25, minute: 0)
+    #expect(throws: NotificationSchedulingError.invalidCalendarComponents(badHour)) {
+      try NotificationTrigger.calendar(dateComponents: badHour, repeats: true).validate()
+    }
+  }
+
   @Test func test_triggerValidate_acceptsValidTriggers() throws {
-    // Positive one-shot, 60s repeating boundary, and any calendar trigger validate cleanly.
+    // Positive one-shot, 60s repeating boundary, and a well-formed calendar trigger validate cleanly.
     try NotificationTrigger.timeInterval(seconds: 1, repeats: false).validate()
     try NotificationTrigger.timeInterval(seconds: 60, repeats: true).validate()
     try NotificationTrigger.calendar(
       dateComponents: NotificationDateComponents(weekday: 2, hour: 18, minute: 0),
+      repeats: true
+    ).validate()
+    // weekday 7 (Saturday) + hour 23 + minute 59 — upper boundaries.
+    try NotificationTrigger.calendar(
+      dateComponents: NotificationDateComponents(weekday: 7, hour: 23, minute: 59),
       repeats: true
     ).validate()
   }
