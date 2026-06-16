@@ -21,6 +21,7 @@
 		CA0000000000000000000038 /* ProfileRepositoryLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000028 /* ProfileRepositoryLive */; };
 		CA0000000000000000000039 /* LocalRepositories in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000029 /* LocalRepositories */; };
 		CA000000000000000000003B /* LogClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA000000000000000000002B /* LogClientLive */; };
+		CA000000000000000000003C /* NotificationClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA000000000000000000002C /* NotificationClientLive */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 				CA0000000000000000000038 /* ProfileRepositoryLive in Frameworks */,
 				CA0000000000000000000039 /* LocalRepositories in Frameworks */,
 				CA000000000000000000003B /* LogClientLive in Frameworks */,
+				CA000000000000000000003C /* NotificationClientLive in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,6 +108,7 @@
 				CA0000000000000000000028 /* ProfileRepositoryLive */,
 				CA0000000000000000000029 /* LocalRepositories */,
 				CA000000000000000000002B /* LogClientLive */,
+				CA000000000000000000002C /* NotificationClientLive */,
 			);
 			productName = CoachApp;
 			productReference = CA0000000000000000000006 /* CoachApp.app */;
@@ -426,6 +429,10 @@
 		CA000000000000000000002B /* LogClientLive */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LogClientLive;
+		};
+		CA000000000000000000002C /* NotificationClientLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = NotificationClientLive;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

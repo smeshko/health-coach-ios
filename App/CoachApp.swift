@@ -9,6 +9,7 @@ import HealthKitClientLive
 import LocalRepositories
 import LogClient
 import LogClientLive
+import NotificationClientLive
 import ProfileRepositoryLive
 import SwiftUI
 import SyncRepositoryLive
@@ -32,6 +33,11 @@ struct CoachApp: App {
       // App-wide logging: console + rotating file, with verbose categories gated by the persisted
       // DevSettings toggles (.http always on). The switch UI lands in Phase 7.4.
       $0.log = .liveValue
+
+      // Local-notification data source for the morning check-in / weekly strength-test reminders
+      // (Epic 10.3 wires the actual scheduling). Basic local notifications need no entitlement, only
+      // runtime authorization. NotificationClientLive is the only place this framework is touched.
+      $0.notificationClient = .liveValue
 
       // Repos with a remote fork install via `routed(dev)` so the DEBUG `-useMockData` toggle works at
       // runtime; CheckIn/StrengthTest are local-only (no `DevEndpoint`) → installed `.live`. The
