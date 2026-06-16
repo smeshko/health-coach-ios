@@ -9,6 +9,8 @@ import HealthKitClient
 enum SettingsTestFixtures {
   /// 2026-06-08 ~09:00 Europe/Sofia.
   static let syncedAt = Date(timeIntervalSince1970: 1_780_898_400)
+  /// A fixed "now" for pinning `\.date` (the HK probe window is computed from it).
+  static let now = Date(timeIntervalSince1970: 1_780_900_000)
   private static let epoch = Date(timeIntervalSince1970: 0)
 
   static func sampleProfile(recomputeWeek: String? = nil) -> DomainModels.Profile {

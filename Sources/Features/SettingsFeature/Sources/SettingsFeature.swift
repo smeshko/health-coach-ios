@@ -64,8 +64,15 @@ public struct SettingsFeature {
   @Dependency(\.healthKitClient) var healthKitClient
   @Dependency(\.tokenClient) var tokenClient
   @Dependency(\.openURL) var openURL
+  @Dependency(\.date) var date
 
   private enum CancelID { case load }
+
+  /// The HealthKit presence-probe window. The status read only needs "did this category produce any
+  /// sample recently", so it reads a bounded recent window rather than the whole history (review #2.2) —
+  /// a category with no sample in this window shows as "not shared yet" (the plan's accepted
+  /// emptiness-framing). 30 days comfortably covers an active user's core signals.
+  private static let healthProbeWindow: TimeInterval = 30 * 24 * 60 * 60
 
   public init() {}
 
@@ -80,11 +87,13 @@ public struct SettingsFeature {
         case .loaded:
           // Re-entering the tab: refresh only the last-sync time — the one slice that goes stale after
           // each sync (a cheap watermark read). Token/constants rarely change, and the HK probe is
-          // intentionally NOT repeated here: it's an unbounded HealthKit history read (review #1.2/#1.3),
-          // so it runs only on the first load. (HK-status refresh after a permission change is a deferred
-          // follow-up tied to a bounded presence API.)
+          // intentionally NOT repeated here (it runs only on the first load — review #1.3). On a transient
+          // read error PRESERVE the displayed value (only update on a successful read) rather than blanking
+          // it to "Never synced" (review #2.3).
           return .run { [syncRepository] send in
-            await send(.lastSyncLoaded(try? await syncRepository.lastSync()))
+            if let date = try? await syncRepository.lastSync() {
+              await send(.lastSyncLoaded(date))
+            }
           }
           .cancellable(id: CancelID.load, cancelInFlight: true)
         case .idle, .failed:
@@ -97,11 +106,12 @@ public struct SettingsFeature {
           // Read all four slices CONCURRENTLY (`async let`), then send the result actions in a FIXED
           // order so the merged load is deterministic to assert in a TestStore (the slices still load in
           // parallel — only the delivery order is pinned).
+          let probeSince = date.now.addingTimeInterval(-Self.healthProbeWindow)
           return .run { [tokenClient, syncRepository, profileRepository, healthKitClient] send in
             async let token = try? await tokenClient.read()
             async let lastSyncDate = try? await syncRepository.lastSync()
             async let constants = loadConstants(profileRepository)
-            async let health = loadHealthStatus(healthKitClient)
+            async let health = loadHealthStatus(healthKitClient, since: probeSince)
             await send(.connectionLoaded(await token))
             await send(.lastSyncLoaded(await lastSyncDate))
             await send(.constantsLoaded(await constants))
@@ -151,12 +161,16 @@ public struct SettingsFeature {
         return .none
 
       case .reconnectTapped:
-        // Clear the bearer token BEFORE bubbling the reset (mirroring the dev-menu reset, review #1.1):
-        // AppFeature's tokenReset handler only routes to onboarding and assumes the You tab already
-        // cleared the session, so without this a restart in the reconnect window would resurrect the
-        // stale token. Then reuse the existing reserved seam (DECISIONS #2) → the parent routes to .connect.
+        // Clear the bearer token, then bubble the reset ONLY on a successful clear (fail-closed,
+        // review #2.1): AppFeature's tokenReset handler routes to onboarding and assumes the session was
+        // cleared, so a failed clear must NOT route — it would leave the stale token to resurrect on
+        // restart. Reuses the existing reserved seam (DECISIONS #2) → the parent routes to .connect.
         return .run { [tokenClient] send in
-          try? await tokenClient.clear()
+          do {
+            try await tokenClient.clear()
+          } catch {
+            return // clear failed → don't route; the old token is still present, the user can retry.
+          }
           await send(.delegate(.tokenReset))
         }
 
@@ -211,15 +225,17 @@ private func loadConstants(
 }
 
 /// Probes HealthKit for the shared/missing status. When HK is unavailable, returns the all-missing
-/// state **without** a delta read. Otherwise reduces a `deltaSamples(since: .distantPast)` probe per
-/// category (emptiness ⇒ not shared — HK masks read grants, §3.3/6.3). A free function so the
-/// `async let` in `onAppear` captures no `self`.
+/// state **without** a delta read. Otherwise reduces a bounded `deltaSamples(since:)` probe per category
+/// (emptiness ⇒ not shared — HK masks read grants, §3.3/6.3); `since` bounds the read to a recent window
+/// (review #2.2) rather than the whole history. A free function so the `async let` in `onAppear` captures
+/// no `self`.
 private func loadHealthStatus(
-  _ client: HealthKitClient
+  _ client: HealthKitClient,
+  since: Date
 ) async -> SettingsFeature.HealthKitStatusState {
   guard client.isHealthDataAvailable() else {
     return HealthStatusInference.healthStatus(from: .empty, status: [:], available: false)
   }
-  let set = (try? await client.deltaSamples(.distantPast)) ?? .empty
+  let set = (try? await client.deltaSamples(since)) ?? .empty
   return HealthStatusInference.healthStatus(from: set, status: client.authorizationStatus(), available: true)
 }

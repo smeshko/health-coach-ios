@@ -22,6 +22,7 @@ struct SettingsLoadTests {
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { profile }
       $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
+      $0.date = .constant(SettingsTestFixtures.now)
     }
 
     await store.send(.onAppear) {
@@ -60,6 +61,7 @@ struct SettingsLoadTests {
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }
       $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
+      $0.date = .constant(SettingsTestFixtures.now)
     }
 
     await store.send(.onAppear) { $0.load = .loading }
@@ -90,6 +92,7 @@ struct SettingsLoadTests {
       $0.syncRepository.lastSync = { nil }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }
       $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
+      $0.date = .constant(SettingsTestFixtures.now)
     }
 
     await store.send(.onAppear) { $0.load = .loading }
@@ -121,6 +124,7 @@ struct SettingsLoadTests {
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { throw Boom() }
       $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
+      $0.date = .constant(SettingsTestFixtures.now)
     }
 
     await store.send(.onAppear) { $0.load = .loading }
@@ -151,6 +155,7 @@ struct SettingsLoadTests {
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }
       $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
+      $0.date = .constant(SettingsTestFixtures.now)
     }
 
     await store.send(.onAppear) { $0.load = .loading }
@@ -194,6 +199,19 @@ struct SettingsLoadTests {
     #expect(cleared.value, "the stored token is cleared on re-connect")
   }
 
+  @Test func test_reconnectTapped_whenClearThrows_doesNotEmitDelegate() async {
+    // Fail-closed (review #2.1): if the token clear fails, do NOT route to onboarding (that would leave
+    // the stale token to resurrect on restart). No delegate is emitted.
+    struct Boom: Error {}
+    let store = TestStore(initialState: SettingsFeature.State()) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.tokenClient.clear = { throw Boom() }
+    }
+    await store.send(.reconnectTapped)
+    // No `receive(\.delegate)` — the failed clear swallows the route. TestStore asserts no further actions.
+  }
+
   @Test func test_onAppear_whenAlreadyLoaded_refreshesLastSyncOnly() async {
     // Re-entering a loaded Settings refreshes the (stale-prone) last-sync time but does NOT re-run the
     // full load / the expensive HK probe (review #1.3 + #1.2 mitigation).
@@ -219,5 +237,31 @@ struct SettingsLoadTests {
     await store.receive(\.lastSyncLoaded) {
       $0.lastSync.lastSyncAt = refreshed
     }
+  }
+
+  @Test func test_onAppear_whenLoaded_refreshReadFails_preservesLastSync() async {
+    // A transient last-sync read failure on reappear must NOT blank a known timestamp to "Never
+    // synced" (review #2.3): only a successful read updates the value.
+    struct Boom: Error {}
+    var initial = SettingsFeature.State()
+    initial.load = .loaded
+    initial.connection.status = .connected(tokenSuffix: "6f2a")
+    initial.connectionResolved = true
+    initial.lastSync.lastSyncAt = SettingsTestFixtures.syncedAt
+    initial.lastSyncResolved = true
+    initial.constants = SettingsTestFixtures.loadedConstants
+    initial.constantsResolved = true
+    initial.health = SettingsTestFixtures.fullGrant
+    initial.healthResolved = true
+
+    let store = TestStore(initialState: initial) {
+      SettingsFeature()
+    } withDependencies: {
+      $0.syncRepository.lastSync = { throw Boom() }
+    }
+
+    await store.send(.onAppear)
+    // No `lastSyncLoaded` received — the failed read is swallowed, the displayed timestamp is preserved.
+    #expect(store.state.lastSync.lastSyncAt == SettingsTestFixtures.syncedAt)
   }
 }

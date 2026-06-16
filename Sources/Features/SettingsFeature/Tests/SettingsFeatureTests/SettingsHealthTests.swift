@@ -141,6 +141,7 @@ struct SettingsHealthTests {
       $0.syncRepository.lastSync = { nil }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }
       $0.healthKitClient = health
+      $0.date = .constant(SettingsTestFixtures.now)
     }
   }
 }
