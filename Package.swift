@@ -140,6 +140,13 @@ let package = Package(
         // The log viewer parses log timestamps back into `Date`s via the shared `LogTimestamp` helper,
         // using the app's canonical Europe/Sofia frame — the same frame the live `LogClient` renders in.
         "CoachCore",
+        // Phase 10.2 production sections: read-only profile constants + connection/HK/last-sync status.
+        // Features depend on repository/data-source INTERFACES only (§3 + the §13/D12 + §4.5 app-spine
+        // carve-out for HealthKitClient/TokenClient) + DomainModels — never *Live/WireModels/GRDB/HealthKit.
+        "DomainModels",
+        "ProfileRepository",
+        "SyncRepository",
+        "HealthKitClient",
       ],
       path: "Sources/Features/SettingsFeature/Sources",
       swiftSettings: [
@@ -975,6 +982,11 @@ let package = Package(
         "SampleData",
         "TokenClient",
         "LogClient",
+        // Phase 10.2: the SettingsFeature load TestStore stubs these interfaces + builds DomainModels.
+        "ProfileRepository",
+        "SyncRepository",
+        "HealthKitClient",
+        "DomainModels",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
       ],
       path: "Sources/Features/SettingsFeature/Tests/SettingsFeatureTests",
@@ -1038,6 +1050,11 @@ let package = Package(
         "SampleData",
         "LogClient",
         "CoachTestSupport",
+        // Phase 10.2 SettingsView snapshots seed DomainModels constants + HealthDataCategory missing sets,
+        // and pin the SyncRepository.lastSync reappear-refresh read.
+        "DomainModels",
+        "HealthKitClient",
+        "SyncRepository",
         .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],

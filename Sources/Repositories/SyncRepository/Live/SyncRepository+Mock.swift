@@ -13,11 +13,19 @@ public extension SyncRepository {
   /// `sync_response.json` with **no HealthKit, no network, and no watermark write** (D25/§7.1). Phase
   /// 4.1's routing wrapper + previews use it to simulate a successful sync with the backend off.
   static func mock(scenario: SyncScenario = .success) -> SyncRepository {
-    SyncRepository(sync: {
-      switch scenario {
-      case .success:
-        try syncResult(SampleData.syncResponse())
+    SyncRepository(
+      sync: {
+        switch scenario {
+        case .success:
+          try syncResult(SampleData.syncResponse())
+        }
+      },
+      lastSync: {
+        switch scenario {
+        case .success:
+          try syncResult(SampleData.syncResponse()).serverTime
+        }
       }
-    })
+    )
   }
 }
