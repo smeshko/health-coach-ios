@@ -68,4 +68,39 @@ struct NotificationClientTests {
     #expect(try await client.requestAuthorization() == .authorized)
     #expect(await client.authorizationStatus() == .authorized)
   }
+
+  // The recording value rejects exactly the intervals the live UNTimeIntervalNotificationTrigger
+  // rejects, so a 10.3 TestStore can't record a schedule production would throw on (review #2.1).
+  @Test(arguments: [
+    NotificationTrigger.timeInterval(seconds: 0, repeats: false),
+    NotificationTrigger.timeInterval(seconds: -5, repeats: false),
+    NotificationTrigger.timeInterval(seconds: .nan, repeats: false),
+    NotificationTrigger.timeInterval(seconds: 30, repeats: true),
+  ])
+  func test_scheduleInvalidTimeInterval_throwsAndRecordsNothing(_ trigger: NotificationTrigger) async {
+    let (client, recorder) = NotificationClient.recording()
+    let req = NotificationRequest(id: "bad", title: "T", body: "B", trigger: trigger)
+
+    await #expect(throws: NotificationSchedulingError.self) {
+      try await client.schedule(req)
+    }
+    #expect(await recorder.pendingIdentifiers() == [], "an invalid schedule records nothing")
+  }
+
+  @Test(arguments: [
+    NotificationTrigger.timeInterval(seconds: 10, repeats: false), // positive one-shot
+    NotificationTrigger.timeInterval(seconds: 60, repeats: true), // 60s repeating boundary
+    NotificationTrigger.calendar(
+      dateComponents: NotificationDateComponents(hour: 7, minute: 30),
+      repeats: true
+    ),
+  ])
+  func test_scheduleValidTrigger_records(_ trigger: NotificationTrigger) async throws {
+    let (client, _) = NotificationClient.recording()
+    let req = NotificationRequest(id: "ok", title: "T", body: "B", trigger: trigger)
+
+    try await client.schedule(req)
+
+    #expect(await client.pendingIdentifiers() == ["ok"])
+  }
 }

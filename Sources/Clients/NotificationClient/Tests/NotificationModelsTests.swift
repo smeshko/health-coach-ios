@@ -50,4 +50,23 @@ struct NotificationModelsTests {
     #expect(NotificationAuthorizationStatus.authorized == .authorized)
     #expect(NotificationAuthorizationStatus.denied != .authorized)
   }
+
+  @Test func test_triggerValidate_rejectsOutOfRangeIntervals() {
+    #expect(throws: NotificationSchedulingError.invalidTimeInterval(seconds: 0, repeats: false)) {
+      try NotificationTrigger.timeInterval(seconds: 0, repeats: false).validate()
+    }
+    #expect(throws: NotificationSchedulingError.invalidTimeInterval(seconds: 30, repeats: true)) {
+      try NotificationTrigger.timeInterval(seconds: 30, repeats: true).validate()
+    }
+  }
+
+  @Test func test_triggerValidate_acceptsValidTriggers() throws {
+    // Positive one-shot, 60s repeating boundary, and any calendar trigger validate cleanly.
+    try NotificationTrigger.timeInterval(seconds: 1, repeats: false).validate()
+    try NotificationTrigger.timeInterval(seconds: 60, repeats: true).validate()
+    try NotificationTrigger.calendar(
+      dateComponents: NotificationDateComponents(weekday: 2, hour: 18, minute: 0),
+      repeats: true
+    ).validate()
+  }
 }

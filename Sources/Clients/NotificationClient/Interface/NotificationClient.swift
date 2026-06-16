@@ -51,7 +51,12 @@ extension NotificationClient: TestDependencyKey {
     let client = NotificationClient(
       requestAuthorization: { .authorized },
       authorizationStatus: { .authorized },
-      schedule: { await recorder.schedule($0) },
+      // Validate up-front, exactly as `NotificationClientLive` does, so a TestStore can't record a
+      // schedule production would reject (review #2.1).
+      schedule: { request in
+        try request.trigger.validate()
+        await recorder.schedule(request)
+      },
       cancel: { await recorder.cancel($0) },
       pendingIdentifiers: { await recorder.pendingIdentifiers() }
     )
