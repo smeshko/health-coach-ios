@@ -1,5 +1,16 @@
 import NotificationClient
 
+extension NotificationAuthorizationStatus {
+  /// The single granted-ness predicate for reminders: `.authorized` and `.provisional` (the OS's quiet-
+  /// deliver state) permit scheduling; `.denied`/`.notDetermined` don't.
+  var isGranted: Bool {
+    switch self {
+    case .authorized, .provisional: true
+    case .denied, .notDetermined: false
+    }
+  }
+}
+
 /// The pure reminder-identity + request-builder helper (Phase 10.3). Owns the two **stable**
 /// notification identifiers and the daily/weekly `NotificationRequest`s, and turns "reminders on/off"
 /// into concrete `NotificationClient` calls — so the reducer (TASK-002) calls one seam and all

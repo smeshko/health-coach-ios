@@ -8,6 +8,7 @@ import Testing
 /// Coverage of the HealthKit empty-delta inference (the shared/missing set is derived from delta
 /// emptiness, NOT the authorization status map — HK masks read grants) + the open-Health-settings deep
 /// link (TASK-003).
+@Suite(.serialized)
 @MainActor
 struct SettingsHealthTests {
   private static let total = HealthStatusInference.displayedCategories.count
@@ -74,6 +75,9 @@ struct SettingsHealthTests {
       $0.healthResolved = true
       $0.load = .loaded
     }
+    await store.receive(\.authorizationStatusLoaded) {
+      $0.notificationAuthorization = .authorized
+    }
     #expect(store.state.health.missingCategories.isEmpty)
   }
 
@@ -95,6 +99,9 @@ struct SettingsHealthTests {
       )
       $0.healthResolved = true
       $0.load = .loaded
+    }
+    await store.receive(\.authorizationStatusLoaded) {
+      $0.notificationAuthorization = .authorized
     }
     #expect(Set(store.state.health.missingCategories) == [.sleep, .vo2Max])
   }
@@ -125,6 +132,9 @@ struct SettingsHealthTests {
       $0.healthResolved = true
       $0.load = .loaded
     }
+    await store.receive(\.authorizationStatusLoaded) {
+      $0.notificationAuthorization = .authorized
+    }
     #expect(deltaCalls.value == 0, "no delta read when HealthKit is unavailable")
     #expect(!store.state.health.available)
   }
@@ -134,6 +144,7 @@ struct SettingsHealthTests {
     let store = TestStore(initialState: SettingsFeature.State()) {
       SettingsFeature()
     } withDependencies: {
+      $0.defaultAppStorage = SettingsTestFixtures.freshAppStorage()
       $0.openURL = OpenURLEffect { url in
         opened.setValue(url)
         return true
@@ -148,6 +159,7 @@ struct SettingsHealthTests {
     TestStore(initialState: SettingsFeature.State()) {
       SettingsFeature()
     } withDependencies: {
+      $0.defaultAppStorage = SettingsTestFixtures.freshAppStorage()
       $0.tokenClient.read = { nil }
       $0.syncRepository.lastSync = { nil }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }

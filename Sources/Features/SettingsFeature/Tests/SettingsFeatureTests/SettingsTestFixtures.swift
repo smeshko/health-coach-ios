@@ -13,6 +13,15 @@ enum SettingsTestFixtures {
   static let now = Date(timeIntervalSince1970: 1_780_900_000)
   private static let epoch = Date(timeIntervalSince1970: 0)
 
+  /// A fresh per-test appStorage suite so the `@Shared(.appStorage)` reminders toggle never leaks between
+  /// tests / real UserDefaults (process-global state — suites are `.serialized`, mirroring WeeklyFeature).
+  static func freshAppStorage() -> UserDefaults {
+    let suiteName = "settings-tests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    return defaults
+  }
+
   static func sampleProfile(recomputeWeek: String? = nil) -> DomainModels.Profile {
     DomainModels.Profile(
       athlete: .init(age: 34, sex: "male", heightCm: 180, goalWeightKg: 75),
