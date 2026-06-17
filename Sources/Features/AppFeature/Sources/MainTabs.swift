@@ -92,7 +92,10 @@ public struct MainTabs {
         return .none
 
       case .settingsRoot(.delegate(.openStrengthTest)):
-        // The Strength-test row asked to open the screen → push it onto the You-tab stack.
+        // The Strength-test row asked to open the screen → push it onto the You-tab stack. De-dupe a
+        // double-tap (review round-2 #1): two stacked editors let a save on the popped-to stale duplicate
+        // overwrite the fresh counts (day/latest-wins upsert). Mirrors the deep-link guard in AppFeature.
+        if case .strengthTest? = state.settings.last { return .none }
         state.settings.append(.strengthTest(StrengthTestFeature.State()))
         return .none
 

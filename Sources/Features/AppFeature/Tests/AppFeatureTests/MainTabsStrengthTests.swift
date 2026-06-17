@@ -72,6 +72,18 @@ struct MainTabsStrengthTests {
     }
   }
 
+  @Test func test_openStrengthTest_doubleTapDoesNotStackTwoScreens() async {
+    // A rapid double-tap on the row must push only one editor (review round-2 #1).
+    let store = TestStore(initialState: MainTabs.State()) {
+      MainTabs()
+    }
+    await store.send(.settingsRoot(.delegate(.openStrengthTest))) {
+      $0.settings.append(.strengthTest(StrengthTestFeature.State()))
+    }
+    // Already on top → the second tap is a no-op (no second element).
+    await store.send(.settingsRoot(.delegate(.openStrengthTest)))
+  }
+
   @Test func test_savedDelegate_popsScreenAndClearsBothFlags() async {
     var initial = MainTabs.State()
     initial.strengthTestDue = true
