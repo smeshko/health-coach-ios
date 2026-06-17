@@ -171,6 +171,40 @@ struct HRZonesRow: View {
   }
 }
 
+/// The STRENGTH section (Phase 10.4) — a single "Strength test" row that delegates up to push the
+/// `StrengthTestFeature` input screen, with a due-dot when a new test is due. The due flag is parent-set
+/// (`MainTabs`, the single deriver); this section never reads `StrengthTestRepository`.
+struct StrengthTestSection: View {
+  let store: StoreOf<SettingsFeature>
+  @State private var taps = 0
+
+  var body: some View {
+    Section {
+      Button {
+        taps += 1
+        store.send(.strengthTestRowTapped)
+      } label: {
+        HStack(spacing: CoachSpacing.spaceSm) {
+          Text("Strength test")
+            .foregroundStyle(.coachForeground)
+          if store.strengthTestDue {
+            Circle().fill(.coachAccent).frame(width: 8, height: 8)
+          }
+          Spacer(minLength: CoachSpacing.spaceSm)
+          Image(systemName: "chevron.forward")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.coachPressable)
+      .sensoryFeedback(.selection, trigger: taps)
+    } header: {
+      Text("Strength")
+    }
+  }
+}
+
 /// The REMINDERS section (Phase 10.3) — the "Good morning check-in" toggle bound to the **effective**
 /// state (so a denied/revoked permission shows OFF, never a lying ON) + an "allow notifications in
 /// Settings" hint when notifications are denied.

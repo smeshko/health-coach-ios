@@ -21,6 +21,10 @@ public struct SettingsFeature {
   /// parallel `reconnectRequested` seam is added.
   public enum Delegate: Equatable {
     case tokenReset
+    /// Asks the shell (`MainTabs`) to push the `StrengthTestFeature` screen onto the You-tab stack
+    /// (Phase 10.4). `SettingsFeature` can't construct a `SettingsPath` value (that would import
+    /// `AppFeature` — a cycle), so the entry row delegates up rather than using `NavigationLink(value:)`.
+    case openStrengthTest
   }
 
   @ObservableState
@@ -46,6 +50,10 @@ public struct SettingsFeature {
     @Shared(.appStorage("settingsRemindersEnabled")) public var remindersEnabled = false
     public var notificationAuthorization: NotificationAuthorizationStatus = .notDetermined
 
+    /// Whether a new strength test is due — drives the entry-row dot. Set by the parent (`MainTabs`, the
+    /// single deriver, Phase 10.4); `SettingsFeature` only renders it and never reads the repository.
+    public var strengthTestDue: Bool = false
+
     /// The toggle's effective ON state — the user wants reminders AND the OS permits them.
     public var remindersEffectivelyOn: Bool { remindersEnabled && notificationAuthorization.isGranted }
     /// Show the "allow notifications in Settings" hint whenever notifications are **explicitly denied**
@@ -67,6 +75,7 @@ public struct SettingsFeature {
     case constantsLoaded(Result<DomainModels.Profile, ProfileLoadFailure>)
     case healthStatusLoaded(HealthKitStatusState)
     case reconnectTapped
+    case strengthTestRowTapped
     case openHealthSettingsTapped
     // Phase 10.3 reminders.
     case openNotificationSettingsTapped
@@ -202,6 +211,10 @@ public struct SettingsFeature {
           }
           await send(.delegate(.tokenReset))
         }
+
+      case .strengthTestRowTapped:
+        // Delegate up — the shell owns the You-tab stack the screen pushes onto (DECISIONS #4).
+        return .send(.delegate(.openStrengthTest))
 
       case .openHealthSettingsTapped:
         return .run { [openURL] _ in

@@ -96,5 +96,19 @@
         })
       }
     }
+
+    /// The Strength-test row in both dot states (Phase 10.4). The full-screen states above push the row
+    /// below the snapshot viewport, so the row + due-dot are pinned by snapshotting the section in a `List`
+    /// in isolation.
+    @Test func test_strengthRow_due() {
+      var state = SettingsFeature.State()
+      state.strengthTestDue = true
+      assertCoachSnapshot(of: List { StrengthTestSection(store: Store(initialState: state) { SettingsFeature() }) })
+    }
+
+    @Test func test_strengthRow_notDue() {
+      let state = SettingsFeature.State()
+      assertCoachSnapshot(of: List { StrengthTestSection(store: Store(initialState: state) { SettingsFeature() }) })
+    }
   }
 #endif

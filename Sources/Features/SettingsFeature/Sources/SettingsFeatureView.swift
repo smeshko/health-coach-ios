@@ -25,6 +25,7 @@ public struct SettingsFeatureView: View {
       ConnectionSection(store: store)
       AppleHealthSection(store: store)
       ProfileConstantsSection(store: store)
+      StrengthTestSection(store: store)
       RemindersSection(store: store)
       #if DEBUG
         Section("Dev") {
