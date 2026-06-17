@@ -274,7 +274,7 @@ private struct TodayContentScroll<Content: View>: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
         TodayHeader(
           dateSubtitle: dateSubtitle,
           syncedLabel: syncedLabel,
@@ -282,7 +282,10 @@ private struct TodayContentScroll<Content: View>: View {
         )
         content
       }
-      .padding(CoachSpacing.spaceLg)
+      // Horizontal screen margin stays roomier than the tightened vertical rhythm so cards keep clear
+      // breathing room from the device edge.
+      .padding(.horizontal, CoachSpacing.spaceLg)
+      .padding(.vertical, CoachSpacing.spaceMd)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .refreshableIf(onRefresh)

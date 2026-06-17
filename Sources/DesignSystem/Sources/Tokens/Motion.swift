@@ -95,6 +95,17 @@ public enum CoachMotion {
   }
 }
 
+public extension AnyTransition {
+  /// The reveal for `disclosure`-token content (an expand/collapse body beneath a header). A fade paired
+  /// with a **top-anchored** scale, so the content unfolds *downward* from the row above as the container's
+  /// height springs open — it never slides up across the header. (The earlier `.move(edge: .top)` offset
+  /// the incoming body up over the headline at the start of the insertion, which is the overlap we fix.)
+  /// Pair with `.coachAnimation(.disclosure, value:)` on the disclosing container, which animates height.
+  static var coachDisclosure: AnyTransition {
+    .opacity.combined(with: .scale(scale: 0.95, anchor: .top))
+  }
+}
+
 public extension View {
   /// Apply a `CoachMotion` token's resolved animation, scoped to `value`, reading the current
   /// `accessibilityReduceMotion` environment (DECISIONS D1). The plain

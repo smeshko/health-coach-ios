@@ -23,33 +23,34 @@ public struct WeeklySessionRow: View {
   }
 
   public var body: some View {
-    HStack(alignment: .top, spacing: CoachSpacing.spaceMd) {
-      if let day = session.suggestedDay {
-        DayBadge(day.label, tone: characterTone, isCore: session.tier == .core)
-      }
-      VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
-        HStack(alignment: .top, spacing: CoachSpacing.spaceSm) {
-          VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-            Text(session.card.label)
-              .font(.coachTextLg)
-              .foregroundStyle(.coachForeground)
-              .fixedSize(horizontal: false, vertical: true)
-            Text(session.intensity.label)
-              .font(.coachTextSm)
-              .foregroundStyle(.coachForegroundMuted)
-          }
-          Spacer(minLength: CoachSpacing.spaceSm)
-          Pill(badgeLabel, tone: characterTone, uppercase: true)
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
+      // Header row: the day chip + title / intensity + the HARD / EASY badge.
+      HStack(alignment: .top, spacing: CoachSpacing.spaceMd) {
+        if let day = session.suggestedDay {
+          DayBadge(day.label, tone: characterTone, isCore: session.tier == .core)
         }
-        TargetLine(session: session, zoneRange: zoneRange)
-        if let duration = durationText {
-          Label(duration, systemImage: "clock")
-            .font(.coachTextSm)
+        VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
+          Text(session.card.label)
+            .font(.coachTextLg)
             .foregroundStyle(.coachForeground)
+            .fixedSize(horizontal: false, vertical: true)
+          Text(session.intensity.label)
+            .font(.coachTextSm)
+            .foregroundStyle(.coachForegroundMuted)
         }
+        Spacer(minLength: CoachSpacing.spaceSm)
+        Pill(badgeLabel, tone: characterTone, uppercase: true)
+      }
+      // The target meter + duration span the **full card width** (under the day chip) — the zone/effort
+      // bar is the row's spine, not an indented detail (`Week · Exercise.png`).
+      TargetLine(session: session, zoneRange: zoneRange)
+      if let duration = durationText {
+        Label(duration, systemImage: "clock")
+          .font(.coachTextSm)
+          .foregroundStyle(.coachForeground)
       }
     }
-    .padding(CoachSpacing.spaceLg)
+    .padding(CoachSpacing.spaceMd)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)

@@ -67,10 +67,11 @@ public struct ReadinessComponentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
 
       // The itemized "why" breakdown (inline, when expanded) — matches `… — Why open.png`. Enters/leaves
-      // with an opacity+slide-from-top transition under the card's `disclosure` animation (Phase 12.3).
+      // with the shared `coachDisclosure` reveal (top-anchored fade+scale) under the card's `disclosure`
+      // animation, so it unfolds downward rather than sliding up over the eyebrow (Phase 12.3).
       if store.isWhyExpanded {
         WhyBreakdown(rows: store.penaltyRows, total: store.readiness.score)
-          .transition(.opacity.combined(with: .move(edge: .top)))
+          .transition(.coachDisclosure)
       }
 
       // The day's lead narrative ("Good morning …") — rendered verbatim by the DS renderer.
@@ -78,7 +79,7 @@ public struct ReadinessComponentView: View {
         NarrativeRenderer(summary)
       }
     }
-    .padding(CoachSpacing.spaceLg)
+    .padding(CoachSpacing.spaceMd)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)

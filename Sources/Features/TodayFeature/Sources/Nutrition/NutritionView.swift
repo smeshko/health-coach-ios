@@ -44,7 +44,7 @@ public struct NutritionView: View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
       // The "TODAY'S FUEL" card — the gauge on a surface card (the caller owns the chrome).
       NutritionGauge(focus: macroFocus)
-        .padding(CoachSpacing.spaceLg)
+        .padding(CoachSpacing.spaceMd)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
           RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)

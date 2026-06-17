@@ -15,7 +15,7 @@ struct WeeklyNutritionView: View {
   let constantsRecomputed: Bool
 
   var body: some View {
-    VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
       // Carb cycling card.
       VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
         VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
@@ -27,24 +27,26 @@ struct WeeklyNutritionView: View {
             .foregroundStyle(.coachForegroundMuted)
         }
         CarbCyclingPattern(dayTypePattern: nutrition.nutrition.dayTypePattern, restDay: nutrition.nutrition.restDay)
+        // The nutrition narrative reads as a soft amber "fuel the work" banner (info glyph + verbatim
+        // prose), not a bare paragraph — matching `Week · Nutrition.png`.
         if !nutrition.narrative.isEmpty {
-          NarrativeRenderer(nutrition.narrative)
+          CarbNarrativeBanner(narrative: nutrition.narrative)
         }
       }
-      .padding(CoachSpacing.spaceLg)
+      .padding(CoachSpacing.spaceMd)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(CardSurface())
 
       // Steady all week constants.
       SectionLead(title: "Steady all week", subtitle: "These stay put while carbs cycle")
       SteadyConstants(nutrition: nutrition.nutrition)
-        .padding(CoachSpacing.spaceLg)
+        .padding(CoachSpacing.spaceMd)
         .background(CardSurface())
 
       // Last week adherence scorecard.
       SectionLead(title: "Last week", subtitle: "How the fueling landed")
       AdherenceScorecard(adherence.scorecardState)
-        .padding(CoachSpacing.spaceLg)
+        .padding(CoachSpacing.spaceMd)
         .background(CardSurface())
 
       if constantsRecomputed {
@@ -114,5 +116,28 @@ private struct ConstantCell: View {
         .foregroundStyle(tint)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+/// The carb-cycling narrative as a soft amber banner — a leading info glyph + the section bodies rendered
+/// **verbatim** (joined, in order) on the `warningSoft` fill, the carb-load amber carried through icon and
+/// text so the "fuel the work, recover the rest" note reads as a tip, not chrome (`Week · Nutrition.png`).
+private struct CarbNarrativeBanner: View {
+  let narrative: [NarrativeSection]
+
+  var body: some View {
+    HStack(alignment: .top, spacing: CoachSpacing.spaceSm) {
+      Image(systemName: "info.circle")
+        .font(.coachTextMd)
+        .foregroundStyle(.coachWarning)
+      Text(narrative.map(\.body).joined(separator: "\n\n"))
+        .font(.coachTextSm)
+        .foregroundStyle(.coachWarning)
+        .fixedSize(horizontal: false, vertical: true)
+      Spacer(minLength: 0)
+    }
+    .padding(CoachSpacing.spaceMd)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(RoundedRectangle(cornerRadius: CoachRadius.md, style: .continuous).fill(.coachWarningSoft))
   }
 }

@@ -57,7 +57,7 @@ public struct YesterdayIntakeView: View {
         YesterdayEmptyState()
       }
     }
-    .padding(CoachSpacing.spaceLg)
+    .padding(CoachSpacing.spaceMd)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)
