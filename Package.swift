@@ -76,6 +76,14 @@ let package = Package(
         // The Week-tab root feature (Epic 9): `MainTabs` composes it and renders `WeeklyView` in place of
         // the 6.1 placeholder. Same-package target dep (no product needed — mirrors TodayFeature).
         "WeeklyFeature",
+        // The strength-test screen (Phase 10.4): the `SettingsPath.strengthTest` case + the You-tab
+        // destination render `StrengthTestView`; the deep-link push constructs its `.State`.
+        "StrengthTestFeature",
+        // The badge deriver reads `strengthTestRepository.current` (`MainTabs` is the single deriver,
+        // DECISIONS #2) — features may depend on repositories (ARCHITECTURE §3; TodayFeature already does).
+        "LocalRepositories",
+        // `isStrengthTestDue` (the ISO-week due rule, TASK-001) for the You-tab badge derivation.
+        "CoachCore",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
         // App-spine observability: emits `.app`/`.lifecycle` log lines (state swaps, session restore,
@@ -932,6 +940,9 @@ let package = Package(
         // The token-reset route test constructs `SettingsFeature.Action.delegate(.tokenReset)` to drive
         // the You-tab → MainTabs → AppFeature bubble.
         "SettingsFeature",
+        // The MainTabs/deep-link tests construct `SettingsPath.State.strengthTest(.init())` and match
+        // `.strengthTest(.delegate(.saved))`, so the test target must import the feature (Phase 10.4).
+        "StrengthTestFeature",
         // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
         "APIClient",
         // The logging tests inject `LogClient.recording(into:)` and assert `.app`/`.lifecycle` entries.
