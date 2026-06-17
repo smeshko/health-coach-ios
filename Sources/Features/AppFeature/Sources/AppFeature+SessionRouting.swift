@@ -34,8 +34,9 @@ extension AppFeature {
       state.route = .onboarding(OnboardingFeature.State(step: .connect(reason: .tokenInvalid)))
       return .none
 
-    case ._restoreSession, ._tokenChecked, .onboarding, .main:
-      // Handled in `AppFeature.body` (launch restore) / the child reducers — never routed here.
+    case ._restoreSession, ._tokenChecked, .notificationOpened, .onboarding, .main:
+      // Handled in `AppFeature.body` (launch restore / deep-link routing) / the child reducers — never
+      // routed here.
       return .none
     }
   }
