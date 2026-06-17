@@ -1243,5 +1243,64 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // The strength-test input feature (Epic 10.4) — the two-numeric-stepper "log today's max" screen the
+    // weekly reminder deep-links into. Mirrors TodayFeature's target shape. Depends on `LocalRepositories`
+    // (the `StrengthTestRepository` it saves through — an interface-less local module, the §4.3 exception)
+    // + `DesignSystem`/`DomainModels`/`CoachCore` (the §3 feature dependency rule) — never a data-source
+    // client, GRDB, HealthKit, WireModels, or `UserNotifications` (the tap glue lives in the app target).
+    .target(
+      name: "StrengthTestFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "LocalRepositories",
+        "DesignSystem",
+        "DomainModels",
+        // `isStrengthTestDue` + `Calendar.europeSofia` (the ISO-week due rule, TASK-001).
+        "CoachCore",
+      ],
+      path: "Sources/Features/StrengthTestFeature/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // StrengthTestFeature exhaustive TestStore (host) — seed-from-`current`, the 0...300 clamp, save →
+    // `save` recorded + `Delegate.saved`, and the `isDue` derivation. Logic only — no snapshot/UIKit
+    // symbols (§4.6 split). Overrides `\.strengthTestRepository`/`\.date`/`\.calendar`.
+    .testTarget(
+      name: "StrengthTestFeatureTests",
+      dependencies: [
+        "StrengthTestFeature",
+        "LocalRepositories",
+        "DomainModels",
+        "CoachCore",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      path: "Sources/Features/StrengthTestFeature/Tests/StrengthTestFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // StrengthTestView snapshots (the due + not-due states, light + dark) — iOS 26 simulator only, via
+    // `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host.
+    // `exclude: ["__Snapshots__"]` keeps the committed references out of the target.
+    .testTarget(
+      name: "StrengthTestFeatureSnapshotTests",
+      dependencies: [
+        "StrengthTestFeature",
+        "CoachTestSupport",
+        "DesignSystem",
+        "CoachCore",
+        // `DomainModels.StrengthTest` is referenced directly to seed the pinned `current` stub —
+        // `StrengthTestFeature` doesn't re-export it, so it must be a direct dep to `import` it.
+        "DomainModels",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/StrengthTestFeature/Tests/StrengthTestFeatureSnapshotTests",
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
   ]
 )
