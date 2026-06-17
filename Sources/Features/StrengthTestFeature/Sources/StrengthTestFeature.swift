@@ -20,16 +20,17 @@ public struct StrengthTestFeature {
     case saved
   }
 
+  /// The save lifecycle. `saving` drives the primary button's busy state; `saved` is the transient
+  /// terminal the view fires its `.success` haptic off (before the parent pops on `Delegate.saved`).
+  /// Nested directly on the reducer (not on `State`) to stay within the 1-level nesting lint.
+  public enum SaveState: Equatable {
+    case idle
+    case saving
+    case saved
+  }
+
   @ObservableState
   public struct State: Equatable {
-    /// The save lifecycle. `saving` drives the primary button's busy state; `saved` is the transient
-    /// terminal the view fires its `.success` haptic off (before the parent pops on `Delegate.saved`).
-    public enum SaveState: Equatable {
-      case idle
-      case saving
-      case saved
-    }
-
     public var maxPushups: Int
     public var maxPullups: Int
     /// Whether a new test is due (no test logged this ISO week) — drives the callout. Derived from the
@@ -97,11 +98,12 @@ public struct StrengthTestFeature {
       case .saveTapped:
         guard state.saveState != .saving else { return .none }
         state.saveState = .saving
-        return .run { [strengthTestRepository, maxPushups = state.maxPushups, maxPullups = state.maxPullups, now = date.now] send in
+        let test = DomainModels.StrengthTest(
+          date: date.now, maxPushups: state.maxPushups, maxPullups: state.maxPullups
+        )
+        return .run { [strengthTestRepository] send in
           do {
-            try await strengthTestRepository.save(
-              DomainModels.StrengthTest(date: now, maxPushups: maxPushups, maxPullups: maxPullups)
-            )
+            try await strengthTestRepository.save(test)
             await send(.saveSucceeded)
           } catch {
             await send(.saveFailed)
