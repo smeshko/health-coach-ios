@@ -25,31 +25,55 @@ public struct StrengthTestView: View {
             .foregroundStyle(.coachForegroundMuted)
         }
 
-        if store.isDue {
+        switch store.loadState {
+        case .loading:
+          // Brief on a local read; an explicit state so a failed read can't masquerade as a saveable
+          // empty test (review #1).
+          HStack {
+            Spacer()
+            ProgressView().tint(.coachAccent)
+            Spacer()
+          }
+          .padding(.vertical, CoachSpacing.spaceLg)
+
+        case .failed:
           InsetCallout(
-            icon: "dumbbell",
-            headline: "It's been a week since your last test",
-            content: "Log today's max — it keeps the trend honest"
+            icon: "exclamationmark.triangle",
+            tone: .warning,
+            headline: "Couldn't load your last test",
+            content: "Check your connection to your data and try again."
           )
-        }
+          SecondaryButton("Try again", icon: "arrow.clockwise") {
+            store.send(.retryTapped)
+          }
 
-        StrengthCard(
-          title: "Max push-ups",
-          value: Binding(get: { store.maxPushups }, set: { store.send(.pushupsChanged($0)) })
-        )
-        StrengthCard(
-          title: "Max pull-ups",
-          value: Binding(get: { store.maxPullups }, set: { store.send(.pullupsChanged($0)) })
-        )
+        case .loaded:
+          if store.isDue {
+            InsetCallout(
+              icon: "dumbbell",
+              headline: "It's been a week since your last test",
+              content: "Log today's max — it keeps the trend honest"
+            )
+          }
 
-        PrimaryButton(
-          "Save strength test",
-          icon: "checkmark",
-          isLoading: store.saveState == .saving
-        ) {
-          store.send(.saveTapped)
+          StrengthCard(
+            title: "Max push-ups",
+            value: Binding(get: { store.maxPushups }, set: { store.send(.pushupsChanged($0)) })
+          )
+          StrengthCard(
+            title: "Max pull-ups",
+            value: Binding(get: { store.maxPullups }, set: { store.send(.pullupsChanged($0)) })
+          )
+
+          PrimaryButton(
+            "Save strength test",
+            icon: "checkmark",
+            isLoading: store.saveState == .saving
+          ) {
+            store.send(.saveTapped)
+          }
+          .padding(.top, CoachSpacing.spaceXs)
         }
-        .padding(.top, CoachSpacing.spaceXs)
       }
       .padding(.horizontal, CoachSpacing.spaceLg)
       .padding(.vertical, CoachSpacing.spaceMd)
@@ -96,7 +120,7 @@ private struct StrengthCard: View {
 #Preview {
   StrengthTestView(
     store: .init(
-      initialState: .init(maxPushups: 42, maxPullups: 11, isDue: true),
+      initialState: .init(loadState: .loaded, maxPushups: 42, maxPullups: 11, isDue: true),
       reducer: StrengthTestFeature.init
     )
   )
