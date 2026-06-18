@@ -46,6 +46,7 @@ private func runSync() async throws -> SyncResult {
   @Dependency(\.checkInRepository) var checkInRepository
   @Dependency(\.strengthTestRepository) var strengthTestRepository
   @Dependency(\.date) var date
+  @Dependency(\.continuousClock) var clock
 
   // 1. Resolve the watermark; an absent row (first-ever sync) → a default with no anchor → backfill.
   let existing = try await database.read { db in
@@ -57,7 +58,14 @@ private func runSync() async throws -> SyncResult {
   let readInstant = date.now
 
   // 3. HK deltas since the anchor. HK-unavailable/partial degrades to an empty set inside the client.
-  let samples = try await healthKit.deltaSamples(anchorDate(existing.anchor))
+  //    Bounded by `healthReadTimeout` (CR-3): `HKSampleQuery`/`HKActivitySummaryQuery` are callback-based
+  //    and ignore cancellation, so a wedged `healthd` would otherwise pin the `.syncing` screen open with
+  //    no automatic recovery (the Cancel button is the manual escape). On timeout this throws BEFORE the
+  //    watermark write below, so the unread window is simply re-read on the next sync — no data loss.
+  let anchor = existing.anchor
+  let samples = try await withSyncTimeout(healthReadTimeout, clock: clock) {
+    try await healthKit.deltaSamples(anchorDate(anchor))
+  }
 
   // 4. Today's check-in (a read failure degrades to nil — the check-in is optional) + the strength
   //    test only when due.
@@ -132,4 +140,57 @@ func anchorDate(_ string: String?) -> Date {
 /// Serialize a read instant for the watermark's `String?` `anchor` column (lossless round-trip).
 func anchorString(_ date: Date) -> String {
   String(date.timeIntervalSince1970)
+}
+
+/// How long the HealthKit delta read may run before the sync gives up (CR-3, release audit 2026-06-18).
+/// Generous enough that a normal — even first-of-the-day — read never trips it, tight enough that a
+/// wedged HealthKit can't pin the `.syncing` screen open forever. The in-screen Cancel button is the
+/// immediate manual escape; this is the automatic backstop.
+let healthReadTimeout: Duration = .seconds(20)
+
+/// Run `operation`, but give up after `duration` and throw `SyncError.transient` rather than awaiting
+/// forever (CR-3). HealthKit's sample/activity queries are callback-based and **ignore task
+/// cancellation**, so cancelling the surrounding task can't unblock a wedged read. This races the
+/// operation against a clock sleep and **abandons** a still-running operation on timeout: whichever
+/// finishes first resumes the continuation (guarded so the other's late result is dropped), so the call
+/// returns even though the underlying read can't be cancelled. The injected `clock` keeps it
+/// deterministic under test (advance a `TestClock` past `duration` to force the timeout branch).
+func withSyncTimeout<T: Sendable>(
+  _ duration: Duration,
+  clock: any Clock<Duration>,
+  _ operation: @escaping @Sendable () async throws -> T
+) async throws -> T {
+  let flag = ResumeOnceFlag()
+  return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+    Task {
+      do {
+        let value = try await operation()
+        if flag.claim() { continuation.resume(returning: value) }
+      } catch {
+        if flag.claim() { continuation.resume(throwing: error) }
+      }
+    }
+    Task {
+      // A cancelled sleep (the success path never advances this clock) just leaves the operation task to
+      // resume the continuation — so swallow the cancellation rather than racing a second resume.
+      guard (try? await clock.sleep(for: duration)) != nil else { return }
+      if flag.claim() { continuation.resume(throwing: SyncError.transient) }
+    }
+  }
+}
+
+/// A one-shot guard so exactly one of the two racing tasks in `withSyncTimeout` resumes the continuation
+/// (a double-resume traps). Foundation `NSLock` mirrors `DevSettingsStore`'s in-process locking; the
+/// `@unchecked Sendable` is sound because every access goes through that lock.
+private final class ResumeOnceFlag: @unchecked Sendable {
+  private let lock = NSLock()
+  private var claimed = false
+  /// True for the first caller only; false thereafter.
+  func claim() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    if claimed { return false }
+    claimed = true
+    return true
+  }
 }

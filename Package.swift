@@ -891,6 +891,9 @@ let package = Package(
         "CoachCore",
         "CoachTestSupport",
         .product(name: "Dependencies", package: "swift-dependencies"),
+        // `TestClock` drives the CR-3 HK-read timeout deterministically (never-advanced in the normal
+        // tests so the timeout never fires; an `ImmediateClock` in the timeout test fires it at once).
+        .product(name: "Clocks", package: "swift-clocks"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryLiveTests",

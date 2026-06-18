@@ -51,4 +51,34 @@ struct MakeLiveTests {
     #expect(survived.count == 1, "the row from the first open survives a re-open")
     #expect(survived.first?.kneePain == 4, "the persisted values are intact across re-open")
   }
+
+  /// CR-2 (release audit 2026-06-18): a corrupt on-disk file must NOT brick the launch. `makeLiveResilient`
+  /// quarantines the bad file and recreates a usable DB, so the app opens instead of crash-looping into a
+  /// reinstall. Mirrors the unique-temp-dir hygiene of the test above.
+  @Test func test_makeLiveResilient_recoversFromCorruptFile_quarantinesIt() async throws {
+    let dir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+      .appendingPathComponent("makeLiveResilientTests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let path = dir.appendingPathComponent("coachapp.sqlite").path
+
+    // Plant a file that is not a valid SQLite database, so the open/migrate path throws.
+    try Data("not a database".utf8).write(to: URL(fileURLWithPath: path))
+
+    // Resilient open must still return a usable, fully-migrated client (no throw, no crash).
+    let recovered = DatabaseClient.makeLiveResilient(path: path)
+    let completed = try await recovered.read { db in try DatabaseClient.migrator.hasCompletedMigrations(db) }
+    #expect(completed, "the recovered DB is freshly created and fully migrated")
+    try await recovered.write { db in
+      try CheckInRecord(date: Self.day, giSymptoms: false, kneePain: 2, illness: false).save(db)
+    }
+    let rows = try await recovered.read { db in try CheckInRecord.fetchAll(db) }
+    #expect(rows.count == 1, "the recovered DB accepts reads and writes")
+
+    // The bad file was moved aside rather than left in place to fail again on the next launch.
+    #expect(
+      FileManager.default.fileExists(atPath: path + ".corrupt"),
+      "the corrupt file is quarantined to a .corrupt sibling"
+    )
+  }
 }
