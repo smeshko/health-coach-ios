@@ -54,6 +54,7 @@ public struct WeeklyView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .background(.coachBackground)
+    .navigationTitle("This Week")
   }
 
   /// "Jun 1 – 7 · a menu, not a schedule" (deload → "… · easy on purpose"). The week range is the plan's
@@ -102,17 +103,16 @@ public struct WeeklyView: View {
 
 // MARK: - Shell chrome
 
-/// The screen header: the large "This Week" title, the week-range subtitle (deload-aware), and the
-/// "Cached — as of …" freshness line when a `.cached` plan is served.
+/// The screen sub-header under the native "This Week" nav title: the week-range subtitle (deload-aware)
+/// and the "Cached — as of …" freshness line when a `.cached` plan is served. (The large "This Week"
+/// title is now the navigation title, so it collapses on scroll instead of scrolling away.) Renders
+/// nothing in the idle/loading/error states, where both lines are nil.
 private struct WeeklyHeader: View {
   let subtitle: String?
   let cachedLabel: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-      Text("This Week")
-        .font(.coachText3xl)
-        .foregroundStyle(.coachForeground)
       if let subtitle {
         Text(subtitle)
           .font(.coachTextMd)

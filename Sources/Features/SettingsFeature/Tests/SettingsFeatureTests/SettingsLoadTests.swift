@@ -1,16 +1,14 @@
 import ComposableArchitecture
 import DomainModels
 import Foundation
-import HealthKitClient
 import Testing
 
 @testable import SettingsFeature
 
 /// Exhaustive `TestStore` coverage of the Phase 10.2 production load: `onAppear` loads the connection,
-/// last-sync, constants, and HealthKit slices concurrently from the stubbed interfaces, sending results
-/// in a fixed order, and `load` settles to `.loaded` once all four resolve (DECISIONS #5). The HK
-/// inference itself is covered in `SettingsHealthTests`; here the HK client is a full-grant stub so the
-/// load orchestration is deterministic.
+/// last-sync, and constants slices concurrently from the stubbed interfaces, sending results in a fixed
+/// order, and `load` settles to `.loaded` once all three resolve (DECISIONS #5). The notification
+/// authorization status is read on the same pass but does not gate the load.
 @Suite(.serialized)
 @MainActor
 struct SettingsLoadTests {
@@ -23,7 +21,6 @@ struct SettingsLoadTests {
       $0.tokenClient.read = { "ahc_live_abcd6f2a" }
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { profile }
-      $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
       $0.date = .constant(SettingsTestFixtures.now)
     }
 
@@ -47,10 +44,6 @@ struct SettingsLoadTests {
         recomputeNoticeWeek: nil
       )
       $0.constantsResolved = true
-    }
-    await store.receive(\.healthStatusLoaded) {
-      $0.health = SettingsTestFixtures.fullGrant
-      $0.healthResolved = true
       $0.load = .loaded
     }
     await store.receive(\.authorizationStatusLoaded) {
@@ -66,7 +59,6 @@ struct SettingsLoadTests {
       $0.tokenClient.read = { nil }
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }
-      $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
       $0.date = .constant(SettingsTestFixtures.now)
     }
 
@@ -82,10 +74,6 @@ struct SettingsLoadTests {
     await store.receive(\.constantsLoaded) {
       $0.constants = SettingsTestFixtures.loadedConstants
       $0.constantsResolved = true
-    }
-    await store.receive(\.healthStatusLoaded) {
-      $0.health = SettingsTestFixtures.fullGrant
-      $0.healthResolved = true
       $0.load = .loaded
     }
     await store.receive(\.authorizationStatusLoaded) {
@@ -101,7 +89,6 @@ struct SettingsLoadTests {
       $0.tokenClient.read = { "ahc_live_abcd6f2a" }
       $0.syncRepository.lastSync = { nil }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }
-      $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
       $0.date = .constant(SettingsTestFixtures.now)
     }
 
@@ -117,10 +104,6 @@ struct SettingsLoadTests {
     await store.receive(\.constantsLoaded) {
       $0.constants = SettingsTestFixtures.loadedConstants
       $0.constantsResolved = true
-    }
-    await store.receive(\.healthStatusLoaded) {
-      $0.health = SettingsTestFixtures.fullGrant
-      $0.healthResolved = true
       $0.load = .loaded
     }
     await store.receive(\.authorizationStatusLoaded) {
@@ -137,7 +120,6 @@ struct SettingsLoadTests {
       $0.tokenClient.read = { "ahc_live_abcd6f2a" }
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { throw Boom() }
-      $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
       $0.date = .constant(SettingsTestFixtures.now)
     }
 
@@ -154,11 +136,6 @@ struct SettingsLoadTests {
       $0.constantsResolved = true
       $0.load = .failed
     }
-    // Health still resolves, but `load` stays `.failed` (settleLoad guards on it).
-    await store.receive(\.healthStatusLoaded) {
-      $0.health = SettingsTestFixtures.fullGrant
-      $0.healthResolved = true
-    }
     await store.receive(\.authorizationStatusLoaded) {
       $0.notificationAuthorization = .authorized
     }
@@ -172,7 +149,6 @@ struct SettingsLoadTests {
       $0.tokenClient.read = { "ahc_live_abcd6f2a" }
       $0.syncRepository.lastSync = { SettingsTestFixtures.syncedAt }
       $0.profileRepository.profile = { SettingsTestFixtures.sampleProfile() }
-      $0.healthKitClient = SettingsTestFixtures.fullGrantClient()
       $0.date = .constant(SettingsTestFixtures.now)
     }
 
@@ -195,10 +171,6 @@ struct SettingsLoadTests {
     await store.receive(\.constantsLoaded) {
       $0.constants = SettingsTestFixtures.loadedConstants
       $0.constantsResolved = true
-    }
-    await store.receive(\.healthStatusLoaded) {
-      $0.health = SettingsTestFixtures.fullGrant
-      $0.healthResolved = true
       $0.load = .loaded
     }
     await store.receive(\.authorizationStatusLoaded) {

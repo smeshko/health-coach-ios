@@ -4,10 +4,12 @@ import DomainModels
 import Foundation
 import SwiftUI
 
-/// The CONNECTION section — coach-connection state, the masked access token, last-sync time, the
-/// "provisioned by your coach" footnote, and a Re-connect affordance (the only connection action — there
-/// is no account/logout). The design doesn't show an explicit re-connect control, but the epic AC
-/// ("re-connecting is reachable") requires one.
+/// The CONNECTION section — coach-connection state, last-sync time (only when there's a real timestamp),
+/// the "provisioned by your coach" footnote, and a Re-connect affordance (the only connection action —
+/// there is no account/logout). The design doesn't show an explicit re-connect control, but the epic AC
+/// ("re-connecting is reachable") requires one. The masked-access-token row was dropped (review) — a
+/// last-4 suffix carries no user value; and an empty "Last sync" is hidden rather than shown as a
+/// "Never synced" placeholder.
 struct ConnectionSection: View {
   let store: StoreOf<SettingsFeature>
   @Dependency(\.calendar) var calendar
@@ -22,8 +24,9 @@ struct ConnectionSection: View {
         Spacer(minLength: CoachSpacing.spaceSm)
         ConnectionStatusBadge(status: store.connection.status)
       }
-      SettingRow(title: "Access token", value: accessTokenLabel)
-      SettingRow(title: "Last sync", value: lastSyncLabel)
+      if let lastSyncAt = store.lastSync.lastSyncAt {
+        SettingRow(title: "Last sync", value: formatLastSync(lastSyncAt, now: date.now, calendar: calendar))
+      }
       Button {
         reconnectTaps += 1
         store.send(.reconnectTapped)
@@ -39,53 +42,6 @@ struct ConnectionSection: View {
       Text("Connection")
     } footer: {
       Text("Provisioned by your coach — no account, password or sign-out.")
-    }
-  }
-
-  private var accessTokenLabel: String {
-    if case let .connected(suffix) = store.connection.status {
-      return "ahc_live ····\(suffix)"
-    }
-    return "—"
-  }
-
-  private var lastSyncLabel: String {
-    formatLastSync(store.lastSync.lastSyncAt, now: date.now, calendar: calendar)
-  }
-}
-
-/// The APPLE HEALTH section — a "shared N of M" count + a "Manage in Health settings" deep link shown
-/// only when categories are missing (or HealthKit is unavailable).
-struct AppleHealthSection: View {
-  let store: StoreOf<SettingsFeature>
-  @State private var manageTaps = 0
-
-  var body: some View {
-    Section {
-      SettingRow(
-        title: "Categories shared",
-        value: "\(store.health.sharedCount) of \(store.health.totalCount)"
-      )
-      if !store.health.missingCategories.isEmpty || !store.health.available {
-        Button {
-          manageTaps += 1
-          store.send(.openHealthSettingsTapped)
-        } label: {
-          HStack {
-            Text("Manage in Health settings")
-              .foregroundStyle(.coachAccent)
-            Spacer(minLength: CoachSpacing.spaceSm)
-            Image(systemName: "arrow.up.right")
-              .font(.coachTextSm)
-              .foregroundStyle(.coachAccent)
-          }
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.coachPressable)
-        .sensoryFeedback(.selection, trigger: manageTaps)
-      }
-    } header: {
-      Text("Apple Health")
     }
   }
 }

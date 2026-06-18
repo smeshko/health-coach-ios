@@ -49,8 +49,6 @@ struct SettingsReconnectRefreshTests {
     initial.lastSyncResolved = true
     initial.constants = SettingsTestFixtures.loadedConstants
     initial.constantsResolved = true
-    initial.health = SettingsTestFixtures.fullGrant
-    initial.healthResolved = true
 
     let refreshed = Date(timeIntervalSince1970: 1_790_000_000)
     let store = TestStore(initialState: initial) {
@@ -81,8 +79,6 @@ struct SettingsReconnectRefreshTests {
     initial.lastSyncResolved = true
     initial.constants = SettingsTestFixtures.loadedConstants
     initial.constantsResolved = true
-    initial.health = SettingsTestFixtures.fullGrant
-    initial.healthResolved = true
 
     let store = TestStore(initialState: initial) {
       SettingsFeature()
