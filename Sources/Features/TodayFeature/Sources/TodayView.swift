@@ -140,7 +140,22 @@ public struct TodayView: View {
     // this body type-checkable — semantic feedback keyed on observable `briefState` transitions.
     .modifier(BriefSuccessHaptics(signal: briefSignal))
     .background(.coachBackground)
+    .navigationTitle("Today")
+    // Loading takeovers stay chrome-free — hide the nav bar there; every other state keeps the title.
+    // `#if os(iOS)`: `.navigationBar` placement is macOS-unavailable; this fidelity is iOS-snapshot-only.
+    #if os(iOS)
+      .toolbar(loadingTakeover ? .hidden : .automatic, for: .navigationBar)
+    #endif
   }
+
+  #if os(iOS)
+    private var loadingTakeover: Bool {
+      switch store.briefState {
+      case .idle, .syncing, .generating: true
+      case .checkInRequired, .ready, .error, .syncFailed: false
+      }
+    }
+  #endif
 
   /// Drives the two `.success` haptics off observable `briefState` transitions (Phase 12.3, D4) — the
   /// payload-free `caseID` plus the one extra bit the brief-ready haptic needs (`.ready` freshness), so
@@ -223,7 +238,9 @@ private func errorDisplay(for error: BriefError) -> ErrorDisplay {
 
 // MARK: - Shell chrome
 
-/// The screen header: large "Today" title, the Europe/Sofia date subtitle, and the trailing synced pill.
+/// The screen sub-header under the native "Today" nav title: the Europe/Sofia date subtitle and the
+/// trailing synced pill. (The large "Today" title is now the navigation title, so it collapses on scroll
+/// rather than scrolling away with the content.)
 private struct TodayHeader: View {
   let dateSubtitle: String
   let syncedLabel: String?
@@ -232,14 +249,9 @@ private struct TodayHeader: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline) {
-      VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-        Text("Today")
-          .font(.coachText3xl)
-          .foregroundStyle(.coachForeground)
-        Text(dateSubtitle)
-          .font(.coachTextMd)
-          .foregroundStyle(.coachForegroundMuted)
-      }
+      Text(dateSubtitle)
+        .font(.coachTextMd)
+        .foregroundStyle(.coachForegroundMuted)
       Spacer(minLength: CoachSpacing.spaceSm)
       if isBackgroundRefreshing {
         // The quiet "Updating…" status during a background refresh (Phase 12.1) — a tiny spinner + a
@@ -274,7 +286,7 @@ private struct TodayContentScroll<Content: View>: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
         TodayHeader(
           dateSubtitle: dateSubtitle,
           syncedLabel: syncedLabel,
@@ -282,7 +294,10 @@ private struct TodayContentScroll<Content: View>: View {
         )
         content
       }
-      .padding(CoachSpacing.spaceLg)
+      // Horizontal screen margin stays roomier than the tightened vertical rhythm so cards keep clear
+      // breathing room from the device edge.
+      .padding(.horizontal, CoachSpacing.spaceLg)
+      .padding(.vertical, CoachSpacing.spaceMd)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .refreshableIf(onRefresh)

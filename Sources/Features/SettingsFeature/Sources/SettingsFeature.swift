@@ -1,7 +1,6 @@
 import ComposableArchitecture
 import DomainModels
 import Foundation
-import HealthKitClient
 import NotificationClient
 import ProfileRepository
 import Sharing
@@ -10,9 +9,10 @@ import TokenClient
 
 /// The You-tab root reducer (ARCHITECTURE §4.5 / §10). Created minimal in Phase 7.4 (the `tokenReset`
 /// delegate seam + a `#if DEBUG` DEV section); **expanded in Phase 10.2** with the production CONNECTION
-/// / APPLE HEALTH / PROFILE sections — read-only display slices loaded once on `onAppear` from the
-/// repository/data-source **interfaces** (DECISIONS #3/#5). The REMINDERS section is Phase 10.3. The
-/// `#if DEBUG` DEV slice (dev menu + log viewer) is retained unchanged.
+/// / PROFILE sections — read-only display slices loaded once on `onAppear` from the repository/data-source
+/// **interfaces** (DECISIONS #3/#5). The REMINDERS section is Phase 10.3. The "Apple Health" categories
+/// section (and its HealthKit presence-probe) was dropped in review. The `#if DEBUG` DEV slice (dev menu +
+/// log viewer) is retained unchanged.
 @Reducer
 public struct SettingsFeature {
   /// Delegate actions the shell (`MainTabs` → `AppFeature`) listens for. `tokenReset` asks the root to
@@ -21,23 +21,25 @@ public struct SettingsFeature {
   /// parallel `reconnectRequested` seam is added.
   public enum Delegate: Equatable {
     case tokenReset
+    /// Asks the shell (`MainTabs`) to push the `StrengthTestFeature` screen onto the You-tab stack
+    /// (Phase 10.4). `SettingsFeature` can't construct a `SettingsPath` value (that would import
+    /// `AppFeature` — a cycle), so the entry row delegates up rather than using `NavigationLink(value:)`.
+    case openStrengthTest
   }
 
   @ObservableState
   public struct State: Equatable {
     public var load: LoadState = .idle
     public var connection: ConnectionState = .init()
-    public var health: HealthKitStatusState = .init()
     public var lastSync: LastSyncState = .init()
     public var constants: ConstantsState = .init()
 
-    // Load-gate bookkeeping: each of the four `onAppear` effects flips its flag; `settleLoad` sets
-    // `load = .loaded` once all four are resolved and none failed — so the transition lives in one
+    // Load-gate bookkeeping: each of the three `onAppear` slices flips its flag; `settleLoad` sets
+    // `load = .loaded` once all three are resolved and none failed — so the transition lives in one
     // place and is independent of which effect resolves last (the merged effects arrive out of order).
     var connectionResolved = false
     var lastSyncResolved = false
     var constantsResolved = false
-    var healthResolved = false
 
     // Phase 10.3 reminders. `remindersEnabled` is the user's persisted **intent** (feature-local
     // appStorage; the key is dotless — swift-sharing rejects `.` for key-value observation, per the
@@ -45,6 +47,10 @@ public struct SettingsFeature {
     // toggle is `intent ∧ isGranted`, so a system-revoked permission shows OFF without a lying ON.
     @Shared(.appStorage("settingsRemindersEnabled")) public var remindersEnabled = false
     public var notificationAuthorization: NotificationAuthorizationStatus = .notDetermined
+
+    /// Whether a new strength test is due — drives the entry-row dot. Set by the parent (`MainTabs`, the
+    /// single deriver, Phase 10.4); `SettingsFeature` only renders it and never reads the repository.
+    public var strengthTestDue: Bool = false
 
     /// The toggle's effective ON state — the user wants reminders AND the OS permits them.
     public var remindersEffectivelyOn: Bool { remindersEnabled && notificationAuthorization.isGranted }
@@ -65,9 +71,8 @@ public struct SettingsFeature {
     case connectionLoaded(String?)
     case lastSyncLoaded(Date?)
     case constantsLoaded(Result<DomainModels.Profile, ProfileLoadFailure>)
-    case healthStatusLoaded(HealthKitStatusState)
     case reconnectTapped
-    case openHealthSettingsTapped
+    case strengthTestRowTapped
     // Phase 10.3 reminders.
     case openNotificationSettingsTapped
     case remindersToggled(Bool)
@@ -82,7 +87,6 @@ public struct SettingsFeature {
 
   @Dependency(\.profileRepository) var profileRepository
   @Dependency(\.syncRepository) var syncRepository
-  @Dependency(\.healthKitClient) var healthKitClient
   @Dependency(\.tokenClient) var tokenClient
   @Dependency(\.notificationClient) var notificationClient
   @Dependency(\.openURL) var openURL
@@ -91,12 +95,6 @@ public struct SettingsFeature {
   // `reminders` = explicit user enable/disable; `reconcile` = the background appear/scene-active heal.
   // Distinct so a background reconcile can never cancel an in-flight user enable (review #3).
   private enum CancelID { case load, reminders, reconcile }
-
-  /// The HealthKit presence-probe window. The status read only needs "did this category produce any
-  /// sample recently", so it reads a bounded recent window rather than the whole history (review #2.2) —
-  /// a category with no sample in this window shows as "not shared yet" (the plan's accepted
-  /// emptiness-framing). 30 days comfortably covers an active user's core signals.
-  private static let healthProbeWindow: TimeInterval = 30 * 24 * 60 * 60
 
   public init() {}
 
@@ -124,26 +122,22 @@ public struct SettingsFeature {
           }
           .cancellable(id: CancelID.load, cancelInFlight: true)
         case .idle, .failed:
-          // First load (or a retry after failure): load all four slices, including the one-time HK probe.
+          // First load (or a retry after failure): load the three display slices.
           state.load = .loading
           state.connectionResolved = false
           state.lastSyncResolved = false
           state.constantsResolved = false
-          state.healthResolved = false
-          // Read all four slices CONCURRENTLY (`async let`), then send the result actions in a FIXED
-          // order so the merged load is deterministic to assert in a TestStore (the slices still load in
-          // parallel — only the delivery order is pinned).
-          let probeSince = date.now.addingTimeInterval(-Self.healthProbeWindow)
-          return .run { [tokenClient, syncRepository, profileRepository, healthKitClient, notificationClient] send in
+          // Read all slices CONCURRENTLY (`async let`), then send the result actions in a FIXED order so
+          // the merged load is deterministic to assert in a TestStore (the slices still load in parallel —
+          // only the delivery order is pinned).
+          return .run { [tokenClient, syncRepository, profileRepository, notificationClient] send in
             async let token = try? await tokenClient.read()
             async let lastSyncDate = try? await syncRepository.lastSync()
             async let constants = loadConstants(profileRepository)
-            async let health = loadHealthStatus(healthKitClient, since: probeSince)
             async let auth = notificationClient.authorizationStatus()
             await send(.connectionLoaded(token))
             await send(.lastSyncLoaded(lastSyncDate))
             await send(.constantsLoaded(constants))
-            await send(.healthStatusLoaded(health))
             await send(.authorizationStatusLoaded(auth))
           }
           .cancellable(id: CancelID.load, cancelInFlight: true)
@@ -183,12 +177,6 @@ public struct SettingsFeature {
         state.load = .failed
         return .none
 
-      case let .healthStatusLoaded(status):
-        state.health = status
-        state.healthResolved = true
-        settleLoad(&state)
-        return .none
-
       case .reconnectTapped:
         // Clear the bearer token, then bubble the reset ONLY on a successful clear (fail-closed,
         // review #2.1): AppFeature's tokenReset handler routes to onboarding and assumes the session was
@@ -203,11 +191,9 @@ public struct SettingsFeature {
           await send(.delegate(.tokenReset))
         }
 
-      case .openHealthSettingsTapped:
-        return .run { [openURL] _ in
-          guard let url = URL(string: "x-apple-health://") else { return }
-          await openURL(url)
-        }
+      case .strengthTestRowTapped:
+        // Delegate up — the shell owns the You-tab stack the screen pushes onto (DECISIONS #4).
+        return .send(.delegate(.openStrengthTest))
 
       case .openNotificationSettingsTapped:
         // "app-settings:" (UIApplication.openSettingsURLString) opens this app's iOS Settings page, where
@@ -321,10 +307,10 @@ public struct SettingsFeature {
   }
 
   /// Sets `load = .loaded` once every slice has resolved and none failed. Order-independent: each of the
-  /// four load result handlers calls this after flipping its own slice's resolved flag.
+  /// three load result handlers calls this after flipping its own slice's resolved flag.
   private func settleLoad(_ state: inout State) {
     guard state.load != .failed else { return }
-    if state.connectionResolved, state.lastSyncResolved, state.constantsResolved, state.healthResolved {
+    if state.connectionResolved, state.lastSyncResolved, state.constantsResolved {
       state.load = .loaded
     }
   }
@@ -340,20 +326,4 @@ private func loadConstants(
   } catch {
     return .failure(.failed)
   }
-}
-
-/// Probes HealthKit for the shared/missing status. When HK is unavailable, returns the all-missing
-/// state **without** a delta read. Otherwise reduces a bounded `deltaSamples(since:)` probe per category
-/// (emptiness ⇒ not shared — HK masks read grants, §3.3/6.3); `since` bounds the read to a recent window
-/// (review #2.2) rather than the whole history. A free function so the `async let` in `onAppear` captures
-/// no `self`.
-private func loadHealthStatus(
-  _ client: HealthKitClient,
-  since: Date
-) async -> SettingsFeature.HealthKitStatusState {
-  guard client.isHealthDataAvailable() else {
-    return HealthStatusInference.healthStatus(from: .empty, status: [:], available: false)
-  }
-  let set = await (try? client.deltaSamples(since)) ?? .empty
-  return HealthStatusInference.healthStatus(from: set, status: client.authorizationStatus(), available: true)
 }

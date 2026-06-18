@@ -69,7 +69,10 @@ public struct WeekRhythmRow: View {
           }
         }
       }
+      // The dots are centered in 1/7-width columns, so the first dot sits ~half a column in from the edge;
+      // inset the legend by the same so its leading dot lines up under the Monday dot, not the card edge.
       Legend()
+        .padding(.leading, CoachSpacing.spaceMd)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

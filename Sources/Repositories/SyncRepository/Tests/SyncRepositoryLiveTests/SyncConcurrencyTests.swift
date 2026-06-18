@@ -1,4 +1,5 @@
 import APIClient
+import Clocks
 import CoachCore
 import Database
 import Dependencies
@@ -45,7 +46,6 @@ struct SyncConcurrencyTests {
     let callCount = LockIsolated(0)
     let releaseConts = LockIsolated<[Int: AsyncStream<Void>.Continuation]>([:])
     let entered = AsyncStream.makeStream(of: Int.self)
-    let serverTimes = [Date(timeIntervalSince1970: 1000), Date(timeIntervalSince1970: 2000)]
 
     let healthKit = HealthKitClient(
       isHealthDataAvailable: { true },
@@ -62,12 +62,16 @@ struct SyncConcurrencyTests {
       releaseConts.withValue { $0[index] = releaseCont }
       entered.continuation.yield(index) // signal: this call read the seed and is parked at the POST
       for await _ in releaseStream { break }
-      return syncResponse(serverTime: serverTimes[index])
+      // Distinct serverTime per call reveals which write landed last (index 0 → 1000, index 1 → 2000).
+      return syncResponse(serverTime: Date(timeIntervalSince1970: index == 0 ? 1000 : 2000))
     })
 
     try await withDependencies {
       $0.useEuropeSofia()
       $0.date = .constant(Self.now)
+      // Never-advanced TestClock: the CR-3 HK-read timeout's sleep suspends forever, so the (immediate)
+      // stub read wins — the concurrency characterization is unaffected by the timeout wrapper.
+      $0.continuousClock = TestClock()
       $0.healthKitClient = healthKit
       $0.apiClient = gatedAPI
       $0.database = db

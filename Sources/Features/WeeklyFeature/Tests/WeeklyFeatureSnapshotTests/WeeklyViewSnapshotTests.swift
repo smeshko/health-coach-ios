@@ -17,6 +17,7 @@
   import Foundation
   import SampleData
   import SnapshotTesting
+  import SwiftUI
   import Testing
 
   @testable import WeeklyFeature
@@ -54,8 +55,12 @@
       )
     }
 
-    private func view(_ state: WeeklyFeature.State) -> WeeklyView {
-      WeeklyView(store: Store(initialState: state) { WeeklyFeature() })
+    /// Wrapped in a `NavigationStack` so the native `.navigationTitle("This Week")` renders in the capture
+    /// (the tab hosts each screen in its own stack — `MainTabsView`).
+    private func view(_ state: WeeklyFeature.State) -> some View {
+      NavigationStack {
+        WeeklyView(store: Store(initialState: state) { WeeklyFeature() })
+      }
     }
 
     @Test func test_normalWeek() throws {

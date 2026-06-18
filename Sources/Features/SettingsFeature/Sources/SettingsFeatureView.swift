@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import DesignSystem
 import SwiftUI
 #if DEBUG
   import DesignSystemGallery
@@ -21,11 +22,18 @@ public struct SettingsFeatureView: View {
 
   public var body: some View {
     List {
-      // Production sections (Phase 10.2 CONNECTION/APPLE HEALTH/PROFILE + Phase 10.3 REMINDERS).
+      // Production sections: CONNECTION, STRENGTH (#2 — review), PROFILE (Phase 10.2), REMINDERS
+      // (Phase 10.3). The APPLE HEALTH "categories shared" section was dropped (review) along with its
+      // probe. Rows sit on `coachSurface` over a `coachBackground` page so the You tab matches the
+      // Today/Week tabs (hides the system grouped-grey List background).
       ConnectionSection(store: store)
-      AppleHealthSection(store: store)
+        .listRowBackground(Color.coachSurface)
+      StrengthTestSection(store: store)
+        .listRowBackground(Color.coachSurface)
       ProfileConstantsSection(store: store)
+        .listRowBackground(Color.coachSurface)
       RemindersSection(store: store)
+        .listRowBackground(Color.coachSurface)
       #if DEBUG
         Section("Dev") {
           // The dev menu is TCA-routed (state-driven), so it's a Button with a manual disclosure chevron
@@ -54,8 +62,11 @@ public struct SettingsFeatureView: View {
             DesignSystemGalleryList()
           }
         }
+        .listRowBackground(Color.coachSurface)
       #endif
     }
+    .scrollContentBackground(.hidden)
+    .background(Color.coachBackground)
     .navigationTitle("Settings")
     .onAppear { store.send(.onAppear) }
     // Returning from iOS Settings (the "allow notifications" hint) backgrounds the app without

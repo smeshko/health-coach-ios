@@ -61,7 +61,7 @@ public struct SessionCard: View {
         )
       }
     }
-    .padding(CoachSpacing.spaceLg)
+    .padding(CoachSpacing.spaceMd)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: CoachRadius.card, style: .continuous)

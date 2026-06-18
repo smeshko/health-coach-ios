@@ -20,6 +20,11 @@ import TokenClient
 /// imported. Everything below the app target depends on interfaces; the live values are installed here.
 @main
 struct CoachApp: App {
+  /// The `AppDelegate` owns the single `AppFeature` `Store` (so the notification-tap delegate can reach
+  /// it, Phase 10.4); `body` reads it back here. See `AppDelegate` for why its store initializer running
+  /// before this `init()`'s `prepareDependencies` is harmless.
+  @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
   init() {
     // DEBUG first-launch default: seed mock=true when nothing is persisted yet; no-op in RELEASE. Must
     // run BEFORE dependencies resolve `devSettings`, so the routed repos below read the seeded flag. The
@@ -55,7 +60,10 @@ struct CoachApp: App {
 
   var body: some Scene {
     WindowGroup {
-      AppView(store: Store(initialState: AppFeature.State()) { AppFeature() })
+      // The single store, owned by the AppDelegate — not constructed inline (so the notification delegate
+      // and the view share one store). Launch/restore is unchanged: AppView's `.task` still fires
+      // `_restoreSession`/`_appWillAppear` once each.
+      AppView(store: appDelegate.store)
     }
   }
 }

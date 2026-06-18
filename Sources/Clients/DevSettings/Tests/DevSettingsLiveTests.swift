@@ -55,7 +55,7 @@ struct DevSettingsStoreTests {
     #expect(dev.scenario(.dailyBrief) == DevEndpoint.dailyBrief.defaultScenario)
   }
 
-  @Test func test_seedFirstLaunchDefault_seedsMockTrueWhenNothingPersisted() {
+  @Test func test_seedFirstLaunchDefault_seedsMockFalseWhenNothingPersisted() {
     let (suite, name) = freshSuite()
     defer { suite.removePersistentDomain(forName: name) }
     let store = DevSettingsStore(defaults: suite)
@@ -63,7 +63,7 @@ struct DevSettingsStoreTests {
 
     DevSettings.seedFirstLaunchDefault(defaults: suite)
     #expect(store.hasPersistedMock(), "seed should write the flag on first launch")
-    #expect(store.readMock(), "DEBUG first-launch default should be true")
+    #expect(!store.readMock(), "DEBUG first-launch default is now live (false), not mock")
   }
 
   @Test func test_seedFirstLaunchDefault_doesNotClobberPersistedFalse() {

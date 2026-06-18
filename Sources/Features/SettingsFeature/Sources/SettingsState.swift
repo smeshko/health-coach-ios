@@ -1,6 +1,5 @@
 import DomainModels
 import Foundation
-import HealthKitClient
 
 /// The production state slices for the You-tab Settings surface (Phase 10.2). Modelled as plain
 /// `Equatable` value slices on the one `SettingsFeature` reducer (DECISIONS #5) — read-only display
@@ -27,27 +26,6 @@ public extension SettingsFeature {
     public var status: ConnectionStatus
     public init(status: ConnectionStatus = .unknown) {
       self.status = status
-    }
-  }
-
-  /// The Apple-Health status: a "shared N of M" count + the inferred-missing set (which drives the
-  /// "Manage in Health settings" deep link). `available == false` ⇒ HealthKit unavailable on device.
-  struct HealthKitStatusState: Equatable, Sendable {
-    public var available: Bool
-    public var sharedCount: Int
-    public var totalCount: Int
-    public var missingCategories: [HealthDataCategory]
-
-    public init(
-      available: Bool = true,
-      sharedCount: Int = 0,
-      totalCount: Int = 0,
-      missingCategories: [HealthDataCategory] = []
-    ) {
-      self.available = available
-      self.sharedCount = sharedCount
-      self.totalCount = totalCount
-      self.missingCategories = missingCategories
     }
   }
 

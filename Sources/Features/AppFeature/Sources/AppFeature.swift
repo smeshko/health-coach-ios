@@ -2,6 +2,7 @@ import APIClient
 import ComposableArchitecture
 import LogClient
 import OnboardingFeature
+import StrengthTestFeature
 import TokenClient
 
 /// The app root (ARCHITECTURE §10 / D7): the `route` is a sum type that is **either** onboarding **or**
@@ -71,6 +72,10 @@ public struct AppFeature {
   public enum Action {
     case onboarding(OnboardingFeature.Action)
     case main(MainTabs.Action)
+    /// A tapped local notification, forwarded by the app-target `UNUserNotificationCenterDelegate`
+    /// (Phase 10.4) with the request identifier. The app-layer half of the 10.3 deep-link seam; kept
+    /// driveable purely from a `String` so the mapping is fully unit-testable.
+    case notificationOpened(identifier: String)
     // Internal actions use TCA's `_`-prefix convention (not part of the feature's public contract);
     // the leading underscore trips `identifier_name`, so scope a disable to these two cases.
     // swiftlint:disable identifier_name
@@ -94,6 +99,14 @@ public struct AppFeature {
   /// contained by TCA's `ifCaseLet` child-effect teardown on the `.main → .onboarding` swap (pinned
   /// by the 11.6 child-teardown test), not by a dedicated cancel ID.
   public enum CancelID: Hashable, Sendable { case sessionStream }
+
+  /// Notification request identifiers the app routes on — the wire strings the 10.3 `ReminderScheduler`
+  /// schedules. Held here as named constants rather than importing `SettingsFeature`'s internal
+  /// `ReminderID` (the project's wire-raw-string convention; an `AppFeature → SettingsFeature` import for
+  /// an internal would also be the wrong coupling).
+  private enum NotificationRoute {
+    static let weeklyStrengthTest = "reminder.weekly-strength-test"
+  }
 
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.tokenClient) var tokenClient
@@ -149,6 +162,22 @@ public struct AppFeature {
         }
         log.info("Launch token absent — falling back to onboarding", category: .app)
         state.route = .onboarding(OnboardingFeature.State())
+        return .none
+      case let .notificationOpened(identifier):
+        // The app-layer half of the 10.3 deep-link seam. Only the weekly strength-test reminder routes;
+        // the morning check-in reminder needs no route (fire-and-open). Map by the literal wire string —
+        // `AppFeature` doesn't import `SettingsFeature`'s internal `ReminderID` (wire-raw-string convention).
+        guard identifier == NotificationRoute.weeklyStrengthTest else { return .none }
+        // A session-gated You-tab screen can only land on `.main`. Mutate the unwrapped `.main` state
+        // explicitly (not via `mainRoute?`, which is a silent no-op while onboarding); a tap while
+        // onboarding has nowhere to land, so it's dropped (accepted v1 behavior — PLAN.md:Risks).
+        guard case var .main(main) = state.route else { return .none }
+        main.selectedTab = .settings
+        // De-dupe: don't stack a second strength-test screen if it's already on top (a double-tap).
+        let alreadyOpen: Bool
+        if case .strengthTest? = main.settings.last { alreadyOpen = true } else { alreadyOpen = false }
+        if !alreadyOpen { main.settings.append(.strengthTest(StrengthTestFeature.State())) }
+        state.route = .main(main)
         return .none
       case .onboarding, .main:
         return .none

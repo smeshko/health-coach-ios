@@ -76,6 +76,14 @@ let package = Package(
         // The Week-tab root feature (Epic 9): `MainTabs` composes it and renders `WeeklyView` in place of
         // the 6.1 placeholder. Same-package target dep (no product needed — mirrors TodayFeature).
         "WeeklyFeature",
+        // The strength-test screen (Phase 10.4): the `SettingsPath.strengthTest` case + the You-tab
+        // destination render `StrengthTestView`; the deep-link push constructs its `.State`.
+        "StrengthTestFeature",
+        // The badge deriver reads `strengthTestRepository.current` (`MainTabs` is the single deriver,
+        // DECISIONS #2) — features may depend on repositories (ARCHITECTURE §3; TodayFeature already does).
+        "LocalRepositories",
+        // `isStrengthTestDue` (the ISO-week due rule, TASK-001) for the You-tab badge derivation.
+        "CoachCore",
         // Shell views (onboarding + tab bar) use design tokens/primitives.
         "DesignSystem",
         // App-spine observability: emits `.app`/`.lifecycle` log lines (state swaps, session restore,
@@ -883,6 +891,9 @@ let package = Package(
         "CoachCore",
         "CoachTestSupport",
         .product(name: "Dependencies", package: "swift-dependencies"),
+        // `TestClock` drives the CR-3 HK-read timeout deterministically (never-advanced in the normal
+        // tests so the timeout never fires; an `ImmediateClock` in the timeout test fires it at once).
+        .product(name: "Clocks", package: "swift-clocks"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Repositories/SyncRepository/Tests/SyncRepositoryLiveTests",
@@ -932,6 +943,9 @@ let package = Package(
         // The token-reset route test constructs `SettingsFeature.Action.delegate(.tokenReset)` to drive
         // the You-tab → MainTabs → AppFeature bubble.
         "SettingsFeature",
+        // The MainTabs/deep-link tests construct `SettingsPath.State.strengthTest(.init())` and match
+        // `.strengthTest(.delegate(.saved))`, so the test target must import the feature (Phase 10.4).
+        "StrengthTestFeature",
         // The 401-routing tests inject a controlled `SessionEvent` stream via the APIClient interface.
         "APIClient",
         // The logging tests inject `LogClient.recording(into:)` and assert `.app`/`.lifecycle` entries.
@@ -1238,6 +1252,65 @@ let package = Package(
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
       ],
       path: "Sources/Features/WeeklyFeature/Tests/WeeklyFeatureSnapshotTests",
+      exclude: ["__Snapshots__"],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The strength-test input feature (Epic 10.4) — the two-numeric-stepper "log today's max" screen the
+    // weekly reminder deep-links into. Mirrors TodayFeature's target shape. Depends on `LocalRepositories`
+    // (the `StrengthTestRepository` it saves through — an interface-less local module, the §4.3 exception)
+    // + `DesignSystem`/`DomainModels`/`CoachCore` (the §3 feature dependency rule) — never a data-source
+    // client, GRDB, HealthKit, WireModels, or `UserNotifications` (the tap glue lives in the app target).
+    .target(
+      name: "StrengthTestFeature",
+      dependencies: [
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        "LocalRepositories",
+        "DesignSystem",
+        "DomainModels",
+        // `isStrengthTestDue` + `Calendar.europeSofia` (the ISO-week due rule, TASK-001).
+        "CoachCore",
+      ],
+      path: "Sources/Features/StrengthTestFeature/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // StrengthTestFeature exhaustive TestStore (host) — seed-from-`current`, the 0...300 clamp, save →
+    // `save` recorded + `Delegate.saved`, and the `isDue` derivation. Logic only — no snapshot/UIKit
+    // symbols (§4.6 split). Overrides `\.strengthTestRepository`/`\.date`/`\.calendar`.
+    .testTarget(
+      name: "StrengthTestFeatureTests",
+      dependencies: [
+        "StrengthTestFeature",
+        "LocalRepositories",
+        "DomainModels",
+        "CoachCore",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+      ],
+      path: "Sources/Features/StrengthTestFeature/Tests/StrengthTestFeatureTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // StrengthTestView snapshots (the due + not-due states, light + dark) — iOS 26 simulator only, via
+    // `xcodebuild test`. `#if canImport(UIKit)`-guarded so it compiles to an empty module on the host.
+    // `exclude: ["__Snapshots__"]` keeps the committed references out of the target.
+    .testTarget(
+      name: "StrengthTestFeatureSnapshotTests",
+      dependencies: [
+        "StrengthTestFeature",
+        "CoachTestSupport",
+        "DesignSystem",
+        "CoachCore",
+        // `DomainModels.StrengthTest` is referenced directly to seed the pinned `current` stub —
+        // `StrengthTestFeature` doesn't re-export it, so it must be a direct dep to `import` it.
+        "DomainModels",
+        .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/StrengthTestFeature/Tests/StrengthTestFeatureSnapshotTests",
       exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),

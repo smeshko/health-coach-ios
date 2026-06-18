@@ -19,6 +19,7 @@
   import Foundation
   import SampleData
   import SnapshotTesting
+  import SwiftUI
   import Testing
 
   @testable import TodayFeature
@@ -46,8 +47,12 @@
       return Calendar.europeSofia.date(from: components)!
     }
 
-    private func view(_ state: BriefViewState) -> TodayView {
-      TodayView(store: Store(initialState: TodayFeature.State(briefState: state)) { TodayFeature() })
+    /// Wrapped in a `NavigationStack` so the native `.navigationTitle("Today")` renders in the capture
+    /// (the tab hosts each screen in its own stack — `MainTabsView`).
+    private func view(_ state: BriefViewState) -> some View {
+      NavigationStack {
+        TodayView(store: Store(initialState: TodayFeature.State(briefState: state)) { TodayFeature() })
+      }
     }
 
     @Test func test_syncing() {
@@ -104,7 +109,9 @@
         $0.date = .constant(fixedInstant())
         $0.checkInRepository.current = { _ in nil }
       } operation: {
-        assertCoachSnapshot(of: TodayView(store: Store(initialState: state) { TodayFeature() }))
+        assertCoachSnapshot(of: NavigationStack {
+          TodayView(store: Store(initialState: state) { TodayFeature() })
+        })
       }
     }
 
@@ -142,7 +149,9 @@
         $0.calendar = .europeSofia
         $0.date = .constant(fixedInstant())
       } operation: {
-        assertCoachSnapshot(of: TodayView(store: Store(initialState: state) { TodayFeature() }))
+        assertCoachSnapshot(of: NavigationStack {
+          TodayView(store: Store(initialState: state) { TodayFeature() })
+        })
       }
     }
 
@@ -170,7 +179,9 @@
         $0.calendar = .europeSofia
         $0.date = .constant(fixedInstant())
       } operation: {
-        assertCoachSnapshot(of: TodayView(store: Store(initialState: state) { TodayFeature() }))
+        assertCoachSnapshot(of: NavigationStack {
+          TodayView(store: Store(initialState: state) { TodayFeature() })
+        })
       }
     }
   }

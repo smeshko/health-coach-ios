@@ -73,6 +73,13 @@
           try await Task.sleep(for: .seconds(3600))
           return nil // unreachable; keeps Today parked on `.syncing` for the capture
         }
+        // The tab bar's `.task` fires `refreshDue`; park the strength-test read too so the You-tab badge
+        // stays deterministically off during capture (the empty testValue would otherwise read nil →
+        // "due" → a badge), keeping this reference byte-stable.
+        $0.strengthTestRepository.current = { _ in
+          try await Task.sleep(for: .seconds(3600))
+          return nil
+        }
       } operation: {
         let view = AppView(store: Store(initialState: AppFeature.State(route: .main(mainState))) { AppFeature() })
         assertCoachSnapshot(of: view)

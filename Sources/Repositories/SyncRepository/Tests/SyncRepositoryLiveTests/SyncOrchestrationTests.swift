@@ -1,4 +1,5 @@
 import APIClient
+import Clocks
 import CoachCore
 import CoachTestSupport
 import Database
@@ -107,6 +108,9 @@ struct SyncOrchestrationTests {
     try await withDependencies {
       $0.useEuropeSofia()
       $0.date = .constant(now)
+      // A never-advanced TestClock: the CR-3 HK-read timeout's sleep suspends forever, so the (fast) stub
+      // read always wins — the normal-path tests are unaffected by the timeout wrapper.
+      $0.continuousClock = TestClock()
       $0.healthKitClient = stubs.healthKit()
       $0.apiClient = stubs.api()
       $0.database = database
@@ -319,6 +323,7 @@ struct SyncOrchestrationTests {
     let result = try await withDependencies {
       $0.useEuropeSofia()
       $0.date = .constant(Self.now)
+      $0.continuousClock = TestClock()
       $0.healthKitClient = stubs.healthKit()
       $0.apiClient = stubs.api()
       $0.database = db
@@ -345,6 +350,7 @@ struct SyncOrchestrationTests {
       _ = try await withDependencies {
         $0.useEuropeSofia()
         $0.date = .constant(Self.now)
+        $0.continuousClock = TestClock()
         $0.healthKitClient = stubs.healthKit()
         $0.apiClient = stubs.api()
         $0.database = db

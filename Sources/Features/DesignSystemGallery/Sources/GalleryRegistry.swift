@@ -19,6 +19,7 @@ extension GalleryComponent {
     GalleryComponent(name: "BarColumns") { AnyView(BarColumnsPage()) },
     GalleryComponent(name: "MacroDonut") { AnyView(MacroDonutPage()) },
     GalleryComponent(name: "Check-in controls") { AnyView(CheckInControlsPage()) },
+    GalleryComponent(name: "NumericStepper") { AnyView(NumericStepperPage()) },
   ]
 
   @MainActor static let composites: [GalleryComponent] = [

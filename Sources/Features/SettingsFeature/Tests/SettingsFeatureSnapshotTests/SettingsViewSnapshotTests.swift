@@ -1,6 +1,6 @@
-// SettingsFeatureView snapshots (ARCHITECTURE D16): the production CONNECTION / APPLE HEALTH / PROFILE
-// sections in the connected + all-shared, degraded (some-missing), and not-connected states, light +
-// dark on the single reference device. `#if canImport(UIKit)`-guarded (empty module on the macOS host —
+// SettingsFeatureView snapshots (ARCHITECTURE D16): the production CONNECTION / STRENGTH / PROFILE
+// sections in the connected (with last-sync) and not-connected (no last-sync row) states, light + dark
+// on the single reference device. `#if canImport(UIKit)`-guarded (empty module on the macOS host —
 // SwiftUI image snapshots are UIKit-only). Runs on the iOS 26 simulator via `make test-snapshots`.
 
 #if canImport(UIKit)
@@ -8,7 +8,6 @@
   import ComposableArchitecture
   import DomainModels
   import Foundation
-  import HealthKitClient
   import SnapshotTesting
   import SwiftUI
   import SyncRepository
@@ -20,7 +19,6 @@
   struct SettingsViewSnapshotTests {
     /// A fixed instant so the last-sync "Today, …" string is deterministic.
     nonisolated private static let now = Date(timeIntervalSince1970: 1_780_900_000)
-    private static let total = HealthStatusInference.displayedCategories.count
 
     private static func zones() -> DomainModels.Zones {
       .init(
@@ -32,23 +30,15 @@
       )
     }
 
-    /// A fully-loaded state seeded directly (no live effects). HK counts derive from the pinned
-    /// `displayedCategories` constant so they can't drift from a live load (round-2 #1).
+    /// A fully-loaded state seeded directly (no live effects).
     private static func loadedState(
       connection: SettingsFeature.ConnectionStatus,
-      lastSync: Date?,
-      missing: [HealthDataCategory]
+      lastSync: Date?
     ) -> SettingsFeature.State {
       var state = SettingsFeature.State()
       state.load = .loaded
       state.connection.status = connection
       state.lastSync.lastSyncAt = lastSync
-      state.health = SettingsFeature.HealthKitStatusState(
-        available: true,
-        sharedCount: total - missing.count,
-        totalCount: total,
-        missingCategories: missing
-      )
       state.constants = SettingsFeature.ConstantsState(
         age: 34, zones: zones(), restingHrBpm: 48, hrvBaselineMs: 92, recomputeNoticeWeek: nil
       )
@@ -56,7 +46,7 @@
     }
 
     @Test func test_settingsConnected() {
-      let state = Self.loadedState(connection: .connected(tokenSuffix: "6f2a"), lastSync: Self.now, missing: [])
+      let state = Self.loadedState(connection: .connected(tokenSuffix: "6f2a"), lastSync: Self.now)
       withDependencies {
         $0.calendar = .europeSofia
         $0.date = .constant(Self.now)
@@ -69,23 +59,8 @@
       }
     }
 
-    @Test func test_settingsDegraded() {
-      let state = Self.loadedState(
-        connection: .connected(tokenSuffix: "6f2a"), lastSync: Self.now, missing: [.sleep, .vo2Max]
-      )
-      withDependencies {
-        $0.calendar = .europeSofia
-        $0.date = .constant(Self.now)
-        $0.syncRepository.lastSync = { Self.now }
-      } operation: {
-        assertCoachSnapshot(of: NavigationStack {
-          SettingsFeatureView(store: Store(initialState: state) { SettingsFeature() })
-        })
-      }
-    }
-
     @Test func test_settingsNotConnected() {
-      let state = Self.loadedState(connection: .notConnected, lastSync: nil, missing: [.sleep, .vo2Max])
+      let state = Self.loadedState(connection: .notConnected, lastSync: nil)
       withDependencies {
         $0.calendar = .europeSofia
         $0.date = .constant(Self.now)
@@ -95,6 +70,20 @@
           SettingsFeatureView(store: Store(initialState: state) { SettingsFeature() })
         })
       }
+    }
+
+    /// The Strength-test row in both dot states (Phase 10.4). The full-screen states above push the row
+    /// below the snapshot viewport, so the row + due-dot are pinned by snapshotting the section in a `List`
+    /// in isolation.
+    @Test func test_strengthRow_due() {
+      var state = SettingsFeature.State()
+      state.strengthTestDue = true
+      assertCoachSnapshot(of: List { StrengthTestSection(store: Store(initialState: state) { SettingsFeature() }) })
+    }
+
+    @Test func test_strengthRow_notDue() {
+      let state = SettingsFeature.State()
+      assertCoachSnapshot(of: List { StrengthTestSection(store: Store(initialState: state) { SettingsFeature() }) })
     }
   }
 #endif

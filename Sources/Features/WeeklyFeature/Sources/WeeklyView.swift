@@ -25,7 +25,7 @@ public struct WeeklyView: View {
 
   public var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
         switch store.weeklyState {
         case .idle, .loading:
           WeeklyHeader(subtitle: nil, cachedLabel: nil)
@@ -47,10 +47,14 @@ public struct WeeklyView: View {
           WeeklyReadyContent(store: store, plan: plan)
         }
       }
-      .padding(CoachSpacing.spaceLg)
+      // Horizontal screen margin stays roomier than the tightened vertical rhythm so cards keep clear
+      // breathing room from the device edge.
+      .padding(.horizontal, CoachSpacing.spaceLg)
+      .padding(.vertical, CoachSpacing.spaceMd)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .background(.coachBackground)
+    .navigationTitle("This Week")
   }
 
   /// "Jun 1 – 7 · a menu, not a schedule" (deload → "… · easy on purpose"). The week range is the plan's
@@ -99,17 +103,16 @@ public struct WeeklyView: View {
 
 // MARK: - Shell chrome
 
-/// The screen header: the large "This Week" title, the week-range subtitle (deload-aware), and the
-/// "Cached — as of …" freshness line when a `.cached` plan is served.
+/// The screen sub-header under the native "This Week" nav title: the week-range subtitle (deload-aware)
+/// and the "Cached — as of …" freshness line when a `.cached` plan is served. (The large "This Week"
+/// title is now the navigation title, so it collapses on scroll instead of scrolling away.) Renders
+/// nothing in the idle/loading/error states, where both lines are nil.
 private struct WeeklyHeader: View {
   let subtitle: String?
   let cachedLabel: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.space2xs) {
-      Text("This Week")
-        .font(.coachText3xl)
-        .foregroundStyle(.coachForeground)
       if let subtitle {
         Text(subtitle)
           .font(.coachTextMd)
@@ -136,11 +139,11 @@ private struct WeeklyReadyContent: View {
   var body: some View {
     switch store.selectedSection {
     case .exercise:
-      VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+      VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
         PlanCard(store: store, narrative: plan.narrative, deload: plan.budgets.deload)
         if let rhythm = store.rhythm {
           WeekRhythmRow(days: rhythm.days)
-            .padding(CoachSpacing.spaceLg)
+            .padding(CoachSpacing.spaceMd)
             .background(CardSurface())
         }
 
@@ -232,7 +235,7 @@ private struct SessionGroup<Content: View>: View {
         VStack(spacing: CoachSpacing.spaceMd) {
           content
         }
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        .transition(.coachDisclosure)
       }
     }
     .coachAnimation(.disclosure, value: isExpanded)
@@ -255,7 +258,7 @@ private struct TargetsSection: View {
           .foregroundStyle(.coachForegroundMuted)
       }
       WeeklyTargetsStrip(targets: targets)
-        .padding(CoachSpacing.spaceLg)
+        .padding(CoachSpacing.spaceMd)
         .background(CardSurface())
     }
   }
@@ -294,10 +297,10 @@ private struct PlanCard: View {
 
       if store.isPlanCardExpanded {
         NarrativeRenderer(narrative.filter { $0.type == .plan })
-          .transition(.opacity.combined(with: .move(edge: .top)))
+          .transition(.coachDisclosure)
       }
     }
-    .padding(CoachSpacing.spaceLg)
+    .padding(CoachSpacing.spaceMd)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(CardSurface())
     .coachAnimation(.disclosure, value: store.isPlanCardExpanded)

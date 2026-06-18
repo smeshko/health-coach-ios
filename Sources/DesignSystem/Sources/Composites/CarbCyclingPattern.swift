@@ -24,7 +24,9 @@ public struct CarbCyclingPattern: View {
   public var body: some View {
     let days = resolvedDays
     let maxCarbs = days.compactMap(\.carbsG).max() ?? 0
-    VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
+    // `spaceSm` between chart and legend: the legend rows carry their own vertical padding, so the prior
+    // `spaceLg` stacked into too large a gap above the first row (`Week · Nutrition.png`).
+    VStack(alignment: .leading, spacing: CoachSpacing.spaceSm) {
       HStack(alignment: .bottom, spacing: CoachSpacing.spaceXs) {
         ForEach(Array(days.enumerated()), id: \.offset) { _, day in
           Bar(label: day.label, carbsG: day.carbsG, kind: day.kind, maxCarbs: maxCarbs)
@@ -107,14 +109,16 @@ private struct Bar: View {
   let maxCarbs: Int
 
   var body: some View {
-    VStack(spacing: CoachSpacing.spaceXs) {
+    // A clear gap (`spaceSm`) keeps the day label sitting *beneath* the bar baseline rather than crowding
+    // it; the bar group is bottom-pinned in a fixed-height frame so every bar shares one baseline.
+    VStack(spacing: CoachSpacing.spaceSm) {
       VStack(spacing: CoachSpacing.space2xs) {
         Spacer(minLength: 0)
         if let carbsG {
           Text("\(carbsG)")
             .font(.coachTextSm)
             .foregroundStyle(.coachForegroundMuted)
-          RoundedRectangle(cornerRadius: CoachRadius.sm, style: .continuous)
+          RoundedRectangle(cornerRadius: Metrics.barRadius, style: .continuous)
             .fill(color)
             .frame(height: height(for: carbsG))
         }
@@ -154,8 +158,13 @@ private struct Legend: View {
   let items: [LegendItem]
 
   var body: some View {
-    VStack(spacing: CoachSpacing.spaceSm) {
-      ForEach(items) { item in
+    // Hairline dividers separate the per-type rows (each padded so the rule has breathing room) — the
+    // legend reads as a small table of day type → ~kcal, matching `Week · Nutrition.png`.
+    VStack(spacing: 0) {
+      ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+        if index > 0 {
+          Divider().overlay(.coachBorder)
+        }
         HStack(spacing: CoachSpacing.spaceSm) {
           Circle()
             .fill(item.dayType.carbColor)
@@ -173,6 +182,7 @@ private struct Legend: View {
             .font(.coachTextMd)
             .foregroundStyle(.coachForeground)
         }
+        .padding(.vertical, CoachSpacing.spaceSm)
       }
     }
   }
@@ -191,4 +201,7 @@ private enum Metrics {
   static let barMaxHeight: CGFloat = 108
   static let minRatio: CGFloat = 0.16
   static let legendDot: CGFloat = 10
+  /// Crisp, slightly-rounded column corners — smaller than `CoachRadius.sm` (12) so short rest-day bars
+  /// read as columns standing on the baseline, not floating lozenges (`Week · Nutrition.png`).
+  static let barRadius: CGFloat = 6
 }
