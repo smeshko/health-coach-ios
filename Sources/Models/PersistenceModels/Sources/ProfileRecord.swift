@@ -11,18 +11,26 @@ public struct ProfileRecord: Codable, Equatable, Sendable, FetchableRecord, Pers
   public var id: Int
   public var constitutionVersion: String
   public var body: Data
+  /// The sync watermark `serverTime` visible when this profile was fetched (Phase 19.2 D1). The
+  /// cached profile is stale iff this stamp differs from the current watermark `serverTime` — an
+  /// equality of two copies of the *server's* clock, immune to device-clock skew. `nil` = fetched
+  /// before any sync (or a pre-upgrade row), which reads as stale exactly once when a watermark
+  /// exists.
+  public var syncServerTime: Date?
 
-  public init(id: Int = 1, constitutionVersion: String, body: Data) {
+  public init(id: Int = 1, constitutionVersion: String, body: Data, syncServerTime: Date? = nil) {
     self.id = id
     self.constitutionVersion = constitutionVersion
     self.body = body
+    self.syncServerTime = syncServerTime
   }
 
   /// Serialize the domain profile into the singleton record.
-  public init(domain: DomainModels.Profile) throws {
+  public init(domain: DomainModels.Profile, syncServerTime: Date? = nil) throws {
     try self.init(
       constitutionVersion: domain.meta.constitutionVersion,
-      body: DomainBodyCoder.encode(domain)
+      body: DomainBodyCoder.encode(domain),
+      syncServerTime: syncServerTime
     )
   }
 

@@ -15,6 +15,16 @@ import Testing
 struct DomainBodyCacheMigrationTests {
   private let day = Date(timeIntervalSince1970: 1_780_000_000)
 
+  /// Raw SQL pinned to the pre-v5 (v2) schema: GRDB record encoding would name the not-yet-existing
+  /// `syncServerTime` column (GRDB overrides `encodeIfPresent`, so a nil optional still enters the
+  /// persistence container and the INSERT names the column).
+  private func seedPreV5Profile(_ db: GRDB.Database, _ domain: DomainModels.Profile) throws {
+    try db.execute(
+      sql: "INSERT INTO profile (id, constitutionVersion, body) VALUES (?, ?, ?)",
+      arguments: [1, domain.meta.constitutionVersion, ProfileRecord(domain: domain).body]
+    )
+  }
+
   @Test func test_v3_clearsBriefCaches_keepsProfileAndFlatRows_opensClean() throws {
     let queue = try DatabaseQueue()
 
@@ -36,7 +46,7 @@ struct DomainBodyCacheMigrationTests {
       )
       // `Profile` is enum/Date-free, so its body format is unchanged across 11.2 — seed a real one
       // (the new coding equals the old) and assert it survives + decodes after the migration.
-      try ProfileRecord(domain: profileDomain).save(db)
+      try seedPreV5Profile(db, profileDomain)
       try db.execute(
         sql: "INSERT INTO checkIn (date, giSymptoms, kneePain, illness) VALUES (?, ?, ?, ?)",
         arguments: [day, false, 2, false]

@@ -87,6 +87,16 @@ extension DatabaseClient {
       }
     }
 
+    // Additive (Phase 19.2 D1): stamp the cached profile with the watermark `serverTime` seen at
+    // fetch time — sync-anchored staleness, so a server constants recompute reaches the device on
+    // the first `profile()` call after the next successful sync. Nullable: pre-upgrade rows read
+    // `nil` = stale exactly once, then restamp. Follows the `v2` additive pattern; no cache clear.
+    migrator.registerMigration("v5_addProfileSyncServerTime") { db in
+      try db.alter(table: ProfileRecord.databaseTableName) { table in
+        table.add(column: "syncServerTime", .datetime)
+      }
+    }
+
     return migrator
   }
 }
