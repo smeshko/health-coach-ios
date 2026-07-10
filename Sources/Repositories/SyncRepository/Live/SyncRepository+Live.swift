@@ -57,15 +57,27 @@ private func runSync() async throws -> SyncResult {
   //    land during the in-flight POST (DECISIONS #1; at worst re-sent — sync is idempotent).
   let readInstant = date.now
 
-  // 3. HK deltas since the anchor. HK-unavailable/partial degrades to an empty set inside the client.
-  //    Bounded by `healthReadTimeout` (CR-3): `HKSampleQuery`/`HKActivitySummaryQuery` are callback-based
-  //    and ignore cancellation, so a wedged `healthd` would otherwise pin the `.syncing` screen open with
-  //    no automatic recovery (the Cancel button is the manual escape). On timeout this throws BEFORE the
-  //    watermark write below, so the unread window is simply re-read on the next sync — no data loss.
+  // 3. HK deltas since the anchor, BOUNDED (Phase 18.2): since = the anchor floor plus the `.since(_:)`
+  //    defaults (per-type row limit, 15s in-client timeout). HK-unavailable/partial degrades to an empty
+  //    set inside the client. Caller cancellation (Today's Cancel) forwards through `withSyncTimeout`
+  //    as structured cancellation into `deltaSamples`, where the live client STOPS its queries; the
+  //    in-client 15s timeout also stops them and throws `.timedOut` → mapped to `SyncError.transient`
+  //    here (one retryable-failure vocabulary). The 20s `healthReadTimeout` backstop remains ONLY for a
+  //    `stop()` that itself wedges — it abandons the read. Every failure throws BEFORE the watermark
+  //    write below, so the unread window is simply re-read on the next sync — no data loss.
   let anchor = existing.anchor
-  let samples = try await withSyncTimeout(healthReadTimeout, clock: clock) {
-    try await healthKit.deltaSamples(anchorDate(anchor))
+  let samples: HealthSampleSet
+  do {
+    samples = try await withSyncTimeout(healthReadTimeout, clock: clock) {
+      try await healthKit.deltaSamples(.since(anchorDate(anchor)))
+    }
+  } catch HealthKitReadError.timedOut {
+    throw SyncError.transient
   }
+  // Review #1.1: cancellation can land in the same instant the read resumes success (the operation
+  // task claims `SyncTimeoutState`'s once-guard first) — never carry a cancelled sync into side
+  // effects. Re-checked before each irreversible boundary below.
+  try Task.checkCancellation()
 
   // 4. Today's check-in (a read failure degrades to nil — the check-in is optional) + the strength
   //    test only when due.
@@ -85,7 +97,10 @@ private func runSync() async throws -> SyncResult {
   // 5. Build the request.
   let request = buildSyncRequest(samples: samples, checkin: checkin, strengthTest: strengthTest)
 
-  // 6. POST. A 401 propagates as the raw `APIError` (session-stream-handled); other errors → SyncError.
+  // 6. POST. Cancellation during the optional local reads above is swallowed by the check-in's
+  //    `try?` — re-check before the irreversible POST (review #1.1). A 401 propagates as the raw
+  //    `APIError` (session-stream-handled); other errors → SyncError.
+  try Task.checkCancellation()
   let response: SyncResponse
   do {
     response = try await apiClient.sync(request)
@@ -95,7 +110,9 @@ private func runSync() async throws -> SyncResult {
   }
 
   // 7. Success only: advance the watermark + store serverTime + (if a strength test was attached) the
-  //    year-qualified ISO-week marker — in one write. Upsert builds the singleton if none existed.
+  //    year-qualified ISO-week marker — in one write. If cancellation landed during the POST, skip
+  //    the advance (review #1.1) — sync is idempotent, so the same window is simply re-sent next time.
+  try Task.checkCancellation()
   try await database.write { db in
     let updated = SyncWatermarkRecord(
       anchor: anchorString(readInstant),
@@ -142,55 +159,122 @@ func anchorString(_ date: Date) -> String {
   String(date.timeIntervalSince1970)
 }
 
-/// How long the HealthKit delta read may run before the sync gives up (CR-3, release audit 2026-06-18).
-/// Generous enough that a normal — even first-of-the-day — read never trips it, tight enough that a
-/// wedged HealthKit can't pin the `.syncing` screen open forever. The in-screen Cancel button is the
-/// immediate manual escape; this is the automatic backstop.
+/// The OUTER abandoning backstop for the HealthKit delta read (CR-3, release audit 2026-06-18) — no
+/// longer the primary bound. Since Phase 18.2 the live client enforces its own whole-read timeout
+/// (`HealthReadBounds.defaultTimeout`, 15s), which STOPS the in-flight queries and throws `.timedOut`
+/// (mapped to `SyncError.transient` by `runSync`). This 20s wrapper only fires when that stop itself
+/// wedges, and then it ABANDONS the read. It must stay strictly ABOVE the in-client timeout so queries
+/// are stopped rather than orphaned (ordering pinned by `SyncBoundedReadTests`).
 let healthReadTimeout: Duration = .seconds(20)
 
-/// Run `operation`, but give up after `duration` and throw `SyncError.transient` rather than awaiting
-/// forever (CR-3). HealthKit's sample/activity queries are callback-based and **ignore task
-/// cancellation**, so cancelling the surrounding task can't unblock a wedged read. This races the
-/// operation against a clock sleep and **abandons** a still-running operation on timeout: whichever
-/// finishes first resumes the continuation (guarded so the other's late result is dropped), so the call
-/// returns even though the underlying read can't be cancelled. The injected `clock` keeps it
-/// deterministic under test (advance a `TestClock` past `duration` to force the timeout branch).
+/// Run `operation`, bounded by `duration` and responsive to caller cancellation (CR-3 + Phase 18.2's
+/// validation round-1 #1). A three-way race:
+/// - the **operation** finishes → its value/error resumes the awaiting caller;
+/// - the **clock sleep** fires first → `SyncError.transient`, and the still-running operation is
+///   ABANDONED (the belt-and-suspenders for a HealthKit `stop()` that itself wedges — the in-client
+///   15s timeout normally fires first and stops the queries);
+/// - the **awaiting caller is cancelled** → both child tasks are cancelled (the operation task's
+///   cancellation propagates into `deltaSamples`, where the live client stops its queries) and the
+///   caller resumes with `CancellationError`.
+/// Exactly one resume wins (`SyncTimeoutState`'s once-guard); late results are dropped. The injected
+/// `clock` keeps the timeout deterministic under test (advance a `TestClock` past `duration`).
 func withSyncTimeout<T: Sendable>(
   _ duration: Duration,
   clock: any Clock<Duration>,
   _ operation: @escaping @Sendable () async throws -> T
 ) async throws -> T {
-  let flag = ResumeOnceFlag()
-  return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
-    Task {
-      do {
-        let value = try await operation()
-        if flag.claim() { continuation.resume(returning: value) }
-      } catch {
-        if flag.claim() { continuation.resume(throwing: error) }
+  let state = SyncTimeoutState<T>()
+  return try await withTaskCancellationHandler {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+      state.begin(continuation)
+      let operationTask = Task {
+        do {
+          let value = try await operation()
+          state.resume(with: .success(value))
+        } catch {
+          state.resume(with: .failure(error))
+        }
       }
+      let timeoutTask = Task {
+        // A cancelled sleep (the success path never advances this clock) just leaves the other racers
+        // to resume the continuation — so swallow the cancellation rather than racing a second resume.
+        guard (try? await clock.sleep(for: duration)) != nil else { return }
+        state.resume(with: .failure(SyncError.transient))
+      }
+      state.register([operationTask, timeoutTask])
     }
-    Task {
-      // A cancelled sleep (the success path never advances this clock) just leaves the operation task to
-      // resume the continuation — so swallow the cancellation rather than racing a second resume.
-      guard (try? await clock.sleep(for: duration)) != nil else { return }
-      if flag.claim() { continuation.resume(throwing: SyncError.transient) }
-    }
+  } onCancel: {
+    state.cancel()
   }
 }
 
-/// A one-shot guard so exactly one of the two racing tasks in `withSyncTimeout` resumes the continuation
-/// (a double-resume traps). Foundation `NSLock` mirrors `DevSettingsStore`'s in-process locking; the
-/// `@unchecked Sendable` is sound because every access goes through that lock.
-private final class ResumeOnceFlag: @unchecked Sendable {
+/// The shared state behind `withSyncTimeout`'s three-way race: the once-guard (exactly one resume — a
+/// double-resume traps), the child-task handles the cancellation handler must reach, and the
+/// continuation itself (the handler resumes it directly because a WEDGED operation would otherwise
+/// never surface the `CancellationError`). Foundation `NSLock` mirrors `DevSettingsStore`'s in-process
+/// locking; the `@unchecked Sendable` is sound because every access goes through that lock.
+private final class SyncTimeoutState<T: Sendable>: @unchecked Sendable {
   private let lock = NSLock()
   private var claimed = false
-  /// True for the first caller only; false thereafter.
-  func claim() -> Bool {
+  private var cancelled = false
+  private var continuation: CheckedContinuation<T, Error>?
+  private var tasks: [Task<Void, Never>] = []
+
+  /// Store the continuation, first thing inside the continuation body. If the caller was already
+  /// cancelled (cancel-before-start), claim and resume with `CancellationError` immediately — the
+  /// children spawned next are reaped by `register`.
+  func begin(_ continuation: CheckedContinuation<T, Error>) {
     lock.lock()
-    defer { lock.unlock() }
-    if claimed { return false }
+    if cancelled, !claimed {
+      claimed = true
+      lock.unlock()
+      continuation.resume(throwing: CancellationError())
+      return
+    }
+    self.continuation = continuation
+    lock.unlock()
+  }
+
+  /// Store the racing children so `cancel()` can reach them; if cancellation landed in between,
+  /// cancel them right away (their late resumes are dropped by the once-guard).
+  func register(_ tasks: [Task<Void, Never>]) {
+    lock.lock()
+    self.tasks = tasks
+    let cancelledEarly = cancelled
+    lock.unlock()
+    if cancelledEarly {
+      for task in tasks { task.cancel() }
+    }
+  }
+
+  /// A racing child finished: the first claimer resumes the caller, late results are dropped.
+  func resume(with result: Result<T, Error>) {
+    lock.lock()
+    guard !claimed, let continuation else {
+      lock.unlock()
+      return
+    }
     claimed = true
-    return true
+    self.continuation = nil
+    lock.unlock()
+    continuation.resume(with: result)
+  }
+
+  /// Caller cancellation: cancel BOTH children — the operation task's cancellation propagates into
+  /// the client read (→ `stop(query)` in the live client) — and resume the awaiting caller with
+  /// `CancellationError` (never wait on a wedged operation to notice).
+  func cancel() {
+    lock.lock()
+    cancelled = true
+    let children = tasks
+    var resumable: CheckedContinuation<T, Error>?
+    if !claimed, let held = continuation {
+      claimed = true
+      continuation = nil
+      resumable = held
+    }
+    lock.unlock()
+    for task in children { task.cancel() }
+    resumable?.resume(throwing: CancellationError())
   }
 }

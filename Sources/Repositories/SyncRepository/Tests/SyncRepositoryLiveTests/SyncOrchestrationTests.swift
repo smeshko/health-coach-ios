@@ -50,8 +50,8 @@ final class SyncStubs: @unchecked Sendable {
       isHealthDataAvailable: { true },
       requestAuthorization: {},
       authorizationStatus: { [:] },
-      deltaSamples: { [self] since in
-        sinceRecorder.record(since)
+      deltaSamples: { [self] bounds in
+        sinceRecorder.record(bounds.since)
         return samples
       }
     )

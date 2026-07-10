@@ -355,6 +355,9 @@ let package = Package(
       name: "HealthKitClientLive",
       dependencies: [
         "HealthKitClient",
+        // The stopped-queries instrumentation logs one `.app` line via the LogClient INTERFACE
+        // (no LogClientLive — the composition root installs the live value).
+        "LogClient",
         "WireModels",
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
@@ -722,6 +725,9 @@ let package = Package(
         "HealthKitClient",
         "HealthKitClientLive",
         "WireModels",
+        // `TestClock` drives the BoundedReadCoordinator timeout deterministically (a DIRECT dep —
+        // a transitively-resolved package is not importable).
+        .product(name: "Clocks", package: "swift-clocks"),
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/HealthKitClient/Tests",
