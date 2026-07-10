@@ -7,6 +7,7 @@ import Dependencies
 import DomainModels
 import Foundation
 import GRDB
+import LogClient
 import PersistenceModels
 import SampleData
 import Testing
@@ -184,4 +185,73 @@ struct WeeklyCachePolicyTests {
   // closed-enum card is no longer constructible in a typed DTO (the closed enums are shared
   // wire↔domain and decode strictly, Phase 11.3), so the collection-element drop path can never be
   // reached. Strict decode is covered by the WireModels decode tests.
+
+  // MARK: - Phase 19.2 TASK-001: a corrupt cached row degrades to a miss
+
+  /// Seed a row under `isoWeek` whose `body` is garbage bytes — the memberwise `WeeklyPlanRecord`
+  /// init bypasses the domain encoder, so `toDomain()` throws a `DecodingError` on read.
+  private static func seedCorruptWeekly(
+    _ database: DatabaseClient, isoWeek: String, weekStart: Date
+  ) async throws {
+    try await database.write { db in
+      try WeeklyPlanRecord(
+        isoWeek: isoWeek,
+        weekStart: weekStart,
+        constantsRecomputed: false,
+        generatedAt: weekStart,
+        cached: false,
+        body: Data("not-a-serialized-weekly-plan".utf8)
+      ).save(db)
+    }
+  }
+
+  /// (a) A corrupt current-week row + synced watermark: the decode failure is a MISS — the policy
+  /// regenerates and overwrites under the same `isoWeek` key; the second call is a plain cache hit
+  /// (stamped `cached == true`). Exactly one degradation notice lands on `.http`.
+  @Test func test_weeklyBrief_corruptRowSynced_regeneratesAndOverwrites() async throws {
+    let (dto, domain) = try deloadFixture()
+    let db = try TestDatabase.makeInMemory()
+    try await TestDatabase.seedWatermark(db)
+    try await Self.seedCorruptWeekly(db, isoWeek: domain.isoWeek, weekStart: domain.weekStart)
+    let stub = BriefAPIStub(weeklyResult: .success(dto))
+    let recorder = LogRecorder()
+
+    let (first, second) = try await withDependencies {
+      $0.log = .recording(into: recorder)
+    } operation: {
+      let first = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
+        try await BriefRepository.live.weeklyBrief(nil, false)
+      }
+      let second = try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
+        try await BriefRepository.live.weeklyBrief(nil, false)
+      }
+      return (first, second)
+    }
+
+    var cachedDomain = domain
+    cachedDomain.cached = true
+    #expect(first == domain, "the corrupt row is a miss → the fresh generated plan is returned")
+    #expect(second == cachedDomain, "the overwritten row decodes → a local hit, stamped cached")
+    #expect(stub.weeklyCallCount == 1, "the overwritten row serves from cache — no second network call")
+    let count = try await TestDatabase.weeklyCount(db)
+    #expect(count == 1, "the corrupt row is overwritten under the same isoWeek key")
+    let notices = recorder.entries.filter { $0.level == .notice && $0.category == .http }
+    #expect(notices.count == 1, "exactly one decode-degradation notice on .http")
+  }
+
+  /// (b) A corrupt current-week row with NO watermark: the miss falls through to the sync gate →
+  /// `.syncRequired` (recoverable), never a raw `DecodingError`.
+  @Test func test_weeklyBrief_corruptRowUnsynced_throwsSyncRequired() async throws {
+    let (_, domain) = try deloadFixture()
+    let db = try TestDatabase.makeInMemory() // no watermark
+    try await Self.seedCorruptWeekly(db, isoWeek: domain.isoWeek, weekStart: domain.weekStart)
+    let stub = BriefAPIStub()
+
+    await expectBriefError(.syncRequired) {
+      try await runWithSofia(now: domain.weekStart, stub: stub, database: db) {
+        try await BriefRepository.live.weeklyBrief(nil, false)
+      }
+    }
+    #expect(stub.weeklyCallCount == 0, "the gated miss must not hit the network")
+  }
 }

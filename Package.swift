@@ -466,6 +466,9 @@ let package = Package(
         // `routed(dev:)` mock/live toggle: DevSettings (devRoute) + SampleData (the mock fixtures).
         "DevSettings",
         "SampleData",
+        // Decode-degradation notices (Phase 19.2): a corrupt cached row logs on `.http` and
+        // degrades to a miss (the Database/SyncRepositoryLive interface-dependency precedent).
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -863,6 +866,8 @@ let package = Package(
         "CoachTestSupport",
         // The `routed(dev:)` mock-toggle test builds a fake DevSettings.
         "DevSettings",
+        // The decode-degradation tests assert notices via `LogRecorder` / `.recording(into:)`.
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],

@@ -5,6 +5,7 @@ import Dependencies
 import DomainModels
 import Foundation
 import GRDB
+import LogClient
 import PersistenceModels
 import WireDomainMapping
 import WireModels
@@ -17,6 +18,7 @@ import WireModels
 func dailyBriefPolicy(refresh: Bool) async throws -> DomainModels.DailyBrief {
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.database) var database
+  @Dependency(\.log) var log
 
   let today = sofiaToday()
 
@@ -25,7 +27,18 @@ func dailyBriefPolicy(refresh: Bool) async throws -> DomainModels.DailyBrief {
       try DailyBriefRecord.fetchOne(db, key: today)
     }
     if let cached {
-      return try cached.toDomain()
+      do {
+        return try cached.toDomain()
+      } catch {
+        // A corrupt/format-drifted row is a cache MISS, not a fatal error (Phase 19.2 D2): fall
+        // through to the generate path — its `save` overwrites the same-day row (same `date` PK).
+        // The catch stays narrow: only the row decode degrades; DB read failures keep propagating.
+        log.notice(
+          "Cached daily brief failed to decode — treating as a cache miss",
+          category: .http,
+          metadata: ["error": String(describing: error)]
+        )
+      }
     }
   }
 
@@ -56,9 +69,22 @@ func dailyBriefPolicy(refresh: Bool) async throws -> DomainModels.DailyBrief {
 /// agree on the same-day row.
 func cachedDailyBriefPolicy() async throws -> DomainModels.DailyBrief? {
   @Dependency(\.database) var database
+  @Dependency(\.log) var log
 
   let cached = try await database.read { db in
     try DailyBriefRecord.fetchOne(db, key: sofiaToday())
   }
-  return try cached?.toDomain()
+  guard let cached else { return nil }
+  do {
+    return try cached.toDomain()
+  } catch {
+    // A corrupt row is "no usable cache" (Phase 19.2 D2): the peek returns `nil` — it never
+    // generates or repairs (the get-or-generate path owns the overwrite).
+    log.notice(
+      "Cached daily brief failed to decode — peek reports no usable cache",
+      category: .http,
+      metadata: ["error": String(describing: error)]
+    )
+    return nil
+  }
 }

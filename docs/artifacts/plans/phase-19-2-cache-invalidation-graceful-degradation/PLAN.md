@@ -1,6 +1,6 @@
 # Plan: Cache invalidation and graceful degradation
 
-Status: draft
+Status: in-progress
 Branch: fix/phase-19-2-cache-invalidation-graceful-degradation
 Risk: medium
 Epic: 19 — Make the numbers trustworthy (audit wave 2) ([epic](../../epics/19-trustworthy-numbers.md))
@@ -133,7 +133,7 @@ profile); D3 stale-serve on refetch failure.
 Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
-- [ ] TASK-001: Brief and weekly cache policies treat decode failure as a cache miss
+- [x] TASK-001: Brief and weekly cache policies treat decode failure as a cache miss
 - [ ] TASK-002: Undecodable cached profile degrades to a fresh fetch
 - [ ] TASK-003: Sync-anchored profile staleness so recomputed constants reach the device
 - [ ] TASK-004: Final Validation
