@@ -188,4 +188,52 @@ struct TodayFeatureBackgroundDegradeTests {
     #expect(store.state.lastSyncedAt == now, "sync succeeded → pill shows Synced X ago even though brief failed")
     #expect(store.state.briefState == .ready(cached, .cached))
   }
+
+  /// Sync SUCCESS + brief FAILURE still delivers the POST-sync zones (Phase 19.2 review round-2 #1):
+  /// the successful sync advanced the watermark and recomputed constants, so the quiet-degrade path must
+  /// merge the recomputed zones, not the pre-sync cached ones.
+  @Test func test_backgroundRefresh_syncOk_briefFails_deliversPostSyncRecomputedZones() async {
+    let now = sofiaInstant()
+    let cached = brief(cached: true)
+    let recomputed = DomainModels.Zones(
+      z1: DomainModels.ZoneRange(low: 100, high: 119),
+      z2: DomainModels.ZoneRange(low: 119, high: 138),
+      z3: DomainModels.ZoneRange(low: 138, high: 157),
+      z4: DomainModels.ZoneRange(low: 157, high: 176),
+      z5: DomainModels.ZoneRange(low: 176, high: 195)
+    )
+    let synced = LockIsolated(false)
+    let store = TestStore(
+      initialState: TodayFeature.State(
+        briefState: .ready(cached, .cached),
+        readiness: expectedReadiness(cached),
+        session: session(cached, zones: sampleZones()),
+        zones: sampleZones()
+      )
+    ) {
+      TodayFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
+      $0.continuousClock = ImmediateClock()
+      $0.syncRepository.sync = {
+        synced.setValue(true)
+        return sampleSyncResult()
+      }
+      $0.briefRepository.dailyBrief = { _ in throw BriefError.serverError }
+      $0.profileRepository.zones = { synced.value ? recomputed : sampleZones() }
+    }
+
+    await store.send(.pullToRefresh) {
+      $0.isBackgroundRefreshing = true
+      $0.lastRefreshAttemptAt = now
+    }
+    await store.receive(\._backgroundSyncCompleted) { $0.lastSyncedAt = now }
+    await store.receive(\._backgroundRefreshFailed) {
+      $0.isBackgroundRefreshing = false
+      $0.zones = recomputed
+      $0.session?.zones = recomputed
+    }
+    #expect(store.state.zones == recomputed, "the failed-brief path still delivers the post-sync zones")
+  }
 }
