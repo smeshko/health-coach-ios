@@ -1,6 +1,6 @@
 # Plan: Production base-URL seam
 
-Status: in-progress
+Status: done
 Branch: fix/phase-18-1-production-base-url
 Risk: medium
 Epic: 18 — Make it run on device (audit wave 1) ([epic](../../epics/18-run-on-device.md))
@@ -94,13 +94,13 @@ the cheapest owner-editable seam (no xcconfig files exist in the project today).
 
 ## Acceptance Criteria
 
-- [ ] A release (and live-mode DEBUG) build resolves the APIClient to the configured server
+- [x] A release (and live-mode DEBUG) build resolves the APIClient to the configured server
   URL; with `API_BASE_URL` set, requests go to that host — unit-tested resolver + built app +
   a simulator runtime run whose `.http` log shows the configured host (TASK-004 evidence).
-- [ ] No build path resolves to localhost — or any cleartext http URL — off DEBUG+simulator;
+- [x] No build path resolves to localhost — or any cleartext http URL — off DEBUG+simulator;
   pinned by resolver unit tests (the "caught by a test" arm); the default parameter is gone
   from `live(...)`.
-- [ ] First-launch live/mock default is coherent with the configured URL: unconfigured DEBUG
+- [x] First-launch live/mock default is coherent with the configured URL: unconfigured DEBUG
   fresh install seeds mock; configured install seeds live (unit-tested).
 - [ ] CI-pending (owner): on-device probe + sync against the real HTTPS backend (physical
   phone + self-hosted server; the epic's Validation step — the corresponding epic acceptance
@@ -115,4 +115,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-002: Remove localhost default from live(); add unconfigured throwing client; resolver-backed liveValue (depends on TASK-001)
 - [x] TASK-003: DevSettings first-launch seeding coherent with configured backend (depends on TASK-002)
 - [x] TASK-004: Composition-root wiring: AppConfig, Info.plist key, API_BASE_URL build setting, explicit apiClient (depends on TASK-003)
-- [ ] TASK-005: Final Validation
+- [x] TASK-005: Final Validation
