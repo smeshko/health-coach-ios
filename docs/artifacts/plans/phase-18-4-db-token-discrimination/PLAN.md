@@ -1,6 +1,6 @@
 # Plan: Resilient-DB and token-restore discrimination
 
-Status: in-progress
+Status: done
 Branch: fix/phase-18-4-db-token-discrimination
 Risk: medium
 Epic: 18 — Make it run on device (audit wave 1) ([epic](../../epics/18-run-on-device.md))
@@ -107,16 +107,30 @@ unavailable) to `hasToken: false` → onboarding swap, exactly the audit's stran
 
 ## Acceptance Criteria
 
-- [ ] Forced `SQLITE_BUSY`/migration-failure opens do NOT quarantine (file byte-identical
+- [x] Forced `SQLITE_BUSY`/migration-failure opens do NOT quarantine (file byte-identical
   after the attempt), fall back to in-memory, and log the preserve decision; forced
   `SQLITE_CORRUPT`/`SQLITE_NOTADB` (and the real garbage-bytes integration case) DO
   quarantine and recreate — unit + integration tested.
-- [ ] Quarantine moves `-journal` alongside ``/`-wal`/`-shm` (test creates all four and
+  *(MakeLiveTests: `test_makeLiveResilient_transientFailure_preservesFileAndFallsBackInMemory`
+  asserts bytes-identical + `.http` preserve log; `test_classifyOpenFailure_quarantinesOnlyProvenCorruption`
+  pins the full matrix incl. a non-SQLite MigrationBug → preserve;
+  `test_makeLiveResilient_recoversFromCorruptFile_quarantinesItAndItsSidecars` is the real
+  garbage-bytes integration case — all passed 2026-07-10.)*
+- [x] Quarantine moves `-journal` alongside ``/`-wal`/`-shm` (test creates all four and
   asserts the `.corrupt` moves).
-- [ ] A throwing `tokenClient.read()` at launch leaves the route on `.main` (TestStore) and
+  *(`test_makeLiveResilient_corruptThenFailingRecreate_logsFailureAndFallsBackInMemory`
+  creates all four and asserts every suffix moved — not copied — to `.corrupt`.)*
+- [x] A throwing `tokenClient.read()` at launch leaves the route on `.main` (TestStore) and
   logs the failure distinctly from "no token"; `absent` still swaps to onboarding; `present`
   unchanged.
-- [ ] Full suite + lint green; no snapshot changes expected.
+  *(AppFeatureSwitchTests: `test_restoreSession_readFailure_staysOnMain_andDispatchesOnAppOpen`
+  asserts route stays `.main` + distinct `.http` error log;
+  `test_restoreSession_missingToken_swapsToOnboarding` and
+  `test_restoreSession_storedToken_staysInMain_andDispatchesOnAppOpen` still green.)*
+- [x] Full suite + lint green; no snapshot changes expected.
+  *(2026-07-10: `swift test` — 483 tests / 95 suites passed; `make lint` — 0 violations in
+  379 files; no view changes on the branch → no snapshot re-records. Sim smoke same day:
+  stored token → `.main`, keychain-reset relaunch → onboarding Connect, no crashes.)*
 - [ ] CI-pending (owner): on-device — inject a transient DB failure / Keychain error and
   observe preservation + no forced onboarding (epic Validation; simulator smoke covers the
   in-app equivalents).
@@ -128,4 +142,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 
 - [x] TASK-001: DatabaseLive: corruption-vs-transient discrimination, journal sidecar, logged recovery
 - [x] TASK-002: AppFeature: three-state token restore (present/absent/read-failed)
-- [ ] TASK-003: Final Validation
+- [x] TASK-003: Final Validation
