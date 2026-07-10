@@ -1,5 +1,6 @@
-// ConnectView snapshots (ARCHITECTURE D16): the two designed states — the **connect** state and the
-// **connect-error** state — in light + dark on the single reference device, via the shared
+// ConnectView snapshots (ARCHITECTURE D16): the three designed states — the **connect** state, the
+// **connect-error** (token rejected) state, and the **connect-unreachable** (server never answered,
+// Phase 18.3) state — in light + dark on the single reference device, via the shared
 // `CoachTestSupport` harness (`assertCoachSnapshot(of:)`, reused — not re-encoded). The whole body is
 // `#if canImport(UIKit)`-guarded so this target compiles to an empty module on the macOS host (so
 // `swift test` stays green); it runs on the iOS 26 simulator via `make test-snapshots`.
@@ -33,6 +34,15 @@
     @Test func test_connect_errorState() {
       let view = ConnectView(
         store: Store(initialState: ConnectComponent.State(token: "ahc_live_x93k7q", validation: .invalid)) {
+          ConnectComponent()
+        }
+      )
+      assertCoachSnapshot(of: view)
+    }
+
+    @Test func test_connect_unreachableState() {
+      let view = ConnectView(
+        store: Store(initialState: ConnectComponent.State(token: "ahc_live_x93k7q", validation: .unreachable)) {
           ConnectComponent()
         }
       )

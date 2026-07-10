@@ -100,10 +100,12 @@ public struct HealthKitPriming {
       case .authorizationResponse(.success):
         state.phase = .checking
         // One-shot, watermark-neutral presence probe since the far past — "is there any sample at all",
-        // not a 30-day window, so an old-but-granted category still reads present (DECISIONS #2).
+        // not a 30-day window, so an old-but-granted category still reads present (DECISIONS #2). Runs
+        // under the dedicated `.presenceProbe()` bounds (365 rows/type ≈ a year of activity-summary
+        // days, 10s timeout — the user is waiting): bounded, but presence semantics preserved.
         return .run { [healthKitClient] send in
           do {
-            let samples = try await healthKitClient.deltaSamples(.since(.distantPast))
+            let samples = try await healthKitClient.deltaSamples(.presenceProbe())
             await send(.degradedProbeResponse(.success(samples)))
           } catch {
             await send(.degradedProbeResponse(.failure(error)))

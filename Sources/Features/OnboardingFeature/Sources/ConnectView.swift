@@ -7,12 +7,15 @@ import SwiftUI
 #endif
 
 /// The Connect screen (`Connect` / `Connect Error` designs): a **left-aligned** token-entry form over
-/// `StoreOf<ConnectComponent>`. Renders the **connect** state and, when `validation == .invalid`, the
-/// **error** state (tinted field + an inline error row). All color/spacing/radius/typography come from
-/// `DesignSystem` tokens — no raw hex or magic numbers. The error row's copy is the fixed
-/// `ErrorDisplay.tokenRejected` label from the `DesignSystem` boundary (DECISIONS 6) — distinct from the
-/// 401 reason banner's `.unauthorized`; the feature authors no raw error string and there is no
-/// `APIError`→`ErrorDisplay` presenter here (every probe failure shows the one token-rejected message).
+/// `StoreOf<ConnectComponent>`. Renders three stories: the **connect** state, and on a failed probe one
+/// of two **error** states (tinted field + an inline error row) — `validation == .invalid` (the server
+/// REJECTED the token, 401) and `validation == .unreachable` (the server never ANSWERED — transport,
+/// timeout, unconfigured client), so a down server can't masquerade as a bad token (Phase 18.3). All
+/// color/spacing/radius/typography come from `DesignSystem` tokens — no raw hex or magic numbers. The
+/// error rows' copy is the fixed `ErrorDisplay.tokenRejected` / `.serverUnreachable` labels from the
+/// `DesignSystem` boundary (DECISIONS 6) — distinct from the 401 reason banner's `.unauthorized`; the
+/// feature authors no raw error string and there is no `APIError`→`ErrorDisplay` presenter here (the
+/// reducer already collapsed every failure into the two `Validation` error cases).
 ///
 /// Pure SwiftUI value code that compiles on the macOS host (the Swift/SPM host-build hazard) — no
 /// iOS-only modifiers; the 401-bounce reason banner is the parent `OnboardingView`'s concern.
@@ -25,6 +28,17 @@ struct ConnectView: View {
 
   init(store: StoreOf<ConnectComponent>) {
     self.store = store
+  }
+
+  /// The inline error-row copy for the current validation state, `nil` when there is no error. Both
+  /// error cases share the row structure and negative tint; only the copy differs (`.invalid` keeps its
+  /// exact pre-18.3 rendering).
+  private var errorLabel: String? {
+    switch store.validation {
+    case .invalid: ErrorDisplay.tokenRejected.label
+    case .unreachable: ErrorDisplay.serverUnreachable.label
+    case .idle, .validating: nil
+    }
   }
 
   var body: some View {
@@ -101,17 +115,17 @@ struct ConnectView: View {
         .padding(CoachSpacing.spaceMd)
         .background(
           RoundedRectangle(cornerRadius: CoachRadius.sm)
-            .fill(store.validation == .invalid ? Color.coachNegativeSoft : .coachSurfaceSunken)
+            .fill(errorLabel != nil ? Color.coachNegativeSoft : .coachSurfaceSunken)
         )
         .overlay(
           RoundedRectangle(cornerRadius: CoachRadius.sm)
-            .stroke(store.validation == .invalid ? Color.coachNegative : .coachBorder, lineWidth: 1)
+            .stroke(errorLabel != nil ? Color.coachNegative : .coachBorder, lineWidth: 1)
         )
 
-        if store.validation == .invalid {
+        if let errorLabel {
           HStack(alignment: .top, spacing: CoachSpacing.space2xs) {
             Image(systemName: "exclamationmark.circle.fill")
-            Text(ErrorDisplay.tokenRejected.label)
+            Text(errorLabel)
             Spacer(minLength: 0)
           }
           .font(.coachTextXs)
@@ -163,6 +177,14 @@ private enum Metrics {
 #Preview("Connect Error") {
   ConnectView(
     store: Store(initialState: ConnectComponent.State(token: "ahc_live_x93k7q", validation: .invalid)) {
+      ConnectComponent()
+    }
+  )
+}
+
+#Preview("Connect Unreachable") {
+  ConnectView(
+    store: Store(initialState: ConnectComponent.State(token: "ahc_live_x93k7q", validation: .unreachable)) {
       ConnectComponent()
     }
   )

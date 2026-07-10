@@ -27,6 +27,10 @@ public enum ErrorDisplay: Sendable, Hashable, CaseIterable {
   /// A freshly-typed connect token was rejected — distinct from `.unauthorized` (a *prior* session
   /// going invalid). Rendered in the Connect field error; the 401 reason banner keeps `.unauthorized`.
   case tokenRejected
+  /// The Connect probe never got an answer (transport failure, timeout, unconfigured client) —
+  /// reachability, not rejection. Distinct from `.tokenRejected` so a down server can't read as
+  /// "your token is wrong".
+  case serverUnreachable
   case validationError
   case notFound
   case briefGenerationFailed
@@ -40,6 +44,7 @@ extension ErrorDisplay: DisplayLabel {
     switch self {
     case .unauthorized: "Session expired — reconnect to continue."
     case .tokenRejected: "That token doesn't look right. Check it and paste again."
+    case .serverUnreachable: "Can't reach the server — check your connection and server address."
     case .validationError: "Something didn't look right — please try again."
     case .notFound: "We couldn't find that."
     case .briefGenerationFailed: "Couldn't build your brief — try again in a moment."

@@ -64,4 +64,14 @@ struct DisplayLabelTests {
     // Distinct from the 401 *banner* copy, which stays `.unauthorized`.
     #expect(ErrorDisplay.tokenRejected.label != ErrorDisplay.unauthorized.label)
   }
+
+  @Test func test_errorDisplay_serverUnreachable_hasConnectCopy() {
+    #expect(
+      ErrorDisplay.serverUnreachable.label ==
+        "Can't reach the server — check your connection and server address."
+    )
+    // Reachability, not rejection — must never read as the token-rejected copy.
+    #expect(ErrorDisplay.serverUnreachable.label != ErrorDisplay.tokenRejected.label)
+    #expect(ErrorDisplay.serverUnreachable.label != ErrorDisplay.unauthorized.label)
+  }
 }

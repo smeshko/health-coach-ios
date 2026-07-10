@@ -4,18 +4,37 @@ import Foundation
 import TokenClient
 
 /// The Connect step's reducer (ARCHITECTURE §4.5 / §10, PRD §8.4 / FR-ONB-1): paste a bearer token,
-/// validate it via `GET /probe`, and either keep it (success → advance) or clear it (failure → show the
-/// error). Lives **inside** the `OnboardingFeature` target — it is composed only by `OnboardingFeature`'s
-/// `.connect` step, never promoted (PLAN.md D5).
+/// validate it via `GET /probe`, and land on one of THREE outcomes: success → keep the token and
+/// advance; 401 (`APIError.unauthorized`) → the token is wrong → clear it and show `.invalid`; any
+/// other failure (transport/offline, decode, the unconfigured client) → the server never gave a
+/// verdict → clear the candidate (restore-safety, see below) but show `.unreachable`, never "token
+/// invalid". Lives **inside** the `OnboardingFeature` target — it is composed only by
+/// `OnboardingFeature`'s `.connect` step, never promoted (PLAN.md D5).
 ///
 /// **Load-bearing ordering (DECISIONS 1):** `probe()` takes no token argument and reads the bearer from
 /// `TokenClient` per request (§6.1/D12), so the candidate token **must** be written to the Keychain
-/// *before* probing. On any failure the candidate is `clear()`ed, so an invalid token is shown without
-/// being left stored.
+/// *before* probing. On EVERY failure the candidate is `clear()`ed — an unvalidated token left stored
+/// would flip the next launch's restore to `.main`. `.unreachable` changes the presentation, not the
+/// persistence.
+///
+/// **Stale-probe race closure:** the probe effect runs under `CancelID.probe`, and any field edit
+/// (`binding`/`tokenPasted`) cancels it — a stale probe response can never arrive after the user moved
+/// on, so a late transient failure cannot clear a NEWER candidate or masquerade as "invalid". The edit
+/// arms also clear the (possibly just-written) candidate themselves, because cancelling the probe
+/// suppresses the failure arm where the clear otherwise lives. That clear is registered under the SAME
+/// cancel ID, so a re-tap cancels a pending clear before writing (a detached clear could interleave
+/// write → clear → probe and 401 a valid token). Cancellation is cooperative: effect bodies lead with
+/// `Task.checkCancellation()` so a cancelled-but-unstarted body cannot still run.
 @Reducer
 public struct ConnectComponent {
-  /// The single source of truth for the button/spinner/error — no boolean soup.
-  public enum Validation: Equatable { case idle, validating, invalid }
+  /// The single source of truth for the button/spinner/error — no boolean soup. `.invalid` means the
+  /// server REJECTED the token (401); `.unreachable` means the server never answered (transport,
+  /// timeout, misconfigured base URL) — the token got no verdict.
+  public enum Validation: Equatable { case idle, validating, invalid, unreachable }
+
+  /// Single cancel ID for the probe effect AND the edit-triggered candidate clears — one in-flight
+  /// operation at a time; each new one cancels its predecessor (`cancelInFlight: true`).
+  private enum CancelID { case probe }
 
   @ObservableState
   public struct State: Equatable {
@@ -62,20 +81,36 @@ public struct ConnectComponent {
       switch action {
       case .binding:
         // Any field edit clears a prior error back to idle — re-entry / re-paste is the only recovery
-        // path (FR-ONB-1: no account/recovery flow).
+        // path (FR-ONB-1: no account/recovery flow). The edit also cancels any in-flight probe (the
+        // stale-probe race closure) and clears the candidate the cancelled probe may have written —
+        // cancellation suppresses the failure arm where the clear otherwise runs. Clearing when
+        // nothing was written is a harmless no-op.
         state.validation = .idle
-        return .none
+        return .run { [tokenClient] _ in
+          try Task.checkCancellation()
+          try? await tokenClient.clear()
+        }
+        .cancellable(id: CancelID.probe, cancelInFlight: true)
 
       case let .tokenPasted(value):
         state.token = value
         state.validation = .idle
-        return .none
+        // Same cancel-probe + clear-candidate semantics as `.binding` — see above.
+        return .run { [tokenClient] _ in
+          try Task.checkCancellation()
+          try? await tokenClient.clear()
+        }
+        .cancellable(id: CancelID.probe, cancelInFlight: true)
 
       case .connectTapped:
         guard state.canSubmit else { return .none }
         state.validation = .validating
         let candidate = state.token.trimmingCharacters(in: .whitespacesAndNewlines)
         return .run { [tokenClient, apiClient] send in
+          // Cooperative cancellation guard: `cancelInFlight` above may have cancelled a PENDING edit
+          // clear, and a later edit may cancel THIS task before it starts — never write a candidate
+          // from an already-cancelled probe.
+          try Task.checkCancellation()
           do {
             // DECISIONS 1: write the candidate FIRST so the transport can inject it as the bearer
             // header when `probe` runs.
@@ -86,6 +121,7 @@ public struct ConnectComponent {
             await send(.probeResponse(.failure(error)))
           }
         }
+        .cancellable(id: CancelID.probe, cancelInFlight: true)
 
       case .probeResponse(.success):
         // Probe returned without throwing → the token is valid (the `Bool` value is irrelevant). It
@@ -93,12 +129,21 @@ public struct ConnectComponent {
         state.validation = .idle
         return .send(.delegate(.connected))
 
-      case .probeResponse(.failure):
-        // Any failure (401 → `APIError.unauthorized`, or a transport error): clear the just-written
-        // candidate so no invalid token is left in the Keychain, and show the in-screen error. Do NOT
-        // navigate — the §13 stream-driven 401 bounce is idempotent (already on Connect).
-        state.validation = .invalid
-        return .run { [tokenClient] _ in try? await tokenClient.clear() }
+      case let .probeResponse(.failure(error)):
+        // Discriminate the verdict: ONLY a 401 (`APIError.unauthorized`) means the server rejected the
+        // token → `.invalid`. Every other failure (transport/offline, decode, the unconfigured
+        // client's `.transport`) means the server never answered → `.unreachable` — reachability, not
+        // a token verdict. BOTH arms clear the just-written candidate: an unvalidated token left in
+        // the Keychain would flip the next launch's restore to `.main`. Do NOT navigate — the §13
+        // stream-driven 401 bounce is idempotent (already on Connect). The clear runs under
+        // `CancelID.probe` too, so a subsequent re-tap cancels it before writing (no stray clear can
+        // interleave write → clear → probe).
+        state.validation = error as? APIError == .unauthorized ? .invalid : .unreachable
+        return .run { [tokenClient] _ in
+          try Task.checkCancellation()
+          try? await tokenClient.clear()
+        }
+        .cancellable(id: CancelID.probe, cancelInFlight: true)
 
       case .delegate:
         return .none

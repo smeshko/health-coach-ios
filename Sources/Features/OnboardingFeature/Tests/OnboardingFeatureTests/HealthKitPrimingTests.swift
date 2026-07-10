@@ -149,6 +149,61 @@ struct HealthKitPrimingTests {
     }
   }
 
+  /// Phase 18.3: the probe runs under the DEDICATED presence-probe bounds — since `.distantPast`
+  /// (presence, not a delta window), `limitPerType` 365 (doubles as the activity-summary window in
+  /// days — 1 would only read activity "present" with a summary today), timeout 10s (< the 15s sync
+  /// default; the user is actively waiting). The stub captures the bounds the reducer requests.
+  @Test func test_probe_requestsDedicatedPresenceProbeBounds() async {
+    let captured = LockIsolated<[HealthReadBounds]>([])
+    let store = TestStore(initialState: HealthKitPriming.State()) {
+      HealthKitPriming()
+    } withDependencies: {
+      $0.healthKitClient.isHealthDataAvailable = { true }
+      $0.healthKitClient.requestAuthorization = {}
+      $0.healthKitClient.authorizationStatus = { HKFixtures.allAuthorized }
+      $0.healthKitClient.deltaSamples = { bounds in
+        captured.withValue { $0.append(bounds) }
+        return HKFixtures.allPresentSamples
+      }
+    }
+
+    await store.send(.connectTapped) { $0.phase = .authorizing }
+    await store.receive(\.authorizationResponse) { $0.phase = .checking }
+    await store.receive(\.degradedProbeResponse) { $0.phase = .granted }
+    await store.receive(\.delegate, .finished)
+
+    let bounds = captured.value
+    #expect(bounds.count == 1, "exactly one one-shot probe read")
+    #expect(bounds.first?.since == .distantPast, "presence == anything at all, since the far past")
+    #expect(bounds.first?.limitPerType == 365, "a year of activity-summary window days, firmly bounded")
+    #expect(bounds.first?.timeout == .seconds(10), "tighter than the 15s sync default — the user waits")
+  }
+
+  /// Phase 18.3 pin (the epic's acceptance in TestStore form): a probe `HealthKitReadError.timedOut`
+  /// lands `.degraded(all rows)` — the actionable Continue-CTA state — never a stuck `.checking`.
+  @Test func test_probeTimedOut_landsFullyDegraded_neverStuckChecking() async {
+    let store = TestStore(initialState: HealthKitPriming.State()) {
+      HealthKitPriming()
+    } withDependencies: {
+      $0.healthKitClient.isHealthDataAvailable = { true }
+      $0.healthKitClient.requestAuthorization = {}
+      $0.healthKitClient.authorizationStatus = { HKFixtures.allAuthorized }
+      $0.healthKitClient.deltaSamples = { _ in throw HealthKitReadError.timedOut }
+    }
+
+    await store.send(.connectTapped) { $0.phase = .authorizing }
+    await store.receive(\.authorizationResponse) { $0.phase = .checking }
+    await store.receive(\.degradedProbeResponse) {
+      $0.missingRows = Set(PrimingRow.allCases)
+      $0.phase = .degraded(
+        HealthKitPriming.DegradedSummary(missing: Set(PrimingRow.allCases))
+      )
+    }
+    // The degraded screen's non-blocking Continue works — the user is never wedged post-timeout.
+    await store.send(.continueTapped)
+    await store.receive(\.delegate, .finished)
+  }
+
   /// "Open Health settings" opens the `x-apple-health://` deep link via `openURL` (the Continue path
   /// never depends on it succeeding).
   @Test func test_openHealthSettings_opensHealthDeepLink() async {

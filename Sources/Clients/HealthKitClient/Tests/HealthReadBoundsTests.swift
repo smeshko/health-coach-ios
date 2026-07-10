@@ -70,6 +70,20 @@ struct HealthReadBoundsTests {
     )
   }
 
+  /// Phase 18.3: the dedicated onboarding presence-probe bounds. `limitPerType` doubles as the
+  /// activity-summary window in DAYS (see `activitySince`), so a probe cannot use 1 — 365 keeps
+  /// "old-but-granted reads present" true for a year of inactivity; the 10s timeout undercuts the
+  /// 15s sync default because the user is actively waiting on the onboarding screen.
+  @Test func test_presenceProbeFactory_carriesDedicatedProbeBounds() {
+    let probe = HealthReadBounds.presenceProbe()
+    #expect(probe.since == .distantPast, "presence means anything at all — since the far past")
+    #expect(probe.limitPerType == 365, "a year of activity-summary window days, firmly bounded")
+    #expect(probe.timeout == .seconds(10), "tighter than the 15s sync default — the user waits")
+
+    let custom = Date(timeIntervalSinceReferenceDate: 99)
+    #expect(HealthReadBounds.presenceProbe(since: custom).since == custom, "explicit floor passes through")
+  }
+
   @Test func test_memberwiseInit_carriesExplicitValues() {
     let date = Date(timeIntervalSinceReferenceDate: 42)
     let bounds = HealthReadBounds(since: date, limitPerType: 500, timeout: .seconds(3))
