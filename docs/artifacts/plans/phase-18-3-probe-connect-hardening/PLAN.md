@@ -1,6 +1,6 @@
 # Plan: Onboarding-probe and Connect hardening
 
-Status: in-progress
+Status: done
 Branch: fix/phase-18-3-probe-connect-hardening
 Risk: medium
 Epic: 18 — Make it run on device (audit wave 1) ([epic](../../epics/18-run-on-device.md))
@@ -100,22 +100,33 @@ summary today.
 
 ## Acceptance Criteria
 
-- [ ] A mid-probe edit cancels the in-flight probe AND clears the just-written candidate
+- [x] A mid-probe edit cancels the in-flight probe AND clears the just-written candidate
   (the cancel-skips-clear persistence hole — validation round-1 #1): TestStore proves no
   `probeResponse` is delivered after `binding`/`tokenPasted` and `tokenClient.clear` was
   called. (`cancelInFlight: true` stays as untestable defense-in-depth — a concurrent
   second probe is unreachable through `canSubmit`; validation round-1 #2.)
-- [ ] `probeResponse(.failure(APIError.unauthorized))` → `.invalid` + candidate cleared;
+  *(`test_editMidProbe_cancelsProbe_andClearsCandidate` +
+  `test_retapAfterEdit_cancelsPendingClear_beforeWriting` passed 2026-07-10.)*
+- [x] `probeResponse(.failure(APIError.unauthorized))` → `.invalid` + candidate cleared;
   any other failure (incl. `APIError.transport` from the 18.1 unconfigured client) →
   `.unreachable` + candidate cleared — unit-tested both arms; the two states render
   distinct copy (snapshot).
-- [ ] The priming probe requests `HealthReadBounds.presenceProbe` (stub captures bounds:
+  *(`test_connect_unauthorized_clearsToken_showsInvalid_noConnected` +
+  `test_connect_nonAuthFailure_clearsToken_showsUnreachable(probeError:)` [transport,
+  decoding] passed; ConnectView snapshots green; sim run 2026-07-10: dead server →
+  "Can't reach the server" copy, log shows `/probe` Connection refused.)*
+- [x] The priming probe requests `HealthReadBounds.presenceProbe` (stub captures bounds:
   since == .distantPast, limitPerType == 365, timeout == 10s) and a probe `.timedOut`
   lands `.degraded(all rows)` with Continue enabled — never a stuck `.checking` (TestStore).
-- [ ] Full suite + lint green; OnboardingFeature snapshots green with the one new
+  *(`test_probe_requestsDedicatedPresenceProbeBounds` +
+  `test_probeTimedOut_landsFullyDegraded_neverStuckChecking` passed; sim run 2026-07-10:
+  healthd suspended mid-`.checking` → queries stopped at +10.5s → degraded screen.)*
+- [x] Full suite + lint green; OnboardingFeature snapshots green with the one new
   unreachable snapshot case (a light+dark PNG pair — validation round-1 #3) recorded on
   the pinned sim; the copy lives in `ErrorDisplay.serverUnreachable` at the D19 boundary
   (validation round-1 #4).
+  *(2026-07-10: 479 host tests / 95 suites passed; swiftlint --strict 0 violations in
+  379 files; 94/94 snapshot tests passed on the pinned iPhone 17 Pro / OS 26.0.)*
 - [ ] CI-pending (owner): on-device slow/failing-probe behaviour (wedged `healthd`,
   unreachable server) settles to actionable states — epic Validation.
 
@@ -127,4 +138,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-001: ConnectComponent: probe CancelID + 401-vs-transport discrimination
 - [x] TASK-002: ConnectView: unreachable error presentation + snapshot (depends on TASK-001)
 - [x] TASK-003: Priming presence-probe bounds + timeout-degrade pin (depends on TASK-001)
-- [ ] TASK-004: Final Validation
+- [x] TASK-004: Final Validation
