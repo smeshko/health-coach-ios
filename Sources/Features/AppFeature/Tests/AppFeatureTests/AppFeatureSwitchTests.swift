@@ -26,7 +26,7 @@ struct AppFeatureSwitchTests {
   }
 
   /// A nil OR empty stored token both fall back to onboarding (parameterized — the two cases share the
-  /// `._tokenChecked(false)` receive path). Folds the former AppFeatureLogTests.test_restoreSession_*
+  /// `._tokenChecked(.absent)` receive path). Folds the former AppFeatureLogTests.test_restoreSession_*
   /// log asserts (audit MERGE): the `.lifecycle` "Restoring session" + `.app` onboarding-fallback lines
   /// are asserted here on the same `._restoreSession` walk.
   @Test(arguments: [String?.none, ""])
@@ -40,7 +40,7 @@ struct AppFeatureSwitchTests {
     }
 
     await store.send(._restoreSession)
-    await store.receive(\._tokenChecked, false) {
+    await store.receive(\._tokenChecked, .absent) {
       // Token-less arm: route swaps to onboarding AND the restore overlay lifts (Phase 12.4, D1).
       $0.route = .onboarding(OnboardingFeature.State())
       $0.isRestoringSession = false
@@ -65,7 +65,7 @@ struct AppFeatureSwitchTests {
     }
 
     await store.send(._restoreSession)
-    await store.receive(\._tokenChecked, true) {
+    await store.receive(\._tokenChecked, .present) {
       // Token-bearing arm: the route stays `.main` but the restore overlay lifts (Phase 12.4, D1).
       $0.isRestoringSession = false
     }
@@ -92,12 +92,50 @@ struct AppFeatureSwitchTests {
     }
 
     await store.send(._restoreSession)
-    await store.receive(\._tokenChecked, false) {
+    await store.receive(\._tokenChecked, .absent) {
       $0.route = .onboarding(OnboardingFeature.State())
       $0.isRestoringSession = false
     }
     // No `.main.todayRoot.onAppOpen` (or any Today action) in the exhaustive walk → the open never ran.
     await store.finish()
+  }
+
+  /// Phase 18.4: a THROWN Keychain read at launch is not "no token". The route stays `.main` (no
+  /// onboarding swap — swapping on a read ERROR is the audit's stranding bug), the restore overlay
+  /// lifts, the cache-first open still dispatches, and the failure is logged distinctly on the
+  /// always-on `.http` category (never the toggle-gated `.app` — the log IS the diagnostic surface).
+  @Test func test_restoreSession_readFailure_staysOnMain_andDispatchesOnAppOpen() async {
+    let now = sofiaInstant()
+    let recorder = LogRecorder()
+    let store = TestStore(initialState: AppFeature.State()) {
+      AppFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
+      $0.tokenClient.read = { throw TokenReadFailure() }
+      $0.checkInRepository.current = { _ in nil }
+      $0.log = .recording(into: recorder)
+    }
+
+    await store.send(._restoreSession)
+    await store.receive(\._tokenChecked, .readFailed("TokenReadFailure()")) {
+      // readFailed arm: ONLY the overlay lifts — the route stays the default `.main` (exhaustive
+      // store: an onboarding swap here would fail the walk).
+      $0.isRestoringSession = false
+    }
+    // The cache-first open still dispatches (same D8 dispatch as the token-bearing arm); `current`
+    // returns nil so the open lands at the check-in gate.
+    await store.receive(\.main.todayRoot.onAppOpen)
+    await store.receive(\.main.todayRoot._checkInRequired) {
+      $0.route = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
+    }
+
+    // Distinct log record on the always-on `.http` category: names the keychain failure (status
+    // description only), never the "no token" fallback line.
+    #expect(recorder.entries.contains {
+      $0.category == .http && $0.level == .error && $0.message.contains("Launch token read FAILED")
+    })
+    #expect(!recorder.entries.contains { $0.message.contains("falling back to onboarding") })
   }
 
   @Test func test_connectedDelegate_swapsToMain_andDispatchesOnAppOpen() async {
@@ -167,3 +205,7 @@ struct AppFeatureSwitchTests {
 private func sofiaInstant() -> Date {
   Calendar.europeSofia.date(from: DateComponents(year: 2026, month: 6, day: 10, hour: 9))!
 }
+
+/// A forced Keychain-read failure for the readFailed walk; `"\(error)"` of a payload-free struct is
+/// its type name + `()`, which pins the `.readFailed` description deterministically.
+private struct TokenReadFailure: Error {}

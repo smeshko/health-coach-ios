@@ -8,7 +8,8 @@ import TokenClient
 /// The app root (ARCHITECTURE §10 / D7): the `route` is a sum type that is **either** onboarding **or**
 /// the main tab bar — never both. **Happy-path-first** (personal app): the app starts in `.main` and, on
 /// launch, a background token check (`tokenClient.read()`) falls back to `.onboarding` only when no bearer
-/// token is stored — the no-token / first-run case is the edge case, not the default. A successful Connect
+/// token is CONFIRMED absent — a Keychain read ERROR stays put on `.main` (Phase 18.4: error ≠ absence;
+/// swapping on a thrown read would strand a token-holding owner at onboarding). A successful Connect
 /// flips the route `.onboarding → .main` on the `connected` delegate, and the 401 effect flips `.main →
 /// .onboarding` at the Connect step with `reason: .tokenInvalid` (see `AppFeature+SessionRouting.swift`).
 /// An *invalid* (vs absent) token is caught by that 401 path on the first request, not by the launch
@@ -26,6 +27,21 @@ public struct AppFeature {
   public enum Route: Equatable {
     case onboarding(OnboardingFeature.State)
     case main(MainTabs.State)
+  }
+
+  /// The launch token-read outcome (Phase 18.4) — three states, because error ≠ absence: `try?` used to
+  /// collapse a thrown Keychain read into "no token" and swap a token-holding owner to onboarding.
+  /// `public` deliberately: `Action` is public, so an internal payload type would be an access-control
+  /// compile error. The `.tca` action log renders structural case labels only, never the `String`.
+  public enum TokenRestore: Equatable, Sendable {
+    /// A non-empty bearer token is stored — the happy path.
+    case present
+    /// The read succeeded and CONFIRMED no (or an empty) stored token — the only outcome that swaps
+    /// the route to onboarding.
+    case absent
+    /// The Keychain read threw (e.g. keychain temporarily unavailable). Payload = the error/status
+    /// description, carried solely for the diagnostic log line.
+    case readFailed(String)
   }
 
   @ObservableState
@@ -88,9 +104,9 @@ public struct AppFeature {
     /// App-open session restore — sent once from `AppView`'s launch hook: reads the stored bearer token
     /// in the background so the default `.main` falls back to onboarding only when none exists.
     case _restoreSession
-    /// The launch token-read result (`true` = a non-empty token is stored). Drives the `.main →
-    /// .onboarding` fallback; an empty/absent token is the only thing that swaps.
-    case _tokenChecked(hasToken: Bool)
+    /// The launch token-read outcome. Drives the `.main → .onboarding` fallback; a CONFIRMED
+    /// `.absent` token is the only thing that swaps — `.readFailed` stays put (Phase 18.4).
+    case _tokenChecked(TokenRestore)
     // swiftlint:enable identifier_name
   }
 
@@ -139,30 +155,52 @@ public struct AppFeature {
         return reduceSessionRouting(into: &state, action: action)
       case ._restoreSession:
         // Background token check: read the stored bearer token off the launch path. We don't probe the
-        // network (an invalid token is the 401 path's job; §13), so launch works offline.
+        // network (an invalid token is the 401 path's job; §13), so launch works offline. A thrown read
+        // is its OWN outcome (Phase 18.4) — never collapsed into "no token".
         log.info("Restoring session — reading stored token", category: .lifecycle)
         return .run { [tokenClient] send in
-          let token = try? await tokenClient.read()
-          await send(._tokenChecked(hasToken: token?.isEmpty == false))
+          do {
+            let token = try await tokenClient.read()
+            await send(._tokenChecked(token?.isEmpty == false ? .present : .absent))
+          } catch {
+            await send(._tokenChecked(.readFailed("\(error)")))
+          }
         }
-      case let ._tokenChecked(hasToken):
-        // The launch token check resolved → the restore overlay can lift either way (Phase 12.4, D1: clear
-        // in BOTH arms so AppView crossfades from the launch color into the now-known screen).
+      case let ._tokenChecked(outcome):
+        // The launch token check resolved → the restore overlay can lift in EVERY arm (Phase 12.4, D1:
+        // AppView crossfades from the launch color into the now-known screen).
         state.isRestoringSession = false
-        // Happy-path-first: stay in the default `.main` when a token exists; fall back to onboarding only
-        // for the no-token edge case, and only if a 401 hasn't already routed us off `.main`.
-        guard !hasToken, case .main = state.route else {
-          log.info("Launch token check — staying put", category: .app, metadata: ["hasToken": "\(hasToken)"])
-          // Staying put. Drive the Today cache-first open from the reducer (Phase 12.1, DECISIONS D8) —
-          // but ONLY while still in `.main` (a token exists; or a 401 hasn't already routed us off it). A
-          // token-less launch falls through to the onboarding swap below and never reaches this dispatch,
-          // so it never hydrates cached health content before the swap.
+        switch outcome {
+        case .present:
+          log.info("Launch token check — staying put", category: .app, metadata: ["outcome": "present"])
+          // Happy-path-first: stay in the default `.main` and drive the Today cache-first open from the
+          // reducer (Phase 12.1, DECISIONS D8) — but ONLY while still in `.main` (a 401 may have already
+          // routed us off it).
+          guard case .main = state.route else { return .none }
+          return .send(.main(.todayRoot(.onAppOpen)))
+        case .absent:
+          // The ONLY outcome that swaps: the read succeeded and confirmed no token. Never dispatches
+          // `.onAppOpen`, so a token-less launch never hydrates cached health content before the swap.
+          // Only-from-`.main` guard kept: don't stomp a route a 401 already changed.
+          guard case .main = state.route else { return .none }
+          log.info("Launch token absent — falling back to onboarding", category: .app)
+          state.route = .onboarding(OnboardingFeature.State())
+          return .none
+        case let .readFailed(description):
+          // A read ERROR is not absence — STAY PUT (no route change from `.main`) and still open Today
+          // cache-first. Outcome spectrum: under a TRANSIENT keychain failure the next request's per-call
+          // `tokenClient.read()` succeeds and everything proceeds; under a PERSISTENT one no request can
+          // even be built (Transport reads the token before sending), so no 401 fires — the owner stays
+          // on `.main` in a degraded route whose exact surface varies (a check-in-gated morning shows the
+          // check-in card first; a cache-hit launch renders cached content with the background failure
+          // deliberately quiet; a cache-miss sync shows the error state). The reliable trace is this
+          // always-on `.http` record naming the keychain cause, not any one screen; relaunch recovers
+          // transients. A dedicated recoverable auth/persistence error state with a foreground re-read is
+          // DEFERRED (single-owner app, rare device-level failure).
+          log.error("Launch token read FAILED (\(description)) — staying on main", category: .http)
           guard case .main = state.route else { return .none }
           return .send(.main(.todayRoot(.onAppOpen)))
         }
-        log.info("Launch token absent — falling back to onboarding", category: .app)
-        state.route = .onboarding(OnboardingFeature.State())
-        return .none
       case let .notificationOpened(identifier):
         // The app-layer half of the 10.3 deep-link seam. Only the weekly strength-test reminder routes;
         // the morning check-in reminder needs no route (fire-and-open). Map by the literal wire string —

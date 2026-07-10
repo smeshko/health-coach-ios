@@ -127,5 +127,5 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
 - [x] TASK-001: DatabaseLive: corruption-vs-transient discrimination, journal sidecar, logged recovery
-- [ ] TASK-002: AppFeature: three-state token restore (present/absent/read-failed)
+- [x] TASK-002: AppFeature: three-state token restore (present/absent/read-failed)
 - [ ] TASK-003: Final Validation

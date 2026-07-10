@@ -21,17 +21,18 @@ struct ActionLoggingTests {
       $0.checkInRepository.current = { _ in nil } // the dispatched Today open lands at the gate
       $0.log = .recording(into: recorder)
     }
-    // `._tokenChecked(true)` now dispatches the Today cache-first open (D8); this test only cares about
-    // the `.tca` log line, so don't assert the open chain exhaustively.
+    // `._tokenChecked(.present)` now dispatches the Today cache-first open (D8); this test only cares
+    // about the `.tca` log line, so don't assert the open chain exhaustively.
     store.exhaustivity = .off
 
-    // A payload-bearing action: only the case label is logged, never `hasToken: true`.
-    await store.send(._tokenChecked(hasToken: true))
+    // A payload-bearing action: the renderer descends through the `TokenRestore` enum (structural case
+    // labels) but stops at its non-enum `String` payload — the error description is never logged.
+    await store.send(._tokenChecked(.readFailed("keychain-status-payload")))
     await store.skipReceivedActions()
 
     let tca = recorder.entries.filter { $0.category == .tca }
-    #expect(tca.contains { $0.level == .debug && $0.message == "_tokenChecked" })
-    #expect(!tca.contains { $0.message.contains("true") || $0.message.contains("hasToken") })
+    #expect(tca.contains { $0.level == .debug && $0.message == "_tokenChecked.readFailed" })
+    #expect(!tca.contains { $0.message.contains("keychain-status-payload") })
   }
 
   @Test func test_nestedAction_logsCaseLabelPath() async {
