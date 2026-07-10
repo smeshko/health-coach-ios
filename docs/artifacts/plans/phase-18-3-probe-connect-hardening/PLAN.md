@@ -126,5 +126,5 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 
 - [x] TASK-001: ConnectComponent: probe CancelID + 401-vs-transport discrimination
 - [x] TASK-002: ConnectView: unreachable error presentation + snapshot (depends on TASK-001)
-- [ ] TASK-003: Priming presence-probe bounds + timeout-degrade pin (depends on TASK-001)
+- [x] TASK-003: Priming presence-probe bounds + timeout-degrade pin (depends on TASK-001)
 - [ ] TASK-004: Final Validation

@@ -32,6 +32,17 @@ public struct HealthReadBounds: Sendable, Equatable {
     HealthReadBounds(since: date, limitPerType: defaultLimitPerType, timeout: defaultTimeout)
   }
 
+  /// The onboarding **presence-probe** bounds: "is anything there at all", not a delta read. Sized
+  /// for presence, not volume: `limitPerType` doubles as the activity-summary window in DAYS
+  /// (`activitySince`, 18.2 review #2.2/#3.1), so a presence probe cannot use 1 — activity would
+  /// only read "present" with a summary today; 365 keeps "old-but-granted reads present" true for
+  /// a year of inactivity while staying firmly bounded. The 10s timeout is below the 15s sync
+  /// default because a probe is smaller than a delta read and the user is actively waiting on the
+  /// onboarding screen.
+  public static func presenceProbe(since date: Date = .distantPast) -> HealthReadBounds {
+    HealthReadBounds(since: date, limitPerType: 365, timeout: .seconds(10))
+  }
+
   /// The start of the **activity-summary** window: `since`, floored at `limitPerType - 1` days
   /// before `now`. `HKActivitySummaryQuery` has no `limit` parameter, but summaries are
   /// one-per-day, so bounding the window enforces the same per-type row cardinality as the
