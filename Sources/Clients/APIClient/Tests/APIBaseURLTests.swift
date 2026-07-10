@@ -92,6 +92,13 @@ struct APIBaseURLTests {
     "https://[::1]", // IPv6 loopback
     "https://[::1]:8000",
     "https://[::ffff:127.0.0.1]", // IPv4-mapped loopback
+    // Equivalent representations (review round-2 #2) — parsed, not string-matched.
+    "https://[0:0:0:0:0:0:0:1]", // expanded IPv6 loopback
+    "https://[0000:0000:0000:0000:0000:0000:0000:0001]", // fully expanded IPv6 loopback
+    "https://[::ffff:7f00:1]", // IPv4-mapped loopback, hex halves
+    "https://127.1", // partial dotted IPv4 (inet_aton → 127.0.0.1)
+    "https://2130706433", // single-integer IPv4 literal (= 127.0.0.1)
+    "https://0x7f000001", // hex IPv4 literal (= 127.0.0.1)
   ]
 
   @Test(arguments: insecureOrLoopbackValues)

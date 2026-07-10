@@ -47,9 +47,11 @@ public enum APIBaseURL {
     return resolve(configuredValue: configured, allowInsecureFallback: allowInsecureFallback)
   }
 
-  /// Classifies loopback hosts (rather than string-comparing a fixed list): `localhost`
-  /// (case-insensitive, trailing FQDN dot stripped), any IPv4 literal in 127/8, IPv6 loopback
-  /// `::1` (bracketed or not), and IPv4-mapped loopback (`::ffff:127.…`).
+  /// Classifies loopback hosts by **parsing** IP literals rather than string-matching spellings
+  /// (review round-2 #2: `[::ffff:7f00:1]`, expanded `::1`, integer/hex/partial IPv4 forms are
+  /// all loopback too): `localhost` (case-insensitive, trailing FQDN dot stripped), any IPv4
+  /// literal in 127/8 in every `inet_aton` spelling (dotted, partial like `127.1`, single
+  /// integer, hex), IPv6 loopback in any textual form, and IPv4-mapped IPv6 loopback.
   private static func isLoopback(host: String) -> Bool {
     var normalized = host.lowercased()
     if normalized.hasSuffix(".") { normalized.removeLast() }
@@ -57,9 +59,26 @@ public enum APIBaseURL {
       normalized = String(normalized.dropFirst().dropLast())
     }
     if normalized == "localhost" { return true }
-    if normalized.hasPrefix("127.") { return true } // IPv4 loopback block 127/8
-    if normalized == "::1" { return true } // IPv6 loopback
-    if normalized.hasPrefix("::ffff:127.") { return true } // IPv4-mapped loopback
+
+    // IPv4 in any `inet_aton` spelling: "127.0.0.1", "127.1", "2130706433", "0x7f000001", octal…
+    var ipv4 = in_addr()
+    if inet_aton(normalized, &ipv4) != 0 {
+      return UInt32(bigEndian: ipv4.s_addr) >> 24 == 127 // loopback block 127/8
+    }
+
+    // IPv6 in any textual form (zone index stripped: "::1%en0" is still loopback).
+    if let percent = normalized.firstIndex(of: "%") {
+      normalized = String(normalized[..<percent])
+    }
+    var ipv6 = in6_addr()
+    if inet_pton(AF_INET6, normalized, &ipv6) == 1 {
+      let bytes = withUnsafeBytes(of: ipv6) { [UInt8]($0) }
+      if bytes[0 ..< 15].allSatisfy({ $0 == 0 }), bytes[15] == 1 { return true } // ::1
+      if bytes[0 ..< 10].allSatisfy({ $0 == 0 }), bytes[10] == 0xFF, bytes[11] == 0xFF,
+         bytes[12] == 127 {
+        return true // IPv4-mapped ::ffff:127.0.0.0/104
+      }
+    }
     return false
   }
 }
