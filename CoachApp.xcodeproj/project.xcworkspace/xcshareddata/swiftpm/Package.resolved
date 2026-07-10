@@ -1,5 +1,5 @@
 {
-  "originHash" : "a5362b1e5d974332f57fce76bc701ddba53a0c5e94d782c0ec7ddb0dbd351c87",
+  "originHash" : "ebbaec2a6a770a9b84f5e99bbdb95d97f464888fa5c2eae105c042b0aff1fc75",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -92,15 +92,6 @@
       }
     },
     {
-      "identity" : "swift-log",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-log",
-      "state" : {
-        "revision" : "2aed77ae5ec9a86d8fe42c12275e4c2653a286ee",
-        "version" : "1.13.1"
-      }
-    },
-    {
       "identity" : "swift-navigation",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/swift-navigation",
@@ -134,15 +125,6 @@
       "state" : {
         "revision" : "9de99a78f099e59caf2b2beec65a4c45d54b2081",
         "version" : "603.0.1"
-      }
-    },
-    {
-      "identity" : "swift-tagged",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pointfreeco/swift-tagged",
-      "state" : {
-        "revision" : "3907a9438f5b57d317001dc99f3f11b46882272b",
-        "version" : "0.10.0"
       }
     },
     {

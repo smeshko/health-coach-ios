@@ -1,4 +1,5 @@
 #if canImport(HealthKit)
+  import HealthKit
   import Testing
   import WireModels
 
@@ -33,6 +34,24 @@
       #expect(
         missing.isEmpty,
         "queried sample types missing from the authorization read set: \(missing.map(\.identifier))"
+      )
+    }
+
+    /// TASK-004 (validation round-1 #5): the effort quantity types are read via the per-workout
+    /// relationship query, NOT via `recordQuerySpecs`, so the subset guard above is structurally
+    /// blind to their omission — assert their membership in the read set directly and
+    /// unconditionally. (The `@available` gate covers only the macOS 14 host floor; the package's
+    /// iOS 26 floor always runs this.)
+    @available(macOS 15.0, *)
+    @Test func test_effortQuantityTypes_areMembersOfAllReadTypes() {
+      let readSet = HKTypeCatalog.allReadTypes
+      #expect(
+        readSet.contains(HKQuantityType(.workoutEffortScore)),
+        "workoutEffortScore is never authorized → relationship reads silently return nothing"
+      )
+      #expect(
+        readSet.contains(HKQuantityType(.estimatedWorkoutEffortScore)),
+        "estimatedWorkoutEffortScore is never authorized → relationship reads silently return nothing"
       )
     }
   }

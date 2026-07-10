@@ -9,14 +9,24 @@ public protocol StoppableQuery: Sendable {
 }
 
 /// The type-erased face `BoundedReadCoordinator` needs from a `QueryLifecycle` regardless of its
-/// handle/success types: cancel it (stopping any registered handle exactly once) and ask whether a
-/// live query was actually stopped (the "stopped N in-flight queries" instrumentation count).
+/// handle/success types: cancel it (stopping any registered handle exactly once) and ask how many
+/// live queries were actually stopped (the "stopped N in-flight queries" instrumentation count).
 public protocol QueryCancelling: Sendable {
   /// Idempotent. Returns `true` only for the call that actually stopped a registered handle.
   @discardableResult
   func cancel() -> Bool
-  /// Whether this lifecycle ever stopped its registered handle.
+  /// Whether this lifecycle ever stopped a handle as timeout/cancellation CLEANUP. A normal
+  /// one-shot stop on first delivery (`finishStoppingHandle`) does NOT flip this.
   var handleWasStopped: Bool { get }
+  /// How many in-flight handles this lifecycle stopped as timeout/cancellation cleanup
+  /// (TASK-004). Single-query lifecycles report the Boolean as 0/1 (the default below); a
+  /// composite registry reports its exact stopped-child count so the coordinator's
+  /// instrumentation never underreports N dynamic children as 1.
+  var stoppedHandleCount: Int { get }
+}
+
+public extension QueryCancelling {
+  var stoppedHandleCount: Int { handleWasStopped ? 1 : 0 }
 }
 
 /// A linearizable register/execute/cancel protocol for one callback-style query (Phase 18.2
@@ -99,12 +109,27 @@ public final class QueryLifecycle<Handle: StoppableQuery, Success: Sendable>: @u
     case .finished, .cancelled:
       lock.unlock()
     case .idle, .registered:
-      phase = .finished
-      let resume = sink
-      sink = nil
-      if resume == nil { pendingResult = .success(value) }
+      resolveFinishedAndUnlock(value)
+    }
+  }
+
+  /// One-shot delivery for a LONG-RUNNING, caller-stopped query (TASK-004 — the effort-
+  /// relationship query keeps streaming updates, so `finish` alone would leave it running):
+  /// delivers the first result exactly like `finish`, then stops the registered handle exactly
+  /// once. This is a NORMAL completion stop, not timeout/cancellation cleanup — `handleWasStopped`
+  /// stays `false` and it contributes 0 to `stoppedHandleCount`. Dropped entirely after
+  /// cancellation (the cancel path already stopped the handle — never two stops) or a prior
+  /// result, so repeated deliveries cannot stop twice or resume twice.
+  public func finishStoppingHandle(_ value: Success) {
+    lock.lock()
+    switch phase {
+    case .finished, .cancelled:
       lock.unlock()
-      resume?(.success(value))
+    case .idle:
+      resolveFinishedAndUnlock(value)
+    case .registered(let handle):
+      resolveFinishedAndUnlock(value)
+      handle.stop()
     }
   }
 
@@ -126,6 +151,17 @@ public final class QueryLifecycle<Handle: StoppableQuery, Success: Sendable>: @u
       handle.stop()
       return true
     }
+  }
+
+  /// Precondition: `lock` held. Flips to `.finished`, releases the lock, resumes with the value
+  /// (or parks it for a late `attach`).
+  private func resolveFinishedAndUnlock(_ value: Success) {
+    phase = .finished
+    let resume = sink
+    sink = nil
+    if resume == nil { pendingResult = .success(value) }
+    lock.unlock()
+    resume?(.success(value))
   }
 
   /// Precondition: `lock` held. Flips to `.cancelled`, releases the lock, resumes with
