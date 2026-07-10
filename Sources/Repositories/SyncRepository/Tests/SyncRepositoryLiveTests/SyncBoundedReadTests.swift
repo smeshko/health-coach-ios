@@ -158,4 +158,89 @@ struct SyncBoundedReadTests {
     let mark = try await watermark(db)
     #expect(mark == seeded, "a cancelled sync must leave the watermark untouched")
   }
+
+  /// Review #1.1: cancellation racing a SUCCESSFULLY completing delta read must still block the
+  /// side effects. The read resumes success before cancellation is observed (here: cancellation
+  /// lands while `runSync` is inside the check-in read, whose `try?` swallows `CancellationError`),
+  /// leaving `runSync` mid-flight in a cancelled task with samples in hand — the cooperative check
+  /// before the POST must throw, so no `/sync` POST and no watermark write happen.
+  @Test func test_sync_cancelledAfterSuccessfulRead_noPost_watermarkUntouched() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    let seeded = SyncWatermarkRecord(anchor: "555.0", serverTime: Date(timeIntervalSince1970: 555))
+    try await db.write { dbx in try seeded.save(dbx) }
+    let postReached = LockIsolated(false)
+    let checkInStarted = AsyncStream.makeStream(of: Void.self)
+    let parked = AsyncStream.makeStream(of: Void.self)
+
+    try await withDependencies {
+      $0.useEuropeSofia()
+      $0.date = .constant(Self.now)
+      $0.continuousClock = TestClock()
+      $0.healthKitClient = healthKit { _ in HealthSampleSet() } // the read completes as success
+      $0.apiClient = .failing(sync: { _ in
+        postReached.withValue { $0 = true }
+        return syncResponse()
+      })
+      $0.database = db
+      $0.checkInRepository = CheckInRepository(save: { _ in }, current: { _ in
+        checkInStarted.continuation.yield(())
+        // Parks until the caller's cancellation lands (nothing ever yields to `parked`;
+        // `AsyncStream.next()` returns nil the moment the task is cancelled), then returns
+        // NORMALLY — simulating a local read that swallows cancellation, exactly the state the
+        // once-guard race leaves behind.
+        var unblock = parked.stream.makeAsyncIterator()
+        _ = await unblock.next()
+        return nil
+      })
+      $0.strengthTestRepository = StrengthTestRepository(save: { _ in }, current: { _ in nil })
+    } operation: {
+      let sync = Task { try await SyncRepository.live.sync() }
+      var started = checkInStarted.stream.makeAsyncIterator()
+      _ = await started.next() // the read has already succeeded — cancel before the POST boundary
+      sync.cancel()
+      await #expect(throws: CancellationError.self) { try await sync.value }
+    }
+
+    #expect(!postReached.value, "a sync cancelled after a successful read must never POST")
+    let mark = try await watermark(db)
+    #expect(mark == seeded, "a sync cancelled after a successful read must not advance the watermark")
+  }
+
+  /// Review #1.1, last boundary: cancellation landing DURING the `/sync` POST (the transport
+  /// resumes with a response anyway) must not advance the watermark — the cooperative check before
+  /// the write throws, and the already-accepted window is simply re-sent next sync (idempotent).
+  @Test func test_sync_cancelledDuringPost_watermarkUntouched() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    let seeded = SyncWatermarkRecord(anchor: "666.0", serverTime: Date(timeIntervalSince1970: 666))
+    try await db.write { dbx in try seeded.save(dbx) }
+    let postStarted = AsyncStream.makeStream(of: Void.self)
+    let parked = AsyncStream.makeStream(of: Void.self)
+
+    try await withDependencies {
+      $0.useEuropeSofia()
+      $0.date = .constant(Self.now)
+      $0.continuousClock = TestClock()
+      $0.healthKitClient = healthKit { _ in HealthSampleSet() }
+      $0.apiClient = .failing(sync: { _ in
+        postStarted.continuation.yield(())
+        // Parks until cancellation lands, then resumes with a SUCCESS response regardless —
+        // simulating a transport that completed as the user cancelled.
+        var unblock = parked.stream.makeAsyncIterator()
+        _ = await unblock.next()
+        return syncResponse()
+      })
+      $0.database = db
+      $0.checkInRepository = CheckInRepository(save: { _ in }, current: { _ in nil })
+      $0.strengthTestRepository = StrengthTestRepository(save: { _ in }, current: { _ in nil })
+    } operation: {
+      let sync = Task { try await SyncRepository.live.sync() }
+      var started = postStarted.stream.makeAsyncIterator()
+      _ = await started.next() // the POST is in flight — cancel before it resumes
+      sync.cancel()
+      await #expect(throws: CancellationError.self) { try await sync.value }
+    }
+
+    let mark = try await watermark(db)
+    #expect(mark == seeded, "a sync cancelled during the POST must not advance the watermark")
+  }
 }

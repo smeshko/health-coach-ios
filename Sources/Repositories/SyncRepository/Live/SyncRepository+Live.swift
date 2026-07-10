@@ -74,6 +74,10 @@ private func runSync() async throws -> SyncResult {
   } catch HealthKitReadError.timedOut {
     throw SyncError.transient
   }
+  // Review #1.1: cancellation can land in the same instant the read resumes success (the operation
+  // task claims `SyncTimeoutState`'s once-guard first) — never carry a cancelled sync into side
+  // effects. Re-checked before each irreversible boundary below.
+  try Task.checkCancellation()
 
   // 4. Today's check-in (a read failure degrades to nil — the check-in is optional) + the strength
   //    test only when due.
@@ -93,7 +97,10 @@ private func runSync() async throws -> SyncResult {
   // 5. Build the request.
   let request = buildSyncRequest(samples: samples, checkin: checkin, strengthTest: strengthTest)
 
-  // 6. POST. A 401 propagates as the raw `APIError` (session-stream-handled); other errors → SyncError.
+  // 6. POST. Cancellation during the optional local reads above is swallowed by the check-in's
+  //    `try?` — re-check before the irreversible POST (review #1.1). A 401 propagates as the raw
+  //    `APIError` (session-stream-handled); other errors → SyncError.
+  try Task.checkCancellation()
   let response: SyncResponse
   do {
     response = try await apiClient.sync(request)
@@ -103,7 +110,9 @@ private func runSync() async throws -> SyncResult {
   }
 
   // 7. Success only: advance the watermark + store serverTime + (if a strength test was attached) the
-  //    year-qualified ISO-week marker — in one write. Upsert builds the singleton if none existed.
+  //    year-qualified ISO-week marker — in one write. If cancellation landed during the POST, skip
+  //    the advance (review #1.1) — sync is idempotent, so the same window is simply re-sent next time.
+  try Task.checkCancellation()
   try await database.write { db in
     let updated = SyncWatermarkRecord(
       anchor: anchorString(readInstant),
