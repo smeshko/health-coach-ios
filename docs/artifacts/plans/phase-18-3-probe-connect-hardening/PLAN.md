@@ -1,6 +1,6 @@
 # Plan: Onboarding-probe and Connect hardening
 
-Status: draft
+Status: in-progress
 Branch: fix/phase-18-3-probe-connect-hardening
 Risk: medium
 Epic: 18 — Make it run on device (audit wave 1) ([epic](../../epics/18-run-on-device.md))
@@ -124,7 +124,7 @@ summary today.
 Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
-- [ ] TASK-001: ConnectComponent: probe CancelID + 401-vs-transport discrimination
+- [x] TASK-001: ConnectComponent: probe CancelID + 401-vs-transport discrimination
 - [ ] TASK-002: ConnectView: unreachable error presentation + snapshot (depends on TASK-001)
 - [ ] TASK-003: Priming presence-probe bounds + timeout-degrade pin (depends on TASK-001)
 - [ ] TASK-004: Final Validation
