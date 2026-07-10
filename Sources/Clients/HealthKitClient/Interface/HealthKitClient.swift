@@ -13,13 +13,17 @@ public struct HealthReadBounds: Sendable, Equatable {
   /// backstop so in-flight queries are stopped rather than orphaned.
   public static let defaultTimeout: Duration = .seconds(15)
 
-  public var since: Date
-  public var limitPerType: Int
-  public var timeout: Duration
+  public let since: Date
+  /// Always `>= 1` — the init clamps, so HealthKit's no-limit sentinel (`HKObjectQueryNoLimit`
+  /// == 0) and negative values are unrepresentable and can never reach an `HKSampleQuery.limit`
+  /// (review #2.3: the "cannot express an unbounded read" claim must hold for every input, not
+  /// just the default-using call sites).
+  public let limitPerType: Int
+  public let timeout: Duration
 
   public init(since: Date, limitPerType: Int, timeout: Duration) {
     self.since = since
-    self.limitPerType = limitPerType
+    self.limitPerType = max(1, limitPerType)
     self.timeout = timeout
   }
 

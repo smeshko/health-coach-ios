@@ -15,6 +15,19 @@ struct HealthReadBoundsTests {
     #expect(bounds.timeout == .seconds(15), "the app-wide default whole-read timeout")
   }
 
+  /// Review #2.3: the interface claims an unbounded read is not expressible — HealthKit's
+  /// no-limit sentinel (`HKObjectQueryNoLimit` == 0) and negative limits must be unrepresentable,
+  /// clamped to the minimum bounded read rather than reaching `HKSampleQuery.limit`.
+  @Test func test_init_clampsNonPositiveLimits_noLimitSentinelUnrepresentable() {
+    let date = Date(timeIntervalSinceReferenceDate: 7)
+    let sentinel = HealthReadBounds(since: date, limitPerType: 0, timeout: .seconds(1))
+    #expect(sentinel.limitPerType == 1, "HKObjectQueryNoLimit (0) must clamp to a bounded read")
+    let negative = HealthReadBounds(since: date, limitPerType: -5, timeout: .seconds(1))
+    #expect(negative.limitPerType == 1, "negative limits must clamp to a bounded read")
+    let valid = HealthReadBounds(since: date, limitPerType: 1, timeout: .seconds(1))
+    #expect(valid.limitPerType == 1, "the minimum valid limit passes through unchanged")
+  }
+
   @Test func test_memberwiseInit_carriesExplicitValues() {
     let date = Date(timeIntervalSinceReferenceDate: 42)
     let bounds = HealthReadBounds(since: date, limitPerType: 500, timeout: .seconds(3))
