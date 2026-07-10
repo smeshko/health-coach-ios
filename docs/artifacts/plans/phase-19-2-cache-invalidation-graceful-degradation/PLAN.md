@@ -1,6 +1,6 @@
 # Plan: Cache invalidation and graceful degradation
 
-Status: in-progress
+Status: done
 Branch: fix/phase-19-2-cache-invalidation-graceful-degradation
 Risk: medium
 Epic: 19 — Make the numbers trustworthy (audit wave 2) ([epic](../../epics/19-trustworthy-numbers.md))
@@ -109,24 +109,45 @@ profile); D3 stale-serve on refetch failure.
 
 ## Acceptance Criteria
 
-- [ ] After a successful sync advances the watermark `serverTime`, the next
+- [x] After a successful sync advances the watermark `serverTime`, the next
   `profile()`/`zones()` call refetches from the network and stamps the new
   `serverTime`; with an unchanged watermark it serves the cache with no network call
   (pinned by `ProfileCacheTests` additions).
-- [ ] An undecodable cached profile body degrades to a network fetch (row replaced on
+  *(ProfileCacheTests: `test_watermarkAdvances_refetchesOnceAndRestamps_thenSteadyState`
+  — refetch once, restamp, then zero-network steady state;
+  `test_freshStamp_matchingWatermark_cacheServes_noNetwork` — all passed on sim
+  2026-07-10.)*
+- [x] An undecodable cached profile body degrades to a network fetch (row replaced on
   success); if the network also fails, the error is the existing
   `ProfileRepositoryError.fetchFailed` — never a raw `DecodingError`.
-- [ ] A corrupt `DailyBriefRecord` row is treated as a cache miss by both
+  *(ProfileCacheTests: `test_corruptCachedProfile_workingAPI_refetchesAndReplaces`
+  — second call cache-hits with zero network;
+  `test_corruptCachedProfile_failingAPI_throwsFetchFailed_thenRecovers`.)*
+- [x] A corrupt `DailyBriefRecord` row is treated as a cache miss by both
   `dailyBriefPolicy(refresh: false)` (regenerates and overwrites) and the
   `cachedDailyBriefPolicy` peek (returns `nil`); a corrupt `WeeklyPlanRecord` row is
   treated as a miss by `weeklyPlanPolicy` — the period is never bricked behind a decode
   error.
-- [ ] When the regenerate path is sync-gated, a corrupt row surfaces `.syncRequired`
+  *(DecodeDegradationTests: `test_dailyBrief_corruptRowSynced_regeneratesAndOverwrites`,
+  `test_cachedDailyBrief_corruptRow_returnsNil_noNetwork`; WeeklyCachePolicyTests:
+  `test_weeklyBrief_corruptRowSynced_regeneratesAndOverwrites`.)*
+- [x] When the regenerate path is sync-gated, a corrupt row surfaces `.syncRequired`
   (recoverable), not a decode error.
-- [ ] Every decode-degradation event logs a notice on the always-on `.http` category.
-- [ ] Migration `v5_addProfileSyncServerTime` is additive; a pre-upgrade profile row
+  *(`test_dailyBrief_corruptRowUnsynced_throwsSyncRequired` +
+  `test_weeklyBrief_corruptRowUnsynced_throwsSyncRequired`.)*
+- [x] Every decode-degradation event logs a notice on the always-on `.http` category.
+  *(All four corrupt-row tests assert exactly one `.notice` on `.http` via LogRecorder —
+  daily branch, daily peek, weekly branch, profile.)*
+- [x] Migration `v5_addProfileSyncServerTime` is additive; a pre-upgrade profile row
   (NULL stamp) reads as stale exactly once, then steady-states.
-- [ ] All package tests green on the canonical sim; no snapshot changes expected.
+  *(ProfileSyncStampMigrationTests:
+  `test_v5_addsSyncServerTimeColumn_preservesProfileRow_idempotent`; ProfileCacheTests:
+  `test_nullStamp_preUpgradeRow_staleExactlyOnce`.)*
+- [x] All package tests green on the canonical sim; no snapshot changes expected.
+  *(2026-07-10: full `xcodebuild test` on iPhone 17 Pro / OS 26.0 — 618 tests, 132
+  suites, ** TEST SUCCEEDED **, all snapshot suites passed with zero re-records
+  (working tree clean); `swiftlint --strict` — 0 violations in 386 files. Sim smoke same
+  day: fresh Debug build launched, no crash/fault in app log.)*
 
 ## Tasks
 
@@ -136,4 +157,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-001: Brief and weekly cache policies treat decode failure as a cache miss
 - [x] TASK-002: Undecodable cached profile degrades to a fresh fetch
 - [x] TASK-003: Sync-anchored profile staleness so recomputed constants reach the device
-- [ ] TASK-004: Final Validation
+- [x] TASK-004: Final Validation
