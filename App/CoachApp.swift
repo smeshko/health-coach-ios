@@ -54,9 +54,12 @@ struct CoachApp: App {
         $0.apiClient = .live(baseURL: baseURL)
       } else {
         $0.apiClient = .unconfigured
+        // `.http`, not `.app`: the misconfiguration diagnostic must ride the ALWAYS-ON network
+        // category (`.app` is gated off by default, off unconditionally in RELEASE — review
+        // round-2 #1a), and a missing base URL is transport observability anyway.
         $0.log.error(
           "API base URL unconfigured — set API_BASE_URL; APIClient will throw on use",
-          category: .app
+          category: .http
         )
       }
 
