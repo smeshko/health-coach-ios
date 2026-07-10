@@ -121,8 +121,10 @@ steps are in `recordQuerySpecs`). `deltaSamples` is single-argument, so switchin
   SyncTimeoutTests green.)*
 - [x] Full suite + lint green on the sim (`make test`, snapshot targets untouched).
   *(467 tests / 95 suites passed; `swiftlint --strict` 0 violations in 379 files.)*
-- [ ] CI-pending (owner): first-ever sync on a physical device with a large HealthKit history
+- [x] CI-pending (owner): first-ever sync on a physical device with a large HealthKit history
   completes within its timeout or degrades to the bounded partial read (epic Validation).
+  *(CI green on PR #56; epic acceptance box stays unticked — owner device run recorded in
+  the PR #56 body.)*
 
 ## Tasks
 
