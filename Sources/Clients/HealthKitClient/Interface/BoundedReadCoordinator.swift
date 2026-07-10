@@ -24,7 +24,9 @@ public enum BoundedReadCoordinator {
       for lifecycle in lifecycles {
         lifecycle.cancel()
       }
-      onQueriesStopped(lifecycles.count { $0.handleWasStopped })
+      // Sum the per-lifecycle counts (not a Boolean per entry): a `ChildQueryRegistry` holding N
+      // dynamically spawned queries reports all N, so the instrumentation never underreports.
+      onQueriesStopped(lifecycles.reduce(0) { $0 + $1.stoppedHandleCount })
       throw error
     }
   }

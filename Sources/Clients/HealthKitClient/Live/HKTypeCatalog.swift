@@ -35,9 +35,22 @@
           HKQuantityType(.dietaryFiber), HKQuantityType(.dietarySodium),
           HKQuantityType(.dietaryWater),
         ]
-      case .workouts: [HKObjectType.workoutType()]
+      case .workouts: Self.workoutReadTypes
       case .activity: [HKObjectType.activitySummaryType()]
       }
+    }
+
+    /// Workouts + the effort-score quantity types their relationship reads return (TASK-004).
+    /// Without read authorization for BOTH types, `HKWorkoutEffortRelationshipQuery` silently
+    /// delivers nothing. iOS 18+/macOS 15+; the package's iOS floor (26) always satisfies the
+    /// clause — the guard exists only for the macOS 14 host floor.
+    private static var workoutReadTypes: [HKObjectType] {
+      var types: [HKObjectType] = [HKObjectType.workoutType()]
+      if #available(macOS 15.0, *) {
+        types.append(HKQuantityType(.workoutEffortScore))
+        types.append(HKQuantityType(.estimatedWorkoutEffortScore))
+      }
+      return types
     }
   }
 

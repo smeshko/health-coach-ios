@@ -27,9 +27,13 @@
     // Snapshot the resolved client into a plain value so the `@Sendable` instrumentation callback
     // captures a Sendable `LogClient`, not the `@Dependency` storage.
     let logClient = log
-    let reads = deltaReads(box: box, bounds: bounds)
+    // The per-workout effort-relationship queries are spawned only after the workouts query
+    // delivers — the composite registry owns those dynamic children and joins the coordinator's
+    // FIXED lifecycle array upfront, so timeout/cancellation reaches them too (TASK-004).
+    let effortRegistry = ChildQueryRegistry()
+    let reads = deltaReads(box: box, bounds: bounds, effortRegistry: effortRegistry)
     let slices = try await BoundedReadCoordinator.run(
-      lifecycles: reads.map(\.lifecycle),
+      lifecycles: reads.map(\.lifecycle) + [effortRegistry],
       timeout: bounds.timeout,
       clock: clock,
       onQueriesStopped: { count in
@@ -76,7 +80,9 @@
     func stop() { store.stop(query) }
   }
 
-  private func deltaReads(box: HealthStoreBox, bounds: HealthReadBounds) -> [DeltaRead] {
+  private func deltaReads(
+    box: HealthStoreBox, bounds: HealthReadBounds, effortRegistry: ChildQueryRegistry
+  ) -> [DeltaRead] {
     var reads: [DeltaRead] = HKSampleMapping.recordQuerySpecs.map { spec in
       let lifecycle = QueryLifecycle<HKQueryHandle, [HealthRecordPayload]>()
       return DeltaRead(lifecycle: lifecycle) {
@@ -86,7 +92,9 @@
     let workouts = QueryLifecycle<HKQueryHandle, [WorkoutPayload]>()
     reads.append(
       DeltaRead(lifecycle: workouts) {
-        try await .workouts(readWorkouts(box: box, bounds: bounds, lifecycle: workouts))
+        try await .workouts(
+          readWorkouts(box: box, bounds: bounds, lifecycle: workouts, effortRegistry: effortRegistry)
+        )
       }
     )
     let activity = QueryLifecycle<HKQueryHandle, [ActivitySummaryPayload]>()
@@ -136,9 +144,10 @@
   private func readWorkouts(
     box: HealthStoreBox,
     bounds: HealthReadBounds,
-    lifecycle: QueryLifecycle<HKQueryHandle, [WorkoutPayload]>
+    lifecycle: QueryLifecycle<HKQueryHandle, [WorkoutPayload]>,
+    effortRegistry: ChildQueryRegistry
   ) async throws -> [WorkoutPayload] {
-    try await lifecycle.run(
+    var payloads = try await lifecycle.run(
       makeHandle: {
         let query = HKSampleQuery(
           sampleType: HKObjectType.workoutType(),
@@ -146,14 +155,86 @@
           limit: bounds.limitPerType,
           sortDescriptors: [newestFirst()]
         ) { _, samples, _ in
-          let payloads = (samples ?? [])
-            .compactMap { ($0 as? HKWorkout).map(HKSampleMapping.workoutPayload) }
+          // Mapped with nil effort here; effort is resolved below via per-workout relationship
+          // queries (only the workout's uuid — a Sendable value — crosses back out).
+          let payloads = (samples ?? []).compactMap { sample in
+            (sample as? HKWorkout).map { HKSampleMapping.workoutPayload(from: $0, effortScore: nil) }
+          }
           lifecycle.finish(payloads)
         }
         return HKQueryHandle(store: box.store, query: query)
       },
       execute: { $0.execute() }
     )
+    // Effort lives as related quantity samples (iOS 18+/macOS 15+); the package's iOS floor (26)
+    // always satisfies the clause — the guard exists only for the macOS 14 host floor.
+    guard #available(macOS 15.0, *) else { return payloads }
+    for index in payloads.indices {
+      guard let uuid = UUID(uuidString: payloads[index].uuid) else { continue }
+      payloads[index].effortScore = try await readEffortScore(
+        box: box, workoutUUID: uuid, registry: effortRegistry
+      )
+    }
+    return payloads
+  }
+
+  /// Resolve one workout's effort score via `HKWorkoutEffortRelationshipQuery` (D2). The child
+  /// lifecycle registers with the composite `registry` (already in the coordinator's array), so
+  /// timeout/cancellation stops the dynamically spawned query — even one added after a stop. This
+  /// is a long-running, caller-stopped query: the one-shot `finishStoppingHandle` stops it exactly
+  /// once on its first delivery (a plain `finish` would leave it streaming forever). A
+  /// failing/denied/empty relationship read degrades to `nil` effort for this workout — never an
+  /// error for the whole read (empty-slice-not-error).
+  @available(macOS 15.0, *)
+  private func readEffortScore(
+    box: HealthStoreBox,
+    workoutUUID: UUID,
+    registry: ChildQueryRegistry
+  ) async throws -> Int? {
+    let lifecycle = QueryLifecycle<HKQueryHandle, Int?>()
+    registry.add(lifecycle)
+    return try await lifecycle.run(
+      makeHandle: {
+        let query = HKWorkoutEffortRelationshipQuery(
+          predicate: HKQuery.predicateForObject(with: workoutUUID),
+          anchor: nil,
+          options: .default
+        ) { _, relationships, _, _ in
+          // Classify inside the callback so non-Sendable HK samples never cross to the awaiting
+          // task; a nil/error delivery reduces over [] → nil effort.
+          lifecycle.finishStoppingHandle(relatedEffortScore(from: relationships ?? []))
+        }
+        return HKQueryHandle(store: box.store, query: query)
+      },
+      execute: { $0.execute() }
+    )
+  }
+
+  /// Classify a workout's related effort samples — user-logged (`workoutEffortScore`) vs
+  /// system-estimated (`estimatedWorkoutEffortScore`), both carried in the same relationship's
+  /// `.samples` — and reduce them to the wire score via the pure preference seam.
+  @available(macOS 15.0, *)
+  private func relatedEffortScore(from relationships: [HKWorkoutEffortRelationship]) -> Int? {
+    let unit = HKUnit.appleEffortScore()
+    var userLogged: [(date: Date, value: Double)] = []
+    var estimated: [(date: Date, value: Double)] = []
+    for relationship in relationships {
+      for sample in relationship.samples ?? [] {
+        guard let quantitySample = sample as? HKQuantitySample,
+              quantitySample.quantity.is(compatibleWith: unit)
+        else { continue }
+        let entry = (
+          date: quantitySample.startDate,
+          value: quantitySample.quantity.doubleValue(for: unit)
+        )
+        switch quantitySample.quantityType.identifier {
+        case HKQuantityTypeIdentifier.workoutEffortScore.rawValue: userLogged.append(entry)
+        case HKQuantityTypeIdentifier.estimatedWorkoutEffortScore.rawValue: estimated.append(entry)
+        default: break
+        }
+      }
+    }
+    return HKSampleMapping.preferredEffortScore(userLogged: userLogged, estimated: estimated)
   }
 
   private func readActivity(

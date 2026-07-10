@@ -127,5 +127,5 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-001: Watermark lookback window so late-arriving samples are re-read
 - [x] TASK-002: Workout type name-string mapping (replace numeric rawValue on the wire)
 - [x] TASK-003: Multi-modality workout distance extraction
-- [ ] TASK-004: Workout effort score via effort-relationship samples (honest nil otherwise)
+- [x] TASK-004: Workout effort score via effort-relationship samples (honest nil otherwise)
 - [ ] TASK-005: Final Validation

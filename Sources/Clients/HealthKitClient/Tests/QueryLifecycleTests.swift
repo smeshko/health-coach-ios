@@ -180,6 +180,54 @@ struct QueryLifecycleTests {
     #expect(handle.stopCount == 0, "a never-executed handle needs no stop")
   }
 
+  // MARK: One-shot mode — long-running, caller-stopped queries (TASK-004)
+
+  @Test func test_finishStoppingHandle_stopsExactlyOnce_andKeepsTheResult() throws {
+    let lifecycle = QueryLifecycle<FakeQueryHandle, Int>()
+    let recorder = ResumeRecorder<Int>()
+    let handle = FakeQueryHandle()
+
+    lifecycle.attach { recorder.record($0) }
+    _ = lifecycle.register(handle)
+    lifecycle.finishStoppingHandle(9)
+    lifecycle.finishStoppingHandle(10)
+
+    #expect(recorder.results.count == 1, "exactly one resume")
+    #expect(try recorder.results.first?.get() == 9, "the first delivery wins")
+    #expect(handle.stopCount == 1, "the long-running query is stopped exactly once on delivery")
+    #expect(lifecycle.handleWasStopped == false, "a normal completion stop is NOT cleanup")
+    #expect(lifecycle.stoppedHandleCount == 0, "…so it contributes 0 to the stopped count")
+  }
+
+  @Test func test_finishStoppingHandle_afterCancel_isDropped_withoutDoubleStop() {
+    let lifecycle = QueryLifecycle<FakeQueryHandle, Int>()
+    let recorder = ResumeRecorder<Int>()
+    let handle = FakeQueryHandle()
+
+    lifecycle.attach { recorder.record($0) }
+    _ = lifecycle.register(handle)
+    #expect(lifecycle.cancel() == true)
+    lifecycle.finishStoppingHandle(9)
+
+    #expect(recorder.results.count == 1)
+    #expect(throwsCancellation(recorder.results.first), "cancellation is kept, not success")
+    #expect(handle.stopCount == 1, "the cancel's stop is the only stop — never two")
+    #expect(lifecycle.stoppedHandleCount == 1, "the cleanup stop still counts")
+  }
+
+  @Test func test_cancelAfterFinishStoppingHandle_isANoOp() {
+    let lifecycle = QueryLifecycle<FakeQueryHandle, Int>()
+    let handle = FakeQueryHandle()
+
+    lifecycle.attach { _ in }
+    _ = lifecycle.register(handle)
+    lifecycle.finishStoppingHandle(9)
+
+    #expect(lifecycle.cancel() == false, "a delivered one-shot cannot be cancelled")
+    #expect(handle.stopCount == 1)
+    #expect(lifecycle.stoppedHandleCount == 0)
+  }
+
   @Test func test_run_cancelledMidFlight_stopsTheHandleAndThrowsCancellation() async {
     let lifecycle = QueryLifecycle<FakeQueryHandle, Int>()
     let handle = FakeQueryHandle()

@@ -224,7 +224,25 @@
       return nil
     }
 
-    static func workoutPayload(from workout: HKWorkout) -> WorkoutPayload {
+    /// Deterministic preference over a workout's related effort samples (D2, validation round-1
+    /// #4): any user-logged (`workoutEffortScore`) beats any system-estimated
+    /// (`estimatedWorkoutEffortScore`) regardless of dates; newest-by-`date` wins within a class
+    /// (inputs are unordered — bare values could not decide "latest wins"); the winning value
+    /// (read in `HKUnit.appleEffortScore()`) is rounded to the wire `Int`. Empty inputs → honest
+    /// `nil`, never a fabricated score.
+    static func preferredEffortScore(
+      userLogged: [(date: Date, value: Double)],
+      estimated: [(date: Date, value: Double)]
+    ) -> Int? {
+      let pool = userLogged.isEmpty ? estimated : userLogged
+      return pool.max { $0.date < $1.date }.map { Int($0.value.rounded()) }
+    }
+
+    /// Effort is resolved by the CALLER (the per-workout effort-relationship read in
+    /// `HKDeltaReads`) so this stays a pure, store-free mapping. The old
+    /// `metadata["HKWorkoutEffortScore"]` read is gone — that metadata key does not exist in
+    /// HealthKit, so it always produced `nil` while looking populated.
+    static func workoutPayload(from workout: HKWorkout, effortScore: Int?) -> WorkoutPayload {
       // Distance types are per-modality (cycling/swimming/rowing each carry their own), so
       // resolve across the ordered candidates instead of only `distanceWalkingRunning`.
       let distance = distanceMeters { identifier in
@@ -233,7 +251,6 @@
       }
       let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?
         .sumQuantity()?.doubleValue(for: .kilocalorie())
-      let effort = (workout.metadata?["HKWorkoutEffortScore"] as? NSNumber)?.intValue
       return WorkoutPayload(
         uuid: workout.uuid.uuidString,
         type: activityTypeName(workout.workoutActivityType),
@@ -242,7 +259,7 @@
         durationS: workout.duration,
         distanceM: distance,
         activeEnergyKcal: energy,
-        effortScore: effort
+        effortScore: effortScore
       )
     }
 

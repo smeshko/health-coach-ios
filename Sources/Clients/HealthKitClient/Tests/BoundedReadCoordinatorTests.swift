@@ -169,3 +169,137 @@ struct BoundedReadCoordinatorTests {
     #expect(recorder.counts == [0], "nothing was in flight, so nothing was stopped")
   }
 }
+
+/// TASK-004: queries spawned DYNAMICALLY — after the coordinator's fixed lifecycle array was
+/// built (one effort-relationship query per workout) — are represented to the coordinator by ONE
+/// upfront `ChildQueryRegistry`. The stopped-count instrumentation must report every child
+/// exactly (no Boolean underreporting) and count ONLY failure/cancellation cleanup: a child that
+/// completed normally via the one-shot stop is excluded.
+struct BoundedReadCoordinatorDynamicChildTests {
+  private struct Read {
+    let handle = FakeQueryHandle()
+    let lifecycle = QueryLifecycle<FakeQueryHandle, Int>()
+  }
+
+  /// Operations that spawn their child inside the coordinator run: register with the registry,
+  /// then run a query that never calls back (the wedged-store shape).
+  private static func wedgedOperations(
+    _ reads: [Read], registry: ChildQueryRegistry
+  ) -> [@Sendable () async throws -> Int] {
+    reads.map { read in
+      {
+        registry.add(read.lifecycle)
+        return try await read.lifecycle.run(makeHandle: { read.handle }, execute: { $0.executed() })
+      }
+    }
+  }
+
+  @Test func test_timeout_stoppedCount_includesEveryDynamicChild() async {
+    let clock = TestClock()
+    let recorder = StopRecorder()
+    let registry = ChildQueryRegistry()
+    let reads = [Read(), Read()]
+
+    let task = Task {
+      try await BoundedReadCoordinator.run(
+        lifecycles: [registry],
+        timeout: .seconds(15),
+        clock: clock,
+        onQueriesStopped: { recorder.record($0) },
+        operations: Self.wedgedOperations(reads, registry: registry)
+      )
+    }
+    for read in reads {
+      while read.handle.executeCount == 0 { await Task.yield() }
+    }
+    await clock.advance(by: .seconds(15))
+    let result = await task.result
+
+    guard case .failure(let error) = result else {
+      Issue.record("expected the timeout to throw")
+      return
+    }
+    #expect(error as? HealthKitReadError == .timedOut)
+    for read in reads {
+      #expect(read.handle.stopCount == 1, "every dynamic child stopped exactly once")
+    }
+    #expect(recorder.counts == [2], "the exact child count — no Boolean underreporting")
+  }
+
+  @Test func test_callerCancellation_stoppedCount_includesEveryDynamicChild() async {
+    let clock = TestClock()
+    let recorder = StopRecorder()
+    let registry = ChildQueryRegistry()
+    let reads = [Read(), Read()]
+
+    let task = Task {
+      try await BoundedReadCoordinator.run(
+        lifecycles: [registry],
+        timeout: .seconds(15),
+        clock: clock,
+        onQueriesStopped: { recorder.record($0) },
+        operations: Self.wedgedOperations(reads, registry: registry)
+      )
+    }
+    for read in reads {
+      while read.handle.executeCount == 0 { await Task.yield() }
+    }
+    task.cancel()
+    let result = await task.result
+
+    #expect(throwsCancellation(result), "a cancelled read can never complete as success")
+    for read in reads {
+      #expect(read.handle.stopCount == 1, "caller cancellation reaches every dynamic child")
+    }
+    #expect(recorder.counts == [2])
+  }
+
+  @Test func test_mixedOutcome_countsOnlyTheStillInFlightChild() async {
+    let clock = TestClock()
+    let recorder = StopRecorder()
+    let registry = ChildQueryRegistry()
+    let completed = Read()
+    let wedged = Read()
+
+    let operations: [@Sendable () async throws -> Int] = [
+      {
+        registry.add(completed.lifecycle)
+        return try await completed.lifecycle.run(
+          makeHandle: { completed.handle },
+          execute: { started in
+            started.executed()
+            // The long-running query completes normally: one-shot stop on first delivery.
+            completed.lifecycle.finishStoppingHandle(1)
+          }
+        )
+      },
+      {
+        registry.add(wedged.lifecycle)
+        return try await wedged.lifecycle.run(
+          makeHandle: { wedged.handle }, execute: { $0.executed() }
+        )
+      },
+    ]
+    let task = Task {
+      try await BoundedReadCoordinator.run(
+        lifecycles: [registry],
+        timeout: .seconds(15),
+        clock: clock,
+        onQueriesStopped: { recorder.record($0) },
+        operations: operations
+      )
+    }
+    while wedged.handle.executeCount == 0 || completed.handle.stopCount == 0 { await Task.yield() }
+    await clock.advance(by: .seconds(15))
+    let result = await task.result
+
+    guard case .failure(let error) = result else {
+      Issue.record("expected the timeout to throw")
+      return
+    }
+    #expect(error as? HealthKitReadError == .timedOut)
+    #expect(completed.handle.stopCount == 1, "stopped once — normally, on first delivery")
+    #expect(wedged.handle.stopCount == 1, "stopped once — by timeout cleanup")
+    #expect(recorder.counts == [1], "only the still-in-flight child is reported as cleanup")
+  }
+}
