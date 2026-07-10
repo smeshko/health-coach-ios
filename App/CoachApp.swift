@@ -1,3 +1,4 @@
+import APIClient
 import APIClientLive
 import AppFeature
 import BriefRepositoryLive
@@ -26,10 +27,11 @@ struct CoachApp: App {
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
   init() {
-    // DEBUG first-launch default: seed mock=true when nothing is persisted yet; no-op in RELEASE. Must
-    // run BEFORE dependencies resolve `devSettings`, so the routed repos below read the seeded flag. The
-    // dev-menu toggle is the only mock/live control thereafter.
-    DevSettings.seedFirstLaunchDefault()
+    // DEBUG first-launch default: seed live iff a backend is actually configured (CR-1 coherence —
+    // an unconfigured fresh install seeds mock instead of a guaranteed-failing live run); no-op in
+    // RELEASE. Must run BEFORE dependencies resolve `devSettings`, so the routed repos below read the
+    // seeded flag. The dev-menu toggle is the only mock/live control thereafter.
+    DevSettings.seedFirstLaunchDefault(liveBackendConfigured: AppConfig.apiBaseURL != nil)
 
     prepareDependencies {
       $0.context = .live
@@ -45,10 +47,24 @@ struct CoachApp: App {
       // runtime authorization. NotificationClientLive is the only place this framework is touched.
       $0.notificationClient = .liveValue
 
+      // APIClient is injected EXPLICITLY (CR-1): the composition root owns the base URL end-to-end
+      // (API_BASE_URL build setting → Info.plist → AppConfig → here). Unconfigured installs get the
+      // throwing `.unconfigured` client — loud at first use, never a silent localhost target.
+      if let baseURL = AppConfig.apiBaseURL {
+        $0.apiClient = .live(baseURL: baseURL)
+      } else {
+        $0.apiClient = .unconfigured
+        $0.log.error(
+          "API base URL unconfigured — set API_BASE_URL; APIClient will throw on use",
+          category: .app
+        )
+      }
+
       // Repos with a remote fork install via `routed(dev)` so the DEBUG `-useMockData` toggle works at
       // runtime; CheckIn/StrengthTest are local-only (no `DevEndpoint`) → installed `.live`. The
-      // data-source live values (APIClient/Database/HealthKitClient/TokenClient/DevSettings) auto-resolve
-      // under `.live` because their `*Live` products are linked by the app target.
+      // remaining data-source live values (Database/HealthKitClient/TokenClient/DevSettings)
+      // auto-resolve under `.live` because their `*Live` products are linked by the app target —
+      // APIClient no longer auto-resolves; it is injected explicitly above.
       let dev = $0.devSettings
       $0.briefRepository = .routed(dev)
       $0.syncRepository = .routed(dev)
