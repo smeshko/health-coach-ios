@@ -55,13 +55,12 @@ struct TodayReadyContent: View {
           switch TodaySessionMode.from(brief) {
           case let .forcedRest(gate, override):
             // The dedicated calm forced-REST screen — read-only override session, no swap/skip/alternatives.
-            // `zoneRange` is nil here: the `rest`/`mobility` overrides carry no `zoneTarget` (→ no chip), and
-            // `TodayFeature` does not yet hold the profile zones (Phase 8.4 wires zone resolution for the
-            // normal session); an `active_recovery` override's Z1 chip is reconciled when that lands.
+            // Chip rule: the override's `zoneTarget` drives (rest/mobility have none → no chip); zones nil
+            // ⇒ silent degrade — mirroring the normal session card's resolution.
             SafetyRestView(
               gate: gate,
               overrideSession: override,
-              zoneRange: nil,
+              zoneRange: TodaySessionMode.overrideZoneRange(override: override, zones: store.zones),
               narrative: brief.narrative.filter { $0.type == .session || $0.type == .caution }
             )
           case .normal:

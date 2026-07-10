@@ -72,17 +72,12 @@ public struct SessionFeature {
     }
 
     /// The bpm range for a given candidate's `zoneTarget`, resolved from the full `zones` map (DECISIONS
-    /// #4) — `nil` when the block has no `zoneTarget` or `zones` is `nil`. 2.2's `Zones` exposes named
-    /// `z1…z5` fields (no `subscript(Zone)`), so the lookup is an exhaustive switch.
+    /// #4) — `nil` when the block has no `zoneTarget` or `zones` is `nil`. Delegates to the module-shared
+    /// `Zones.range(for:)` lookup (Phase 19.3, DECISIONS D4) so the forced-REST override chip resolves
+    /// through the exact same switch.
     public func zoneRange(for block: SessionBlock) -> ZoneRange? {
       guard let zone = block.zoneTarget, let zones else { return nil }
-      switch zone {
-      case .z1: return zones.z1
-      case .z2: return zones.z2
-      case .z3: return zones.z3
-      case .z4: return zones.z4
-      case .z5: return zones.z5
-      }
+      return zones.range(for: zone)
     }
   }
 

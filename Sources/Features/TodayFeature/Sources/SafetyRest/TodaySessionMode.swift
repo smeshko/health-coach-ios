@@ -26,4 +26,15 @@ public enum TodaySessionMode: Equatable {
       ? .forcedRest(gate: brief.safetyGate, override: brief.session)
       : .normal(brief.session)
   }
+
+  /// The forced-REST override card's zone-chip range (Phase 19.3): the override's `zoneTarget` resolved
+  /// from the loaded zones map — `nil` when the override carries no `zoneTarget` (`rest`/`mobility` → no
+  /// chip) or zones aren't loaded (silent degrade, mirroring the normal session card). Pure and static so
+  /// the derivation is testable outside a view body; the view (`SafetyRestView`) stays render-only.
+  static func overrideZoneRange(
+    override: DomainModels.SessionBlock,
+    zones: DomainModels.Zones?
+  ) -> DomainModels.ZoneRange? {
+    override.zoneTarget.flatMap { zones?.range(for: $0) }
+  }
 }

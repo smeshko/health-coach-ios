@@ -70,4 +70,64 @@ struct SafetyRestComponentTests {
     let emptyGate = DomainModels.SafetyGate(triggered: true, reasons: [], overrideTo: .rest)
     #expect(SafetyRestView.reasonHeadlines(for: emptyGate) == ["Today is for recovery."])
   }
+
+  // MARK: - overrideZoneRange (the forced-REST override card's zone chip, Phase 19.3)
+
+  /// The five-zone bpm map for the chip-derivation cases below (distinct per-zone values so a wrong-zone
+  /// resolution can't pass by accident).
+  private let zones = DomainModels.Zones(
+    z1: DomainModels.ZoneRange(low: 98, high: 118),
+    z2: DomainModels.ZoneRange(low: 119, high: 132),
+    z3: DomainModels.ZoneRange(low: 133, high: 147),
+    z4: DomainModels.ZoneRange(low: 148, high: 160),
+    z5: DomainModels.ZoneRange(low: 161, high: 178)
+  )
+
+  /// An `active_recovery` override with a `zoneTarget` resolves its bpm chip from the loaded zones. No
+  /// fixture carries a triggered gate + `activeRecovery` + `zoneTarget` (the tripped fixtures are
+  /// `card: rest` without one, and `daily_brief_red` has `triggered: false`), so the tripped shape is
+  /// hand-rolled: `SafetyGate(triggered: true, overrideTo: .activeRecovery)`'s expanded override block.
+  @Test func test_overrideZoneRange_activeRecoveryResolvesFromZones() {
+    let gate = DomainModels.SafetyGate(triggered: true, reasons: [.illness], overrideTo: .activeRecovery)
+    #expect(gate.triggered) // the shape the forcedRest branch receives
+    let overrideBlock = DomainModels.SessionBlock(
+      card: .activeRecovery,
+      intensity: .recovery,
+      zoneTarget: .z1,
+      durationMinLow: 20,
+      durationMinHigh: 30
+    )
+    #expect(
+      TodaySessionMode.overrideZoneRange(override: overrideBlock, zones: zones)
+        == DomainModels.ZoneRange(low: 98, high: 118)
+    )
+  }
+
+  /// Zones not loaded (fetch failed or pending) → `nil` chip, never a crash — the same silent degrade as
+  /// the normal session card.
+  @Test func test_overrideZoneRange_nilZonesDegradesToNil() {
+    let overrideBlock = DomainModels.SessionBlock(
+      card: .activeRecovery,
+      intensity: .recovery,
+      zoneTarget: .z1,
+      durationMinLow: 20,
+      durationMinHigh: 30
+    )
+    #expect(TodaySessionMode.overrideZoneRange(override: overrideBlock, zones: nil) == nil)
+  }
+
+  /// `rest`/`mobility` overrides carry no `zoneTarget` → no chip (unchanged behavior), even with zones
+  /// loaded.
+  @Test func test_overrideZoneRange_noZoneTargetYieldsNil() {
+    for card in [DomainModels.Card.rest, .mobility] {
+      let overrideBlock = DomainModels.SessionBlock(
+        card: card,
+        intensity: .recovery,
+        zoneTarget: nil,
+        durationMinLow: 0,
+        durationMinHigh: 0
+      )
+      #expect(TodaySessionMode.overrideZoneRange(override: overrideBlock, zones: zones) == nil)
+    }
+  }
 }
