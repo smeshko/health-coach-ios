@@ -4,6 +4,7 @@ import Dependencies
 import DomainModels
 import Foundation
 import GRDB
+import LogClient
 import PersistenceModels
 import ProfileRepository
 import WireDomainMapping
@@ -23,17 +24,32 @@ extension ProfileRepository: DependencyKey {
   }
 }
 
-/// Cache-first fetch (Decision 1): serve the single cached `ProfileRecord` when present. On a miss,
+/// Cache-first fetch (Decision 1): serve the single cached `ProfileRecord` when present. On a miss —
+/// including an undecodable cached row, which is deleted and degraded to a miss (Phase 19.2 D2) —
 /// fetch `GET /profile` and persist. `ProfileResponse` is the canonical `DomainModels.Profile`
 /// (Phase 11.3 — no mapping layer), so the decoded value is the domain value. An `APIError` maps to a
 /// domain `ProfileRepositoryError.fetchFailed`.
 private func fetchProfile() async throws -> DomainModels.Profile {
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.database) var database
+  @Dependency(\.log) var log
 
   let cached = try await database.read { db in try ProfileRecord.fetchOne(db, key: 1) }
   if let cached {
-    return try cached.toDomain()
+    do {
+      return try cached.toDomain()
+    } catch {
+      // An undecodable singleton row is deleted eagerly (Phase 19.2 D2 — its *existence* is what
+      // blocks the miss path), then the call falls through to the plain first-fetch path below. The
+      // catch stays narrow: only the row decode degrades; DB read failures keep propagating (18.4
+      // discrimination — transient DB trouble is not row corruption).
+      log.notice(
+        "Cached profile failed to decode — deleting the row and refetching",
+        category: .http,
+        metadata: ["error": String(describing: error)]
+      )
+      _ = try await database.write { db in try ProfileRecord.deleteOne(db, key: 1) }
+    }
   }
 
   let domain: DomainModels.Profile

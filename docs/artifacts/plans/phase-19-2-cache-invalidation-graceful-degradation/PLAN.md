@@ -134,6 +134,6 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
 - [x] TASK-001: Brief and weekly cache policies treat decode failure as a cache miss
-- [ ] TASK-002: Undecodable cached profile degrades to a fresh fetch
+- [x] TASK-002: Undecodable cached profile degrades to a fresh fetch
 - [ ] TASK-003: Sync-anchored profile staleness so recomputed constants reach the device
 - [ ] TASK-004: Final Validation

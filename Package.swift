@@ -542,7 +542,7 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // ProfileRepository interface — cache-first profile fetch + zone-range accessor + recompute stream.
+    // ProfileRepository interface — cache-first profile fetch + zone-range accessor.
     // Interface deps: DomainModels + SampleData (for .mock/testValue) + Dependencies only.
     .target(
       name: "ProfileRepository",
@@ -556,8 +556,8 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // ProfileRepository.live — fetch GET /profile, map via WireDomainMapping, cache via Database; owns
-    // the recompute AsyncStream. Depends on the data-source INTERFACES + model layers + WireDomainMapping.
+    // ProfileRepository.live — fetch GET /profile, map via WireDomainMapping, cache via Database.
+    // Depends on the data-source INTERFACES + model layers + WireDomainMapping.
     .target(
       name: "ProfileRepositoryLive",
       dependencies: [
@@ -571,6 +571,9 @@ let package = Package(
         // `routed(dev:)` mock/live toggle: DevSettings (devRoute) + SampleData (the mock fixtures).
         "DevSettings",
         "SampleData",
+        // Decode degradation (Phase 19.2): an undecodable cached profile logs a notice on the
+        // always-on `.http` category before deleting the row and refetching.
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -925,7 +928,7 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
-    // ProfileRepository.live cache/refresh/recompute tests — host, stubbed APIClient + in-memory DB.
+    // ProfileRepository.live cache tests — host, stubbed APIClient + in-memory DB.
     .testTarget(
       name: "ProfileRepositoryLiveTests",
       dependencies: [
@@ -933,6 +936,8 @@ let package = Package(
         "ProfileRepository",
         "APIClient",
         "Database",
+        // `LogRecorder` pins the Phase 19.2 decode-degradation notice on the always-on `.http` category.
+        "LogClient",
         "WireModels",
         "DomainModels",
         "PersistenceModels",
