@@ -1,6 +1,6 @@
 # Plan: HealthKit ingest correctness
 
-Status: in-progress
+Status: done
 Branch: fix/phase-19-1-healthkit-ingest-correctness
 Risk: medium
 Epic: 19 — Make the numbers trustworthy (audit wave 2) ([epic](../../epics/19-trustworthy-numbers.md))
@@ -93,31 +93,59 @@ relationship query vs interval matching, D3 type-name mapping format.
 
 ## Acceptance Criteria
 
-- [ ] A sleep/HRV/RHR sample written after the watermark advanced (startDate before it) is
+- [x] A sleep/HRV/RHR sample written after the watermark advanced (startDate before it) is
   still ingested on the next sync: the delta-read floor is `max(backfillFloor,
   anchor − 48h)`, pinned by a SyncRepository bounds-capture test.
-- [ ] A cycling/swimming/rowing workout maps a non-nil `distanceM`: the distance
+  *(SyncBoundedReadTests: `test_sync_requestsBoundedRead_sinceAnchorMinusLookback_defaultLimitAndTimeout`
+  captures `since == anchor − 48h`; `test_sync_anchorNearBackfillFloor_sinceClampsAtFloor`
+  pins the floor clamp; `test_firstEverSync_usesBackfillAnchor` unchanged — all passed on
+  sim 2026-07-10.)*
+- [x] A cycling/swimming/rowing workout maps a non-nil `distanceM`: the distance
   resolution is a pure per-type-sums → first-non-nil seam, tested end-to-end through the
   mapping result for cycling, swimming, rowing, and a no-statistics (strength/rest)
   workout — not merely a pinned candidate list.
-- [ ] `Workout.type` on the wire is the snake_case name string the backend canonicalizes
+  *(HKDistanceCandidatesTests: cycling/swimming/rowing-only fixtures each return their
+  type's sum; `test_distanceMeters_noStatistics_returnsNil`;
+  `test_distanceMeters_walkingRunningPresent_winsOverLaterCandidates`;
+  `test_distanceTypeCandidates_containProductModalities_walkingRunningFirst`.)*
+- [x] `Workout.type` on the wire is the snake_case name string the backend canonicalizes
   (e.g. `"running"`, `"high_intensity_interval_training"`), pinned by tests over every
   product-relevant `HKWorkoutActivityType` case.
-- [ ] `effortScore` is populated from related `workoutEffortScore` (preferring user-logged
+  *(HKActivityTypeNameTests: `test_activityTypeName_pinsProductRelevantModalities_toExactWireStrings`
+  + `test_activityTypeName_neverNumeric_andAlwaysSnakeCase_forAllKnownCases`.)*
+- [x] `effortScore` is populated from related `workoutEffortScore` (preferring user-logged
   over estimated, newest-by-date within a class) when present, and is honestly `nil`
   otherwise — the bogus metadata read is gone; both effort quantity types are asserted
   members of `HKTypeCatalog.allReadTypes` by a direct, unconditional test.
-- [ ] Dynamically spawned effort-relationship queries are owned by the bounded read:
+  *(HKEffortScoreTests: `test_userLogged_beatsEstimated_evenWhenEstimatedIsNewer`,
+  newest-by-date within each class, `test_emptyInputs_returnNil`,
+  `test_values_roundToTheWireInt`; HKReadSetCoverageTests:
+  `test_effortQuantityTypes_areMembersOfAllReadTypes` — unconditional membership assert.)*
+- [x] Dynamically spawned effort-relationship queries are owned by the bounded read:
   fake-handle tests prove timeout/cancellation stops every child query exactly once (the
   coordinator's stopped count includes each child — exact-count contract, no Boolean
   underreporting), a post-cancellation delivery cannot contribute, and the long-running
   relationship query is stopped exactly once on normal first delivery too (one-shot
   success path). The stopped count means failure/cancellation cleanup only — a
   mixed-outcome test pins that a normally-completed child is not counted.
-- [ ] Delta-read truncation is visible: a per-type count hitting `limitPerType` logs a
+  *(BoundedReadCoordinatorDynamicChildTests: `test_timeout_stoppedCount_includesEveryDynamicChild`,
+  `test_callerCancellation_stoppedCount_includesEveryDynamicChild`,
+  `test_mixedOutcome_countsOnlyTheStillInFlightChild`; ChildQueryRegistryTests:
+  `test_cancel_stopsEveryRegisteredChildExactlyOnce`,
+  `test_postCancellationDelivery_cannotContribute`,
+  `test_stoppedHandleCount_excludesNormallyCompletedChildren`; QueryLifecycleTests:
+  `test_finishStoppingHandle_stopsExactlyOnce_andKeepsTheResult` — one-shot success path.)*
+- [x] Delta-read truncation is visible: a per-type count hitting `limitPerType` logs a
   warning on the always-on `.http` category (pure counting seam tested).
-- [ ] All package tests green on the canonical sim (`make test-sim`); no snapshot changes
+  *(SyncDeltaTruncationTests: `test_truncatedTypes_flagsTypeAtLimit_notBelow` — pure
+  counting seam; `test_sync_deltaReadAtLimit_logsTruncationWarning_onHttp` — warning on
+  `.http`.)*
+- [x] All package tests green on the canonical sim (`make test-sim`); no snapshot changes
   expected.
+  *(2026-07-10: full `xcodebuild test` on iPhone 17 Pro / OS 26.0 — 606 tests across all
+  Swift Testing runs, ** TEST SUCCEEDED **, all snapshot suites passed with zero
+  re-records (working tree clean); `make lint` — 0 violations in 384 files. Sim smoke same
+  day: fresh Debug build launched, no crash/fault in app log.)*
 
 ## Tasks
 
@@ -128,4 +156,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-002: Workout type name-string mapping (replace numeric rawValue on the wire)
 - [x] TASK-003: Multi-modality workout distance extraction
 - [x] TASK-004: Workout effort score via effort-relationship samples (honest nil otherwise)
-- [ ] TASK-005: Final Validation
+- [x] TASK-005: Final Validation
