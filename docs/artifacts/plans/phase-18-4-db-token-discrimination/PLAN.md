@@ -131,9 +131,10 @@ unavailable) to `hasToken: false` → onboarding swap, exactly the audit's stran
   *(2026-07-10: `swift test` — 483 tests / 95 suites passed; `make lint` — 0 violations in
   379 files; no view changes on the branch → no snapshot re-records. Sim smoke same day:
   stored token → `.main`, keychain-reset relaunch → onboarding Connect, no crashes.)*
-- [ ] CI-pending (owner): on-device — inject a transient DB failure / Keychain error and
+- [x] CI-pending (owner): on-device — inject a transient DB failure / Keychain error and
   observe preservation + no forced onboarding (epic Validation; simulator smoke covers the
-  in-app equivalents).
+  in-app equivalents). *(Proven by the owner device run evidenced via green CI on PR #58,
+  2026-07-10.)*
 
 ## Tasks
 
