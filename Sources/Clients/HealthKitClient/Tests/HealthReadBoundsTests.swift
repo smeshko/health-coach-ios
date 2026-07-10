@@ -28,10 +28,12 @@ struct HealthReadBoundsTests {
     #expect(valid.limitPerType == 1, "the minimum valid limit passes through unchanged")
   }
 
-  /// Review #2.2: `HKActivitySummaryQuery` has no `limit` parameter, so the activity read's bound
-  /// is its WINDOW — `activitySince` floors the start at `limitPerType` days before now (one
-  /// summary per day ⇒ at most `limitPerType` rows). A `.distantPast` probe is clamped; a recent
-  /// delta anchor passes through untouched.
+  /// Review #2.2 + #3.1: `HKActivitySummaryQuery` has no `limit` parameter, so the activity
+  /// read's bound is its WINDOW — and the activity predicate is inclusive at BOTH day
+  /// endpoints, so `activitySince` floors the start at `limitPerType - 1` days before now
+  /// (floor day + today inclusive = exactly `limitPerType` distinct days ⇒ at most
+  /// `limitPerType` rows). A `.distantPast` probe is clamped; a recent delta anchor passes
+  /// through untouched.
   @Test func test_activitySince_floorsDistantPast_keepsRecentAnchors() throws {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = try #require(TimeZone(identifier: "Europe/Sofia"))
@@ -39,14 +41,32 @@ struct HealthReadBoundsTests {
 
     let probe = HealthReadBounds(since: .distantPast, limitPerType: 10, timeout: .seconds(1))
     let floored = probe.activitySince(now: now, calendar: calendar)
-    let expectedFloor = try #require(calendar.date(byAdding: .day, value: -10, to: now))
-    #expect(floored == expectedFloor, "a distant-past probe is clamped to limitPerType days")
+    let expectedFloor = try #require(calendar.date(byAdding: .day, value: -9, to: now))
+    #expect(
+      floored == expectedFloor,
+      "a distant-past probe is clamped to limitPerType days INCLUSIVE of today (review #3.1)"
+    )
 
     let recentAnchor = try #require(calendar.date(byAdding: .day, value: -2, to: now))
     let delta = HealthReadBounds(since: recentAnchor, limitPerType: 10, timeout: .seconds(1))
     #expect(
       delta.activitySince(now: now, calendar: calendar) == recentAnchor,
       "a delta anchor inside the window is unchanged"
+    )
+  }
+
+  /// Review #3.1 regression pin at the boundary: with `limitPerType == 1` the window must span
+  /// exactly ONE day — the floor is `now` itself (`-(1 - 1) = 0` days), not yesterday (which
+  /// would make the both-endpoints-inclusive predicate span two summary rows).
+  @Test func test_activitySince_limitOne_spansExactlyToday() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = try #require(TimeZone(identifier: "Europe/Sofia"))
+    let now = Date(timeIntervalSince1970: 1_780_898_400) // 2026-06-08 ~09:00 Europe/Sofia
+
+    let bounds = HealthReadBounds(since: .distantPast, limitPerType: 1, timeout: .seconds(1))
+    #expect(
+      bounds.activitySince(now: now, calendar: calendar) == now,
+      "limit 1 ⇒ the floor is now's own day; -1 day would span two inclusive endpoints"
     )
   }
 

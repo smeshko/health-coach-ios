@@ -1,11 +1,11 @@
 # Review Summary — phase-18-2-bounded-hk-reads
 
 **Rounds:** 3
-**Fix commits:** 3ff5d5d..5d387c2
-**Status:** ⚠️ ESCALATED — round 3 still produced a fix row (round-3 #1, a one-line
-off-by-one in the round-2 activity-window fix). Per the round protocol the review stopped
-instead of running a fourth round; the open item is listed below and needs an owner decision
-(act-and-stop / act-and-continue) before `create-pr`.
+**Fix commits:** 3ff5d5d..5d387c2 + the escalation resolution (round-3 #1 fix, committed
+after the owner decision)
+**Status:** ✅ RESOLVED — round 3 produced one [low] fix row and the review escalated per
+protocol; the owner chose **act-and-stop** (apply the one-line fix + regression test, no
+fourth round — the finding series converged high → med → low). The fix is committed below.
 
 ## Rounds
 
@@ -32,12 +32,13 @@ instead of running a fourth round; the open item is listed below and needs an ow
   summary per day makes the window the cardinality bound), so the `.distantPast` onboarding
   probe can no longer request an unbounded activity range (round-2 #2)
 
-## Open (escalated)
+### Round 3 (escalation resolution — owner chose act-and-stop)
 
 - (round-3 #1) The inclusive day-bucket predicate spans `limitPerType + 1` days, so the
-  activity window can return one row more than the claimed cap — correct finding, trivial
-  fix (`-(limitPerType - 1)` + a limit-1 regression test), unapplied because round-3 fix
-  rows stop the review per protocol.
+  activity window could return one row more than the claimed cap — fixed:
+  `activitySince` floors at `-(limitPerType - 1)` days, existing floor test corrected,
+  `test_activitySince_limitOne_spansExactlyToday` regression pin added
+  (25 HealthKitClientTests green).
 
 ## Deferred
 

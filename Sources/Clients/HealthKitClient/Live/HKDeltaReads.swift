@@ -167,10 +167,11 @@
     @Dependency(\.calendar) var calendar
     @Dependency(\.date.now) var now
 
-    // Review #2.2: `HKActivitySummaryQuery` has no `limit` parameter, so the WINDOW is the bound —
-    // `activitySince` floors the start at `limitPerType` days before now (summaries are
-    // one-per-day, so this enforces the same per-type row cardinality as the sample queries; the
-    // `.distantPast` probe no longer requests an unbounded range).
+    // Review #2.2 + #3.1: `HKActivitySummaryQuery` has no `limit` parameter, so the WINDOW is the
+    // bound — `activitySince` floors the start at `limitPerType - 1` days before now (the activity
+    // predicate is inclusive at both day endpoints; summaries are one-per-day, so this enforces the
+    // same per-type row cardinality as the sample queries; the `.distantPast` probe no longer
+    // requests an unbounded range).
     let since = bounds.activitySince(now: now, calendar: calendar)
 
     // Activity-summary predicates require each `DateComponents` to carry its own calendar — the
