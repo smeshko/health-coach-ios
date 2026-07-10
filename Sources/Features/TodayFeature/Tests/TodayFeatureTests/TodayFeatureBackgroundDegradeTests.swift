@@ -134,7 +134,7 @@ struct TodayFeatureBackgroundDegradeTests {
       $0.profileRepository.zones = { sampleZones() } // cached zones survive the failing sync
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._cachedBriefLoaded) {
       $0.briefState = .ready(cached, .cached)
       $0.readiness = expectedReadiness(cached)
@@ -171,7 +171,7 @@ struct TodayFeatureBackgroundDegradeTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._cachedBriefLoaded) {
       $0.briefState = .ready(cached, .cached)
       $0.readiness = expectedReadiness(cached)

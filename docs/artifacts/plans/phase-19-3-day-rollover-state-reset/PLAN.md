@@ -1,6 +1,6 @@
 # Plan: Day-rollover state reset
 
-Status: draft
+Status: in-progress
 Branch: fix/phase-19-3-day-rollover-state-reset
 Risk: medium
 Epic: 19 — Make the numbers trustworthy (audit wave 2) ([epic](../../epics/19-trustworthy-numbers.md))
@@ -142,7 +142,7 @@ depth; D4 in-module `Zones.range(for:)` (not DomainModels — Epic 20.1 owns SSO
 Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
-- [ ] TASK-001: Rollover reset of per-day Today state (contentDay stamp + child reset)
+- [x] TASK-001: Rollover reset of per-day Today state (contentDay stamp + child reset)
 - [ ] TASK-002: Day-guard the check-in footer copy
 - [ ] TASK-003: Resolve the forced-REST override card zone chip
 - [ ] TASK-004: Final Validation

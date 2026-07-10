@@ -23,8 +23,12 @@ extension TodayFeature {
   /// so a stale brief can't land after a newer request. Each `await` carries the typed catch **plus a
   /// catch-all**: a 401 propagates from `sync()` as **not** a `SyncError` (session-stream-handled,
   /// §13/D13), so the catch-all maps any unexpected throw to a terminal retryable state.
-  func orchestrationEffect(refresh: Bool) -> Effect<Action> {
+  ///
+  /// Takes `state` **inout** to stamp `contentDay` (Phase 19.3, DECISIONS D2): the two orchestration
+  /// factories are the single conceptual write point, so every reducer trigger site inherits the stamp.
+  func orchestrationEffect(_ state: inout State, refresh: Bool) -> Effect<Action> {
     let day = today
+    state.contentDay = day
     let deps = OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
     return .run { [checkInRepository, sessionSelectionRepository, clock] send in
       // 1. The check-in gates the chain (2026-06-10 design): nothing saved today → show the check-in
@@ -54,8 +58,11 @@ extension TodayFeature {
   /// alongside). On a MISS (nil, or a peek error treated as a miss) fall through to the **blocking** chain
   /// verbatim — its 1s dwell and `.syncing`/`.generating` screens are the honest first-of-the-day flow.
   /// One `CancelID.orchestration` covers the whole open path (D7).
-  func cacheFirstOpenEffect() -> Effect<Action> {
+  ///
+  /// Takes `state` **inout** to stamp `contentDay` (Phase 19.3, DECISIONS D2) — see `orchestrationEffect`.
+  func cacheFirstOpenEffect(_ state: inout State) -> Effect<Action> {
     let day = today
+    state.contentDay = day
     let deps = OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
     return .run { [checkInRepository, sessionSelectionRepository, briefRepository, clock] send in
       // The check-in gates the chain (unchanged) — a read error degrades to the gate, exactly as before.
@@ -108,6 +115,57 @@ extension TodayFeature {
   }
 
   // MARK: - Reducer helpers (Phase 12.1)
+
+  /// The scene re-activation detector (Phase 12.1 DECISIONS D6 / Phase 19.3 D1–D2) — two legs:
+  ///
+  /// **Rollover leg:** compares the `contentDay` stamp — ONE detector over every stamped state, so
+  /// yesterday's terminals (`.ready`, `.checkInRequired`, `.error`, `.syncFailed`) AND an
+  /// overnight-suspended in-flight chain (`.syncing`/`.generating`) all reset + re-orchestrate (the
+  /// restart is safe: `cacheFirstOpenEffect` is `cancelInFlight` on the shared orchestration CancelID;
+  /// the new day's gate/loading are the explicit no-loading-over-content exemption). A `nil` stamp
+  /// (orchestration never ran) must NOT trigger it — fresh state falls through to the staleness leg.
+  ///
+  /// **Same-day staleness leg:** stays `.ready`-gated exactly as before Phase 19.3 —
+  /// `isStale(nil, nil) == true`, so widening it would fire a background refresh over a same-day
+  /// `.checkInRequired`. It never stamps `contentDay` (a background pass must not mask a rollover, D2).
+  func sceneActivated(_ state: inout State) -> Effect<Action> {
+    if let contentDay = state.contentDay, contentDay != today {
+      // Day rollover: yesterday's content (whatever terminal or in-flight shape it is in) is stale →
+      // reset the per-day state and re-run the full cache-first orchestration.
+      log.info("Scene active — day rollover, resetting per-day state", category: .lifecycle)
+      Self.rolloverReset(&state)
+      return cacheFirstOpenEffect(&state)
+    }
+    // Same day (or no stamp yet): refresh only over a rendered brief whose freshness reference is past
+    // the staleness threshold. `lastRefreshAttemptAt` (recorded below) throttles a failed refresh.
+    guard case .ready = state.briefState else { return .none }
+    guard Self.isStale(
+      now: date.now, threshold: Self.backgroundRefreshStaleness,
+      lastSyncedAt: state.lastSyncedAt, lastRefreshAttemptAt: state.lastRefreshAttemptAt
+    ) else { return .none }
+    log.info("Scene active — stale, starting background refresh", category: .lifecycle)
+    state.isBackgroundRefreshing = true
+    state.lastRefreshAttemptAt = date.now
+    return backgroundRefreshEffect()
+  }
+
+  /// The per-day state contract (Phase 19.3, DECISIONS D1) — everything belonging to ONE Sofia day,
+  /// cleared at the rollover detection point before re-orchestration: the check-in child (answers,
+  /// `existing`, the "Last saved" footer), the session carousel + the restored pick (yesterday's pick
+  /// must never seed today's carousel), the readiness card, and the refresh throttle.
+  /// `isBackgroundRefreshing` clears too: the rollover's `cancelInFlight` kills an in-flight background
+  /// pass, so its resolved/failed action never arrives to clear the flag — a stuck "Updating…" pill
+  /// otherwise. **Survivors, deliberately:** `zones` (profile-derived — 19.2 refreshes them per-sync,
+  /// not per-day) and `lastSyncedAt` (mirrors the sync watermark — a fact about the store, not the
+  /// day). `contentDay` itself is re-stamped by the factory the detector invokes next.
+  static func rolloverReset(_ state: inout State) {
+    state.checkIn = CheckInComponent.State()
+    state.session = nil
+    state.restoredSelection = nil
+    state.readiness = nil
+    state.lastRefreshAttemptAt = nil
+    state.isBackgroundRefreshing = false
+  }
 
   /// Hydrate `.ready(brief, freshness)` + the readiness/session children from a resolved brief — the
   /// single source of the child-seeding mutation shared by `._briefResolved`, `._cachedBriefLoaded`, and

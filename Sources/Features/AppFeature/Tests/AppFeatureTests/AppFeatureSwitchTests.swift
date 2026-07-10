@@ -69,10 +69,15 @@ struct AppFeatureSwitchTests {
       // Token-bearing arm: the route stays `.main` but the restore overlay lifts (Phase 12.4, D1).
       $0.isRestoringSession = false
     }
-    // D8: the token-bearing staying-put branch dispatches the Today open.
-    await store.receive(\.main.todayRoot.onAppOpen)
+    // D8: the token-bearing staying-put branch dispatches the Today open (stamping `contentDay`, 19.3).
+    await store.receive(\.main.todayRoot.onAppOpen) {
+      $0.route = .main(Self.main { $0.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now) })
+    }
     await store.receive(\.main.todayRoot._checkInRequired) {
-      $0.route = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
+      $0.route = .main(Self.main {
+        $0.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now)
+        $0.todayRoot.briefState = .checkInRequired
+      })
     }
   }
 
@@ -125,9 +130,14 @@ struct AppFeatureSwitchTests {
     }
     // The cache-first open still dispatches (same D8 dispatch as the token-bearing arm); `current`
     // returns nil so the open lands at the check-in gate.
-    await store.receive(\.main.todayRoot.onAppOpen)
+    await store.receive(\.main.todayRoot.onAppOpen) {
+      $0.route = .main(Self.main { $0.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now) })
+    }
     await store.receive(\.main.todayRoot._checkInRequired) {
-      $0.route = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
+      $0.route = .main(Self.main {
+        $0.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now)
+        $0.todayRoot.briefState = .checkInRequired
+      })
     }
 
     // Distinct log record on the always-on `.http` category: names the keychain failure (status
@@ -156,9 +166,14 @@ struct AppFeatureSwitchTests {
     await store.send(.onboarding(.delegate(.connected))) {
       $0.route = .main(MainTabs.State())
     }
-    await store.receive(\.main.todayRoot.onAppOpen)
+    await store.receive(\.main.todayRoot.onAppOpen) {
+      $0.route = .main(Self.main { $0.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now) })
+    }
     await store.receive(\.main.todayRoot._checkInRequired) {
-      $0.route = .main(Self.main { $0.todayRoot.briefState = .checkInRequired })
+      $0.route = .main(Self.main {
+        $0.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now)
+        $0.todayRoot.briefState = .checkInRequired
+      })
     }
 
     #expect(recorder.entries.contains { $0.category == .app && $0.message.contains("Connected") })

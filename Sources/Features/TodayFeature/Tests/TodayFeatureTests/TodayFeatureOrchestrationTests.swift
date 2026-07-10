@@ -41,7 +41,7 @@ struct TodayFeatureOrchestrationTests {
       $0.log = .recording(into: recorder)
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
 
     #expect(recorder.entries.contains { $0.category == .lifecycle && $0.message.contains("cache-first orchestration") })
@@ -64,7 +64,7 @@ struct TodayFeatureOrchestrationTests {
       }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._syncStarted) { $0.briefState = .syncing }
     await store.receive(\._syncFailed) { $0.briefState = .syncFailed(.network) }
 
@@ -87,7 +87,7 @@ struct TodayFeatureOrchestrationTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await receiveSuccessChain(store, brief: cached, freshness: .cached, now: now, zones: sampleZones())
   }
 
@@ -104,7 +104,7 @@ struct TodayFeatureOrchestrationTests {
       $0.briefRepository.dailyBrief = { _ in throw BriefError.serverError }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._syncStarted) { $0.briefState = .syncing }
     await store.receive(\._generating) {
       $0.lastSyncedAt = now
@@ -131,7 +131,7 @@ struct TodayFeatureOrchestrationTests {
       }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._syncStarted) { $0.briefState = .syncing }
     await store.receive(\._syncFailed) { $0.briefState = .syncFailed(.transient) }
 
@@ -153,7 +153,7 @@ struct TodayFeatureOrchestrationTests {
       $0.briefRepository.dailyBrief = { _ in throw WeirdError() }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._syncStarted) { $0.briefState = .syncing }
     await store.receive(\._generating) {
       $0.lastSyncedAt = now
@@ -177,7 +177,7 @@ struct TodayFeatureOrchestrationTests {
       $0.briefRepository.dailyBrief = { _ in sampleBrief(cached: false) }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._checkInRequired) { $0.briefState = .checkInRequired }
 
     let count = await syncCounter.count
@@ -199,7 +199,7 @@ struct TodayFeatureOrchestrationTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.retryTapped)
+    await store.send(.retryTapped) { $0.contentDay = sofiaToday() }
     await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
   }
 
@@ -223,7 +223,7 @@ struct TodayFeatureOrchestrationTests {
       $0.profileRepository.zones = { throw BriefError.serverError } // fetch fails → try? → nil
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._syncStarted) { $0.briefState = .syncing }
     await store.receive(\._generating) {
       $0.lastSyncedAt = now

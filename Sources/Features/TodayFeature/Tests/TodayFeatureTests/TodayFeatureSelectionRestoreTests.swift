@@ -39,7 +39,7 @@ struct TodayFeatureSelectionRestoreTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     // The persisted pick is restored first (before any hydration).
     await store.receive(\._selectionLoaded, pick) { $0.restoredSelection = pick }
     // The cache render seeds the carousel on the restored pick (selectedIndex 1), not the primary.

@@ -71,9 +71,14 @@ struct AppFeature401Tests {
     await store.send(.onboarding(.delegate(.connected))) {
       $0.route = .main(MainTabs.State())
     }
-    await store.receive(\.main.todayRoot.onAppOpen)
+    await store.receive(\.main.todayRoot.onAppOpen) {
+      var main = MainTabs.State()
+      main.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now)
+      $0.route = .main(main)
+    }
     await store.receive(\.main.todayRoot._checkInRequired) {
       var main = MainTabs.State()
+      main.todayRoot.contentDay = Calendar.europeSofia.startOfDay(for: now)
       main.todayRoot.briefState = .checkInRequired
       $0.route = .main(main)
     }

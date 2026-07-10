@@ -40,7 +40,7 @@ struct TodayFeatureSaveTests {
       $0.checkIn.lastSavedAt = now
     }
     // The delegate re-enters the chain: gate (now unlocked) → sync → brief.
-    await store.receive(\.checkIn.delegate)
+    await store.receive(\.checkIn.delegate) { $0.contentDay = sofiaToday() }
     await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
 
     let flags = await recorder.flags
@@ -73,7 +73,7 @@ struct TodayFeatureSaveTests {
       $0.checkIn.isSaving = false
       $0.checkIn.lastSavedAt = now
     }
-    await store.receive(\.checkIn.delegate)
+    await store.receive(\.checkIn.delegate) { $0.contentDay = sofiaToday() }
     await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
 
     let flags = await recorder.flags
@@ -103,7 +103,7 @@ struct TodayFeatureSaveTests {
     }
 
     // First run starts and suspends inside sync().
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._syncStarted) { $0.briefState = .syncing }
 
     // A second trigger cancels the in-flight first run (cancelInFlight on .orchestration). The first

@@ -59,7 +59,7 @@ struct TodayFeatureCacheFirstTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     // Instant cache render — NO `.syncing`/`.generating`, no clock advance.
     await store.receive(\._cachedBriefLoaded) {
       $0.briefState = .ready(cached, .cached)
@@ -103,7 +103,7 @@ struct TodayFeatureCacheFirstTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._cachedBriefLoaded) {
       $0.briefState = .ready(cached, .cached)
       $0.readiness = expectedReadiness(cached)
@@ -226,7 +226,7 @@ struct TodayFeatureCacheFirstTests {
       $0.briefRepository.cachedDailyBrief = { cached }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await store.receive(\._checkInRequired) { $0.briefState = .checkInRequired }
   }
 
@@ -246,7 +246,7 @@ struct TodayFeatureCacheFirstTests {
       $0.profileRepository.zones = { sampleZones() }
     }
 
-    await store.send(.onAppOpen)
+    await store.send(.onAppOpen) { $0.contentDay = sofiaToday() }
     await receiveSuccessChain(store, brief: fresh, freshness: .fresh, now: now, zones: sampleZones())
   }
 

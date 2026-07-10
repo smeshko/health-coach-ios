@@ -10,11 +10,12 @@ import Testing
 
 @testable import TodayFeature
 
-/// Phase 12.1 scene-staleness + pull-to-refresh coverage (DECISIONS D6): on re-activation while `.ready`,
-/// day rollover re-orchestrates (the explicit no-loading-over-content exemption), a same-day brief older
-/// than `backgroundRefreshStaleness` background-refreshes quietly, and otherwise nothing happens;
-/// non-`.ready` states ignore activation. The `max(lastSyncedAt, lastRefreshAttemptAt)` reference
-/// throttles a failed refresh so it can't re-fire on every activation.
+/// Phase 12.1 scene-staleness + pull-to-refresh coverage (DECISIONS D6): on re-activation, a `contentDay`
+/// rollover re-orchestrates (Phase 19.3 — the reset itself is `TodayFeatureRolloverResetTests`), a
+/// same-day `.ready` brief older than `backgroundRefreshStaleness` background-refreshes quietly, and
+/// otherwise nothing happens; unstamped (`contentDay == nil`) non-`.ready` states ignore activation. The
+/// `max(lastSyncedAt, lastRefreshAttemptAt)` reference throttles a failed refresh so it can't re-fire on
+/// every activation.
 @MainActor
 struct TodayFeatureSceneStalenessTests {
   private func brief(date: Date, cached: Bool = true) -> DomainModels.DailyBrief {
@@ -110,12 +111,17 @@ struct TodayFeatureSceneStalenessTests {
     }
   }
 
-  /// Day rollover (yesterday's brief) → full re-orchestration hitting the check-in gate (the no-loading
-  /// exemption). With no check-in for the new day → `.checkInRequired`.
+  /// Day rollover (yesterday's `contentDay` stamp, Phase 19.3) → full re-orchestration hitting the
+  /// check-in gate (the no-loading exemption). With no check-in for the new day → `.checkInRequired`.
   @Test func test_sceneActive_dayRollover_reOrchestrates_hitsCheckInGate() async {
     let now = sofiaInstant()
     let yesterday = brief(date: now.addingTimeInterval(-86400))
-    let store = TestStore(initialState: TodayFeature.State(briefState: .ready(yesterday, .cached))) {
+    let store = TestStore(
+      initialState: TodayFeature.State(
+        briefState: .ready(yesterday, .cached),
+        contentDay: Calendar.europeSofia.startOfDay(for: now.addingTimeInterval(-86400))
+      )
+    ) {
       TodayFeature()
     } withDependencies: {
       $0.calendar = .europeSofia
@@ -124,7 +130,7 @@ struct TodayFeatureSceneStalenessTests {
       $0.briefRepository.cachedDailyBrief = { yesterday } // ignored — the gate precedes the peek
     }
 
-    await store.send(.sceneBecameActive)
+    await store.send(.sceneBecameActive) { $0.contentDay = sofiaToday() }
     await store.receive(\._checkInRequired) { $0.briefState = .checkInRequired }
   }
 
@@ -185,7 +191,7 @@ struct TodayFeatureSceneStalenessTests {
         $0.calendar = .europeSofia
         $0.date = .constant(sofiaInstant())
       }
-      await store.send(.sceneBecameActive) // no-op in every non-ready state
+      await store.send(.sceneBecameActive) // no-op: an unstamped (contentDay nil) non-ready state
     }
   }
 }
