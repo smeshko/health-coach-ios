@@ -112,7 +112,7 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
 - [x] TASK-001: APIBaseURL resolver in APIClientLive with simulator fallback + tests
-- [ ] TASK-002: Remove localhost default from live(); add unconfigured throwing client; resolver-backed liveValue (depends on TASK-001)
+- [x] TASK-002: Remove localhost default from live(); add unconfigured throwing client; resolver-backed liveValue (depends on TASK-001)
 - [ ] TASK-003: DevSettings first-launch seeding coherent with configured backend (depends on TASK-002)
 - [ ] TASK-004: Composition-root wiring: AppConfig, Info.plist key, API_BASE_URL build setting, explicit apiClient (depends on TASK-003)
 - [ ] TASK-005: Final Validation
