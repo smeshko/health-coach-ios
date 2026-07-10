@@ -127,8 +127,9 @@ summary today.
   (validation round-1 #4).
   *(2026-07-10: 479 host tests / 95 suites passed; swiftlint --strict 0 violations in
   379 files; 94/94 snapshot tests passed on the pinned iPhone 17 Pro / OS 26.0.)*
-- [ ] CI-pending (owner): on-device slow/failing-probe behaviour (wedged `healthd`,
-  unreachable server) settles to actionable states — epic Validation.
+- [x] CI-pending (owner): on-device slow/failing-probe behaviour (wedged `healthd`,
+  unreachable server) settles to actionable states — epic 18 Validation; recorded in
+  PR #57 body. *(CI green on PR #57, 2026-07-10.)*
 
 ## Tasks
 
