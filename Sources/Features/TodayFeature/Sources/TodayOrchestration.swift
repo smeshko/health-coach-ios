@@ -234,11 +234,15 @@ private func runBlockingChain(
   }
 }
 
-/// The quiet background pass (sync → record → brief, with zones alongside) — Phase 12.1. Zones start
-/// ALONGSIDE `sync()` (`ProfileRepository.zones()` is cache-first, so cached zones survive a failing sync,
-/// DECISIONS D3 round-3 #2); a `sync()` success records `lastSyncedAt` via `._backgroundSyncCompleted`;
-/// `dailyBrief(refresh: true)` (D2) resolves through `._backgroundRefreshResolved` (swap-if-changed) or,
-/// on any throw, `._backgroundRefreshFailed` — both merging already-fetched zones. No min-dwell.
+/// The quiet background pass (sync → record → brief, with zones alongside) — Phase 12.1. A pre-sync
+/// zones read starts ALONGSIDE `sync()` (`ProfileRepository.zones()` is cache-first, so cached zones
+/// survive a failing sync, DECISIONS D3 round-3 #2); a `sync()` success records `lastSyncedAt` via
+/// `._backgroundSyncCompleted`; `dailyBrief(refresh: true)` (D2) resolves through
+/// `._backgroundRefreshResolved` (swap-if-changed) or, on any throw, `._backgroundRefreshFailed` — both
+/// merging fetched zones. A SECOND `zones()` read starts right after a successful sync (Phase 19.2
+/// review rounds 1–2): that sync just advanced the watermark `serverTime`, so the post-sync read is the
+/// one that picks up recomputed constants in the same pass, on both the resolved and the failed-brief
+/// paths — the pre-sync value is only the nil fallback. No min-dwell.
 private func runBackgroundPass(
   send: Send<TodayFeature.Action>,
   deps: OrchestrationDeps
@@ -246,19 +250,33 @@ private func runBackgroundPass(
   let syncRepository = deps.sync
   let briefRepository = deps.brief
   let profileRepository = deps.profile
-  async let zonesResult = try? await profileRepository.zones()
+  async let preSyncZones = try? await profileRepository.zones()
   do {
     _ = try await syncRepository.sync()
     try Task.checkCancellation()
-    await send(._backgroundSyncCompleted)
+  } catch is CancellationError {
+    return
+  } catch {
+    // Sync failed → the watermark did not advance; the pre-sync cached zones are still current.
+    await send(._backgroundRefreshFailed(await preSyncZones))
+    return
+  }
+  await send(._backgroundSyncCompleted)
+  // Post-sync read (19.2 sync-anchored staleness): the watermark just advanced, so this call refetches
+  // the recomputed profile. Started alongside the brief so a brief failure still delivers it.
+  async let postSyncZonesResult = try? await profileRepository.zones()
+  do {
     let brief = try await briefRepository.dailyBrief(true)
-    let zones = await zonesResult
+    var zones = await postSyncZonesResult
+    if zones == nil { zones = await preSyncZones }
     try Task.checkCancellation()
     await send(._backgroundRefreshResolved(brief, zones))
   } catch is CancellationError {
     return
   } catch {
-    // Any failure (sync or brief) degrades quietly; already-fetched zones still merge.
-    await send(._backgroundRefreshFailed(await zonesResult))
+    // The brief failure degrades quietly; the post-sync (recomputed) zones still merge.
+    var zones = await postSyncZonesResult
+    if zones == nil { zones = await preSyncZones }
+    await send(._backgroundRefreshFailed(zones))
   }
 }
