@@ -103,7 +103,7 @@ public struct HealthKitPriming {
         // not a 30-day window, so an old-but-granted category still reads present (DECISIONS #2).
         return .run { [healthKitClient] send in
           do {
-            let samples = try await healthKitClient.deltaSamples(.distantPast)
+            let samples = try await healthKitClient.deltaSamples(.since(.distantPast))
             await send(.degradedProbeResponse(.success(samples)))
           } catch {
             await send(.degradedProbeResponse(.failure(error)))

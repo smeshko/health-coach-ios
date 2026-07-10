@@ -64,7 +64,7 @@ private func runSync() async throws -> SyncResult {
   //    watermark write below, so the unread window is simply re-read on the next sync — no data loss.
   let anchor = existing.anchor
   let samples = try await withSyncTimeout(healthReadTimeout, clock: clock) {
-    try await healthKit.deltaSamples(anchorDate(anchor))
+    try await healthKit.deltaSamples(.since(anchorDate(anchor)))
   }
 
   // 4. Today's check-in (a read failure degrades to nil — the check-in is optional) + the strength

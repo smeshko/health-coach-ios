@@ -1,6 +1,6 @@
 # Plan: Bounded, cancellable HealthKit reads
 
-Status: draft
+Status: in-progress
 Branch: fix/phase-18-2-bounded-hk-reads
 Risk: medium
 Epic: 18 — Make it run on device (audit wave 1) ([epic](../../epics/18-run-on-device.md))
@@ -122,7 +122,7 @@ steps are in `recordQuerySpecs`). `deltaSamples` is single-argument, so switchin
 Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
-- [ ] TASK-001: HealthReadBounds + HealthKitReadError interface; signature + call-site adaptation
+- [x] TASK-001: HealthReadBounds + HealthKitReadError interface; signature + call-site adaptation
 - [ ] TASK-002: Live reads: per-type limit + DESC sort, stop(query) on cancel, in-client timeout (depends on TASK-001)
 - [ ] TASK-003: SyncRepository bounds wiring: timedOut→transient, outer backstop kept, tests (depends on TASK-002)
 - [ ] TASK-004: Final Validation

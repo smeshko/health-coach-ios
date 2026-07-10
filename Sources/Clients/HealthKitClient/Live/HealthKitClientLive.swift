@@ -22,7 +22,7 @@ import HealthKitClient
           try await box.store.requestAuthorization(toShare: [], read: HKTypeCatalog.allReadTypes)
         },
         authorizationStatus: { liveAuthorizationStatus(store: box.store) },
-        deltaSamples: { since in try await liveDeltaSamples(box: box, since: since) }
+        deltaSamples: { bounds in try await liveDeltaSamples(box: box, bounds: bounds) }
       )
     }()
   }

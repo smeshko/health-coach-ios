@@ -4,17 +4,20 @@
   import HealthKit
   import HealthKitClient
 
-  /// Read everything newer than `since` across records, workouts, and activity, mapping each HK sample
-  /// to its payload (tagged with the wire `RecordType`). A denied/empty/failing category contributes an
-  /// **empty slice, never an error** (PRD §7.1/§8.5): every query swallows its error to `[]`.
+  /// Read everything newer than `bounds.since` across records, workouts, and activity, mapping each HK
+  /// sample to its payload (tagged with the wire `RecordType`). A denied/empty/failing category
+  /// contributes an **empty slice, never an error** (PRD §7.1/§8.5): every query swallows its error to
+  /// `[]`. (`bounds.limitPerType`/`bounds.timeout` enforcement lands in TASK-002 — this commit only
+  /// threads the since-floor through unchanged.)
   ///
-  /// The `@unchecked Sendable` `box` and the `Date` anchor are the only values that cross the
-  /// concurrency boundaries (both Sendable); each query builds its own `NSPredicate` locally and maps
-  /// the non-`Sendable` HK samples to `Sendable` payloads inside its callback, so nothing non-Sendable
-  /// escapes a task.
-  func liveDeltaSamples(box: HealthStoreBox, since: Date) async throws -> HealthSampleSet {
+  /// The `@unchecked Sendable` `box` and the `HealthReadBounds` anchor are the only values that cross
+  /// the concurrency boundaries (both Sendable); each query builds its own `NSPredicate` locally and
+  /// maps the non-`Sendable` HK samples to `Sendable` payloads inside its callback, so nothing
+  /// non-Sendable escapes a task.
+  func liveDeltaSamples(box: HealthStoreBox, bounds: HealthReadBounds) async throws -> HealthSampleSet {
     guard HKHealthStore.isHealthDataAvailable() else { return .empty }
 
+    let since = bounds.since
     async let records = readRecords(box: box, since: since)
     async let workouts = readWorkouts(box: box, since: since)
     async let activity = readActivity(box: box, since: since)
