@@ -1,6 +1,6 @@
 # Plan: Bounded, cancellable HealthKit reads
 
-Status: in-progress
+Status: done
 Branch: fix/phase-18-2-bounded-hk-reads
 Risk: medium
 Epic: 18 — Make it run on device (audit wave 1) ([epic](../../epics/18-run-on-device.md))
@@ -91,29 +91,36 @@ steps are in `recordQuerySpecs`). `deltaSamples` is single-argument, so switchin
 
 ## Acceptance Criteria
 
-- [ ] A read that times out or is cancelled stops the underlying `HKQuery` — code path
+- [x] A read that times out or is cancelled stops the underlying `HKQuery` — code path
   verified by review + the `.app` "stopped N queries" log line demonstrated in a simulator
   run (cancel mid-sync via the Today screen's Cancel, or the timeout branch under a TestClock
-  in repo tests).
-- [ ] Caller cancellation propagates end-to-end: cancelling the task awaiting `sync()`
+  in repo tests). *(Sim run 2026-07-10: healthd suspended → sync hung on the HK read →
+  Today's Cancel → `NOTICE [app] HK read cancelled/timed out — stopped 25 in-flight
+  queries`; no orphan POST followed.)*
+- [x] Caller cancellation propagates end-to-end: cancelling the task awaiting `sync()`
   cancels the in-flight `deltaSamples` before any timeout (unit-tested with a
   cancellation-observing stub client; validation round-1 #1).
-- [ ] The iOS (`canImport(HealthKit)`) arm is compiled by the pinned-simulator CoachApp
+  *(`test_sync_callerCancelled_cancelsDeltaRead_noPost_watermarkUntouched` passed.)*
+- [x] The iOS (`canImport(HealthKit)`) arm is compiled by the pinned-simulator CoachApp
   build (transcript shows `HKDeltaReads.swift`) — `make test` is host-only and the package
-  scheme omits `HealthKitClientTests` (validation round-1 #3 + round-2 #2).
-- [ ] A cancelled read can neither complete as success nor leak a running query:
+  scheme omits `HealthKitClientTests` (validation round-1 #3 + round-2 #2). *(BUILD
+  SUCCEEDED; transcript: `SwiftCompile … HKDeltaReads.swift (in target 'HealthKitClientLive')`.)*
+- [x] A cancelled read can neither complete as success nor leak a running query:
   `QueryLifecycle` (linearizable register/execute/cancel protocol — cancel-before-
   registration never executes; late callbacks dropped) and `BoundedReadCoordinator`
   (TestClock-driven timeout → `.timedOut` + every registered handle stopped exactly once)
   pinned by deterministic host tests with fake query handles (validation round-2 #1,
-  round-3 #1, round-3 #2).
-- [ ] The delta read enforces a per-type row bound and the since-date floor (interface tests
+  round-3 #1, round-3 #2). *(QueryLifecycleTests + BoundedReadCoordinatorTests suites green.)*
+- [x] The delta read enforces a per-type row bound and the since-date floor (interface tests
   + repo test asserting the bounds passed to the client carry since = anchor and the default
-  limit).
-- [ ] `HealthKitReadError.timedOut` surfaces as `SyncError.transient` before any watermark
+  limit). *(`test_sync_requestsBoundedRead_sinceAnchor_defaultLimitAndTimeout` +
+  HealthReadBoundsTests green.)*
+- [x] `HealthKitReadError.timedOut` surfaces as `SyncError.transient` before any watermark
   write (unit-tested with a TestClock); existing `SyncTimeoutTests` backstop behaviour
-  unchanged.
-- [ ] Full suite + lint green on the sim (`make test`, snapshot targets untouched).
+  unchanged. *(`test_sync_clientTimedOut_throwsTransient_watermarkUntouched` +
+  SyncTimeoutTests green.)*
+- [x] Full suite + lint green on the sim (`make test`, snapshot targets untouched).
+  *(467 tests / 95 suites passed; `swiftlint --strict` 0 violations in 379 files.)*
 - [ ] CI-pending (owner): first-ever sync on a physical device with a large HealthKit history
   completes within its timeout or degrades to the bounded partial read (epic Validation).
 
@@ -125,4 +132,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-001: HealthReadBounds + HealthKitReadError interface; signature + call-site adaptation
 - [x] TASK-002: Live reads: per-type limit + DESC sort, stop(query) on cancel, in-client timeout (depends on TASK-001)
 - [x] TASK-003: SyncRepository bounds wiring: timedOut→transient, outer backstop kept, tests (depends on TASK-002)
-- [ ] TASK-004: Final Validation
+- [x] TASK-004: Final Validation
