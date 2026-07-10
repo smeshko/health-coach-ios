@@ -31,6 +31,20 @@ public struct HealthReadBounds: Sendable, Equatable {
   public static func since(_ date: Date) -> HealthReadBounds {
     HealthReadBounds(since: date, limitPerType: defaultLimitPerType, timeout: defaultTimeout)
   }
+
+  /// The start of the **activity-summary** window: `since`, floored at `limitPerType` days before
+  /// `now`. `HKActivitySummaryQuery` has no `limit` parameter, but summaries are one-per-day, so
+  /// bounding the window to `limitPerType` days enforces the same per-type row cardinality as the
+  /// sample queries — the `.distantPast` onboarding probe can no longer request an unbounded
+  /// activity range (review #2.2; 10 000 days ≈ 27 years, far beyond any device's HK history, so
+  /// real probes are semantically unchanged). Falls back to `since` if the calendar cannot form
+  /// the floor (never in practice).
+  public func activitySince(now: Date, calendar: Calendar) -> Date {
+    guard let floor = calendar.date(byAdding: .day, value: -limitPerType, to: now) else {
+      return since
+    }
+    return max(since, floor)
+  }
 }
 
 /// Thrown by `deltaSamples` **only** when the whole read exceeds `bounds.timeout`. The

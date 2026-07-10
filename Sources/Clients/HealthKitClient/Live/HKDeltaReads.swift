@@ -92,7 +92,7 @@
     let activity = QueryLifecycle<HKQueryHandle, [ActivitySummaryPayload]>()
     reads.append(
       DeltaRead(lifecycle: activity) {
-        try await .activity(readActivity(box: box, since: bounds.since, lifecycle: activity))
+        try await .activity(readActivity(box: box, bounds: bounds, lifecycle: activity))
       }
     )
     return reads
@@ -158,7 +158,7 @@
 
   private func readActivity(
     box: HealthStoreBox,
-    since: Date,
+    bounds: HealthReadBounds,
     lifecycle: QueryLifecycle<HKQueryHandle, [ActivitySummaryPayload]>
   ) async throws -> [ActivitySummaryPayload] {
     // Resolve the app's pinned frame (Europe/Sofia, installed at the composition root via
@@ -166,6 +166,12 @@
     // math rather than the device locale — and the injected clock for the `end` boundary.
     @Dependency(\.calendar) var calendar
     @Dependency(\.date.now) var now
+
+    // Review #2.2: `HKActivitySummaryQuery` has no `limit` parameter, so the WINDOW is the bound —
+    // `activitySince` floors the start at `limitPerType` days before now (summaries are
+    // one-per-day, so this enforces the same per-type row cardinality as the sample queries; the
+    // `.distantPast` probe no longer requests an unbounded range).
+    let since = bounds.activitySince(now: now, calendar: calendar)
 
     // Activity-summary predicates require each `DateComponents` to carry its own calendar — the
     // components returned by `dateComponents(_:from:)` do **not** (HealthKit raises
@@ -183,8 +189,7 @@
     // Snapshot the resolved calendar into a plain value so the `@Sendable` query callback captures
     // a Sendable `Calendar`, not the `@Dependency` storage; the (non-Sendable) `NSPredicate` is
     // built from the Sendable components INSIDE `makeHandle` so it never crosses the boundary.
-    // (`HKActivitySummaryQuery` has no limit parameter — the day-bucketed date predicate already
-    // bounds it — but it is wrapped in the same lifecycle so cancellation/timeout stops it too.)
+    // (The query is wrapped in the same lifecycle so cancellation/timeout stops it too.)
     let payloadCalendar = calendar
     return try await lifecycle.run(
       makeHandle: {
