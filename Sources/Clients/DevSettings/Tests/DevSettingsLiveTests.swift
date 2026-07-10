@@ -61,9 +61,20 @@ struct DevSettingsStoreTests {
     let store = DevSettingsStore(defaults: suite)
     #expect(!store.hasPersistedMock(), "precondition: nothing persisted")
 
-    DevSettings.seedFirstLaunchDefault(defaults: suite)
+    DevSettings.seedFirstLaunchDefault(liveBackendConfigured: true, defaults: suite)
     #expect(store.hasPersistedMock(), "seed should write the flag on first launch")
-    #expect(!store.readMock(), "DEBUG first-launch default is now live (false), not mock")
+    #expect(!store.readMock(), "configured backend: first-launch default is live (false)")
+  }
+
+  @Test func test_seedFirstLaunchDefault_seedsMockTrueWhenBackendUnconfigured() {
+    let (suite, name) = freshSuite()
+    defer { suite.removePersistentDomain(forName: name) }
+    let store = DevSettingsStore(defaults: suite)
+    #expect(!store.hasPersistedMock(), "precondition: nothing persisted")
+
+    DevSettings.seedFirstLaunchDefault(liveBackendConfigured: false, defaults: suite)
+    #expect(store.hasPersistedMock(), "seed should write the flag on first launch")
+    #expect(store.readMock(), "unconfigured backend: first-launch default is mock (true)")
   }
 
   @Test func test_seedFirstLaunchDefault_doesNotClobberPersistedFalse() {
@@ -71,9 +82,22 @@ struct DevSettingsStoreTests {
     defer { suite.removePersistentDomain(forName: name) }
     let store = DevSettingsStore(defaults: suite)
 
-    // A dev who has toggled mock OFF has a persisted `false`; the seed must leave it untouched.
+    // A dev who has toggled mock OFF has a persisted `false`; the unconfigured seed
+    // (which would otherwise write `true`) must leave it untouched.
     store.writeMock(false)
-    DevSettings.seedFirstLaunchDefault(defaults: suite)
+    DevSettings.seedFirstLaunchDefault(liveBackendConfigured: false, defaults: suite)
     #expect(!store.readMock(), "seed must not overwrite an already-persisted value")
+  }
+
+  @Test func test_seedFirstLaunchDefault_doesNotClobberPersistedTrue() {
+    let (suite, name) = freshSuite()
+    defer { suite.removePersistentDomain(forName: name) }
+    let store = DevSettingsStore(defaults: suite)
+
+    // A dev who has toggled mock ON has a persisted `true`; the configured seed
+    // (which would otherwise write `false`) must leave it untouched.
+    store.writeMock(true)
+    DevSettings.seedFirstLaunchDefault(liveBackendConfigured: true, defaults: suite)
+    #expect(store.readMock(), "seed must not overwrite an already-persisted value")
   }
 }

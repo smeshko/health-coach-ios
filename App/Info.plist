@@ -13,5 +13,13 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
+	<!--
+	  Phase 18.1 (audit CR-1): the API base URL seam. `$(API_BASE_URL)` substitutes the app target's
+	  User-Defined `API_BASE_URL` build setting (shipped EMPTY in the repo by design — the owner sets the
+	  real HTTPS hostname locally). `AppConfig`/`APIBaseURL.resolve(bundle:)` read this key; empty resolves
+	  to localhost only on DEBUG+simulator and to the throwing `.unconfigured` client everywhere else.
+	-->
+	<key>APIBaseURL</key>
+	<string>$(API_BASE_URL)</string>
 </dict>
 </plist>
