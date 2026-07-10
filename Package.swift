@@ -405,6 +405,10 @@ let package = Package(
       dependencies: [
         "CoachCore",
         "PersistenceModels",
+        // The resilient-open recovery decision (quarantine vs preserve, Phase 18.4) logs on the
+        // always-on `.http` category via the LogClient INTERFACE (no LogClientLive — the
+        // composition root installs the live value; 18.2 precedent).
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -758,6 +762,10 @@ let package = Package(
         // Test-only: a real profile fixture for the v3 cache-clear migration test (11.2).
         "SampleData",
         "CoachCore",
+        // Test-only: `LogRecorder`/`.recording(into:)` + `withDependencies` capture the
+        // resilient-open recovery records (Phase 18.4).
+        "LogClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Clients/Database/Tests",

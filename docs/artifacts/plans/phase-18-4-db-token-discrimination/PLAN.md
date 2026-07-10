@@ -1,6 +1,6 @@
 # Plan: Resilient-DB and token-restore discrimination
 
-Status: draft
+Status: in-progress
 Branch: fix/phase-18-4-db-token-discrimination
 Risk: medium
 Epic: 18 — Make it run on device (audit wave 1) ([epic](../../epics/18-run-on-device.md))
@@ -126,6 +126,6 @@ unavailable) to `hasToken: false` → onboarding swap, exactly the audit's stran
 Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
-- [ ] TASK-001: DatabaseLive: corruption-vs-transient discrimination, journal sidecar, logged recovery
+- [x] TASK-001: DatabaseLive: corruption-vs-transient discrimination, journal sidecar, logged recovery
 - [ ] TASK-002: AppFeature: three-state token restore (present/absent/read-failed)
 - [ ] TASK-003: Final Validation
