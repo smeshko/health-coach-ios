@@ -143,6 +143,6 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
 - [x] TASK-001: Rollover reset of per-day Today state (contentDay stamp + child reset)
-- [ ] TASK-002: Day-guard the check-in footer copy
+- [x] TASK-002: Day-guard the check-in footer copy
 - [ ] TASK-003: Resolve the forced-REST override card zone chip
 - [ ] TASK-004: Final Validation

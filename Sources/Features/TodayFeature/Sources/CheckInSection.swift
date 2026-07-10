@@ -14,6 +14,7 @@ import SwiftUI
 struct CheckInSection: View {
   @Bindable var store: StoreOf<CheckInComponent>
   @Dependency(\.calendar) var calendar
+  @Dependency(\.date) var date
 
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceLg) {
@@ -62,9 +63,12 @@ struct CheckInSection: View {
         }
         // The footer shows a precise clock time only for a save made this session (`lastSavedAt`); a
         // check-in loaded from earlier today has only a day-key, so it shows day-relative copy instead.
+        // `lastSavedAt` needs no day guard — it is session-local and cleared by the rollover reset.
         if let savedAt = store.lastSavedAt {
           CheckInFooter(text: "Last saved \(savedTime(savedAt)) · tap any answer to edit")
-        } else if store.existing != nil {
+        } else if CheckInComponent.isSameSofiaDay(store.existing, now: date.now, calendar: calendar) {
+          // Day-guarded (D3): "Saved earlier today" renders only when `existing` really is today's,
+          // so even a delayed/missed rollover reset cannot show yesterday's save as today's.
           CheckInFooter(text: "Saved earlier today · tap any answer to edit")
         }
       }

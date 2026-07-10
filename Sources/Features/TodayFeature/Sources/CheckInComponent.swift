@@ -82,6 +82,18 @@ public struct CheckInComponent {
   /// to start-of-day, but computing it here keeps the saved `CheckIn.date` deterministic + assertable.
   private var today: Date { calendar.startOfDay(for: date.now) }
 
+  /// The one day guard for the "Saved earlier today" footer (defense in depth on top of the rollover
+  /// reset — DECISIONS D3): true only when `existing` is dated the same Sofia day as `now`, so a
+  /// delayed/missed reset or a child-reload window can never present yesterday's save as today's. Pure
+  /// (no dependency reads) so the view can call it deterministically and tests can pin the exact
+  /// Sofia-midnight boundary. Uses `isDate(_:inSameDayAs:)` — not `==` — because although the repo
+  /// normalizes `CheckIn.date` to `startOfDay` on save, an un-normalized value from any future source
+  /// must still compare correctly.
+  public static func isSameSofiaDay(_ existing: DomainModels.CheckIn?, now: Date, calendar: Calendar) -> Bool {
+    guard let existing else { return false }
+    return calendar.isDate(existing.date, inSameDayAs: now)
+  }
+
   public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
