@@ -188,9 +188,49 @@
 
     // swiftlint:enable cyclomatic_complexity function_body_length
 
+    /// Ordered distance sources for `workoutPayload`. HealthKit stores workout distance under a
+    /// per-modality quantity type, and a workout carries statistics only for its own modality's
+    /// type — so first-non-nil resolution over this list is exact, not heuristic.
+    /// `distanceWalkingRunning` leads as the most common case.
+    static let distanceTypeCandidates: [HKQuantityTypeIdentifier] = {
+      // Rowing/cross-country-skiing/paddle-sports identifiers need macOS 15 (host tests build at
+      // macOS 14; the shipped iOS 26 floor always satisfies the `*` clause, so on-device — and on
+      // any modern host runtime — the full list applies).
+      guard #available(macOS 15.0, *) else {
+        return [
+          .distanceWalkingRunning, .distanceCycling, .distanceSwimming,
+          .distanceDownhillSnowSports, .distanceWheelchair,
+        ]
+      }
+      return [
+        .distanceWalkingRunning,
+        .distanceCycling,
+        .distanceSwimming,
+        .distanceRowing,
+        .distanceCrossCountrySkiing,
+        .distanceDownhillSnowSports,
+        .distancePaddleSports,
+        .distanceWheelchair,
+      ]
+    }()
+
+    /// Pure resolution seam: the first candidate the workout has a distance sum for wins.
+    /// Takes a closure (instead of the `HKWorkout`) so tests can inject fixtures — constructed
+    /// `HKWorkout`s don't reliably expose `statistics(for:)` off-device.
+    static func distanceMeters(sumForType: (HKQuantityTypeIdentifier) -> Double?) -> Double? {
+      for candidate in distanceTypeCandidates {
+        if let meters = sumForType(candidate) { return meters }
+      }
+      return nil
+    }
+
     static func workoutPayload(from workout: HKWorkout) -> WorkoutPayload {
-      let distance = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
-        .sumQuantity()?.doubleValue(for: .meter())
+      // Distance types are per-modality (cycling/swimming/rowing each carry their own), so
+      // resolve across the ordered candidates instead of only `distanceWalkingRunning`.
+      let distance = distanceMeters { identifier in
+        workout.statistics(for: HKQuantityType(identifier))?
+          .sumQuantity()?.doubleValue(for: .meter())
+      }
       let energy = workout.statistics(for: HKQuantityType(.activeEnergyBurned))?
         .sumQuantity()?.doubleValue(for: .kilocalorie())
       let effort = (workout.metadata?["HKWorkoutEffortScore"] as? NSNumber)?.intValue
