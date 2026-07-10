@@ -528,6 +528,9 @@ let package = Package(
         "CoachCore",
         // `routed(dev:)` mock/live toggle (devRoute).
         "DevSettings",
+        // Truncation visibility (Phase 19.1): a delta read hitting `limitPerType` logs a warning on
+        // the always-on `.http` category so the condition is diagnosable on device.
+        "LogClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -898,6 +901,8 @@ let package = Package(
         "APIClient",
         "Database",
         "LocalRepositories",
+        // `LogRecorder` pins the Phase 19.1 truncation warning on the always-on `.http` category.
+        "LogClient",
         "WireModels",
         "DomainModels",
         "PersistenceModels",

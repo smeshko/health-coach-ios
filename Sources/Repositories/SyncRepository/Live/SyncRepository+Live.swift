@@ -7,6 +7,7 @@ import Foundation
 import GRDB
 import HealthKitClient
 import LocalRepositories
+import LogClient
 import PersistenceModels
 import SyncRepository
 import WireModels
@@ -65,11 +66,11 @@ private func runSync() async throws -> SyncResult {
   //    here (one retryable-failure vocabulary). The 20s `healthReadTimeout` backstop remains ONLY for a
   //    `stop()` that itself wedges — it abandons the read. Every failure throws BEFORE the watermark
   //    write below, so the unread window is simply re-read on the next sync — no data loss.
-  let anchor = existing.anchor
+  let bounds = HealthReadBounds.since(deltaReadSince(existing.anchor))
   let samples: HealthSampleSet
   do {
     samples = try await withSyncTimeout(healthReadTimeout, clock: clock) {
-      try await healthKit.deltaSamples(.since(anchorDate(anchor)))
+      try await healthKit.deltaSamples(bounds)
     }
   } catch HealthKitReadError.timedOut {
     throw SyncError.transient
@@ -78,6 +79,8 @@ private func runSync() async throws -> SyncResult {
   // task claims `SyncTimeoutState`'s once-guard first) — never carry a cancelled sync into side
   // effects. Re-checked before each irreversible boundary below.
   try Task.checkCancellation()
+
+  logDeltaTruncation(samples, bounds: bounds)
 
   // 4. Today's check-in (a read failure degrades to nil — the check-in is optional) + the strength
   //    test only when due.
@@ -146,6 +149,22 @@ private func dueStrengthTest(
 /// 2026-05-23 00:00 Europe/Sofia — earlier history was exported separately and is intentionally skipped.
 let backfillFloor = Date(timeIntervalSince1970: 1_779_483_600)
 
+/// Late-arrival lookback subtracted from the anchor at READ time (Phase 19.1 — never persisted: the
+/// watermark still stores the raw `readInstant`, so tuning this needs no migration). Samples
+/// routinely land on the phone AFTER the sync that covers their `startDate` (overnight Watch
+/// sleep/HRV/RHR transfers, backdated dietary entries); without a lookback the `.strictStartDate`
+/// delta query would skip them forever. Re-reading 48h is safe: the backend upserts by uuid, so
+/// re-sent samples dedup.
+let deltaLookback: TimeInterval = 48 * 60 * 60
+
+/// The delta-read floor: `max(backfillFloor, anchor − deltaLookback)`. A nil/garbage anchor already
+/// resolves to `backfillFloor` (first-ever sync — the lookback then clamps back to the floor, so the
+/// behavior is unchanged), and the clamp keeps an anchor within 48h of the floor from reaching past
+/// the intentional backfill cutoff.
+func deltaReadSince(_ anchor: String?) -> Date {
+  max(backfillFloor, anchorDate(anchor).addingTimeInterval(-deltaLookback))
+}
+
 /// The HK read anchor as a `Date`. The watermark stores it as a lossless `timeIntervalSince1970`
 /// string (the 2.3 record's `anchor` column is `String?`); an absent/garbage value → the
 /// `backfillFloor` (first-ever sync backfills bounded historical data, PRD §7.1).
@@ -157,6 +176,36 @@ func anchorDate(_ string: String?) -> Date {
 /// Serialize a read instant for the watermark's `String?` `anchor` column (lossless round-trip).
 func anchorString(_ date: Date) -> String {
   String(date.timeIntervalSince1970)
+}
+
+/// Truncation visibility (Phase 19.1, validation round-1 #1): a per-type count AT `limitPerType`
+/// means the bounded read cut the OLDEST rows in the window — exactly where a late-arriving
+/// old-startDate sample sorts — so the lookback cannot recover them. Log on the always-on `.http`
+/// category (the Epic-18 convention for audit-critical records; `.app` is toggle-gated) so the
+/// condition is diagnosable on device.
+private func logDeltaTruncation(_ samples: HealthSampleSet, bounds: HealthReadBounds) {
+  @Dependency(\.log) var log
+  let truncated = truncatedTypes(in: samples, limitPerType: bounds.limitPerType)
+  guard !truncated.isEmpty else { return }
+  log.notice(
+    "delta read truncated at limitPerType \(bounds.limitPerType): \(truncated.joined(separator: ", "))",
+    category: .http
+  )
+}
+
+/// Per-type labels whose returned count REACHED `limitPerType` — i.e. types the bounded delta read
+/// (likely) truncated. Truncation cuts the *oldest* rows in the window — exactly where a
+/// late-arriving old-startDate sample sorts — so hitting the limit silently defeats the lookback and
+/// must be visible on device (Phase 19.1, validation round-1 #1). Records group by `RecordType`;
+/// workouts and activity summaries are their own buckets. Pure so it is testable without HealthKit.
+func truncatedTypes(in samples: HealthSampleSet, limitPerType: Int) -> [String] {
+  var counts: [String: Int] = [:]
+  for record in samples.records {
+    counts[record.type.rawValue, default: 0] += 1
+  }
+  counts["workouts"] = samples.workouts.count
+  counts["activity_summaries"] = samples.activity.count
+  return counts.filter { $0.value >= limitPerType }.keys.sorted()
 }
 
 /// The OUTER abandoning backstop for the HealthKit delta read (CR-3, release audit 2026-06-18) — no

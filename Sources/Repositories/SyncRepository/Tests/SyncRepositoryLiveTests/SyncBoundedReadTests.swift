@@ -6,6 +6,7 @@ import Dependencies
 import Foundation
 import HealthKitClient
 import LocalRepositories
+import LogClient
 import PersistenceModels
 import SyncRepository
 import Testing
@@ -20,33 +21,39 @@ import WireModels
 /// reach the in-flight `deltaSamples` (the live client stops its queries on that cancellation).
 /// Split from `SyncTimeoutTests` (the outer-backstop coverage, behaviour unchanged); reuses that
 /// target's `syncResponse` helper.
+/// 2026-06-08 ~09:00 Europe/Sofia — the same anchor instant the orchestration tests use. Shared by
+/// both suites in this file.
+private let boundsTestNow = Date(timeIntervalSince1970: 1_780_898_400)
+
+private func healthKit(
+  deltaSamples: @escaping @Sendable (HealthReadBounds) async throws -> HealthSampleSet
+) -> HealthKitClient {
+  HealthKitClient(
+    isHealthDataAvailable: { true },
+    requestAuthorization: {},
+    authorizationStatus: { [:] },
+    deltaSamples: deltaSamples
+  )
+}
+
 struct SyncBoundedReadTests {
-  /// 2026-06-08 ~09:00 Europe/Sofia — the same anchor instant the orchestration tests use.
-  private static let now = Date(timeIntervalSince1970: 1_780_898_400)
+  private static let now = boundsTestNow
 
   private func watermark(_ database: DatabaseClient) async throws -> SyncWatermarkRecord? {
     try await database.read { db in try SyncWatermarkRecord.fetchOne(db, key: 1) }
   }
 
-  private func healthKit(
-    deltaSamples: @escaping @Sendable (HealthReadBounds) async throws -> HealthSampleSet
-  ) -> HealthKitClient {
-    HealthKitClient(
-      isHealthDataAvailable: { true },
-      requestAuthorization: {},
-      authorizationStatus: { [:] },
-      deltaSamples: deltaSamples
-    )
-  }
-
-  /// The bounds `runSync()` passes to the client: since = the watermark anchor, and the `.since(_:)`
-  /// defaults pinned as LITERALS (limit 10 000 / timeout 15s) — a drive-by change to either constant
-  /// must consciously update this pin. Also pins the ordering the design relies on: the in-client
-  /// timeout fires strictly before the repo's 20s abandoning backstop, so queries are stopped, not
-  /// orphaned.
-  @Test func test_sync_requestsBoundedRead_sinceAnchor_defaultLimitAndTimeout() async throws {
+  /// The bounds `runSync()` passes to the client: since = the watermark anchor MINUS the 48h
+  /// late-arrival lookback (Phase 19.1 — samples landing on the phone after the sync that covers
+  /// their startDate must be re-read, not permanently dropped), and the `.since(_:)` defaults pinned
+  /// as LITERALS (limit 10 000 / timeout 15s) — a drive-by change to either constant must consciously
+  /// update this pin. Also pins the ordering the design relies on: the in-client timeout fires
+  /// strictly before the repo's 20s abandoning backstop, so queries are stopped, not orphaned.
+  @Test func test_sync_requestsBoundedRead_sinceAnchorMinusLookback_defaultLimitAndTimeout() async throws {
     let db = try DatabaseClient.makeInMemory()
-    let seeded = SyncWatermarkRecord(anchor: "222.0", serverTime: Date(timeIntervalSince1970: 222))
+    // A realistic anchor well after `backfillFloor + 48h`, so no clamping is in play here.
+    let anchor = Self.now
+    let seeded = SyncWatermarkRecord(anchor: anchorString(anchor), serverTime: Date(timeIntervalSince1970: 222))
     try await db.write { dbx in try seeded.save(dbx) }
     let captured = LockIsolated<HealthReadBounds?>(nil)
 
@@ -67,12 +74,48 @@ struct SyncBoundedReadTests {
     }
 
     let bounds = captured.value
-    #expect(bounds?.since == Date(timeIntervalSince1970: 222), "since = the watermark anchor")
+    #expect(
+      bounds?.since == anchor.addingTimeInterval(-48 * 60 * 60),
+      "since = the watermark anchor − the 48h late-arrival lookback"
+    )
     #expect(bounds?.limitPerType == 10000, "the documented default per-type row limit")
     #expect(bounds?.timeout == .seconds(15), "the documented default in-client timeout")
     #expect(
       HealthReadBounds.defaultTimeout < healthReadTimeout,
       "the in-client timeout must fire strictly before the 20s abandoning backstop"
+    )
+  }
+
+  /// The lookback is clamped at `backfillFloor`: an anchor within 48h of the floor must not let the
+  /// read reach past the intentional backfill cutoff (Phase 19.1 — the floor marks history that was
+  /// exported separately and is deliberately skipped).
+  @Test func test_sync_anchorNearBackfillFloor_sinceClampsAtFloor() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    // One hour after the floor — the naive `anchor − 48h` would land 47h BEFORE the floor.
+    let anchor = backfillFloor.addingTimeInterval(60 * 60)
+    let seeded = SyncWatermarkRecord(anchor: anchorString(anchor), serverTime: Date(timeIntervalSince1970: 222))
+    try await db.write { dbx in try seeded.save(dbx) }
+    let captured = LockIsolated<HealthReadBounds?>(nil)
+
+    _ = try await withDependencies {
+      $0.useEuropeSofia()
+      $0.date = .constant(Self.now)
+      $0.continuousClock = TestClock()
+      $0.healthKitClient = healthKit { bounds in
+        captured.setValue(bounds)
+        return HealthSampleSet()
+      }
+      $0.apiClient = .failing(sync: { _ in syncResponse() })
+      $0.database = db
+      $0.checkInRepository = CheckInRepository(save: { _ in }, current: { _ in nil })
+      $0.strengthTestRepository = StrengthTestRepository(save: { _ in }, current: { _ in nil })
+    } operation: {
+      try await SyncRepository.live.sync()
+    }
+
+    #expect(
+      captured.value?.since == backfillFloor,
+      "an anchor within 48h of the backfill floor floors the read at backfillFloor, never before it"
     )
   }
 
@@ -242,5 +285,82 @@ struct SyncBoundedReadTests {
 
     let mark = try await watermark(db)
     #expect(mark == seeded, "a sync cancelled during the POST must not advance the watermark")
+  }
+}
+
+/// Truncation visibility (Phase 19.1, validation round-1 #1): the bounded delta read truncates
+/// newest-first, cutting the OLDEST rows in the window — exactly where a late-arriving old-startDate
+/// sample sorts — so a per-type count hitting `limitPerType` silently defeats the lookback and must
+/// be visible on device.
+struct SyncDeltaTruncationTests {
+  private static let now = boundsTestNow
+
+  private func records(_ count: Int, type: RecordType = .heartRate) -> [HealthRecordPayload] {
+    (0..<count).map { index in
+      HealthRecordPayload(
+        uuid: "\(type.rawValue)-\(index)",
+        type: type,
+        start: Self.now.addingTimeInterval(Double(index)),
+        end: Self.now.addingTimeInterval(Double(index) + 1)
+      )
+    }
+  }
+
+  /// The pure counting seam: a per-type count AT `limitPerType` flags that type as (likely)
+  /// truncated; counts below the limit flag nothing. Workouts and activity summaries are their own
+  /// buckets.
+  @Test func test_truncatedTypes_flagsTypeAtLimit_notBelow() {
+    let atLimit = HealthSampleSet(records: records(3) + records(2, type: .stepCount))
+    #expect(
+      truncatedTypes(in: atLimit, limitPerType: 3) == ["heart_rate"],
+      "a record type AT the limit is flagged; one below is not"
+    )
+
+    let below = HealthSampleSet(records: records(2))
+    #expect(
+      truncatedTypes(in: below, limitPerType: 3).isEmpty,
+      "counts below the limit flag nothing"
+    )
+
+    let workout = WorkoutPayload(uuid: "w", type: "running", start: Self.now, end: Self.now, durationS: 1)
+    let summary = ActivitySummaryPayload(date: Self.now, activeEnergyKcal: 1, exerciseMinutes: 1, standHours: 1)
+    let aggregates = HealthSampleSet(workouts: [workout], activity: [summary])
+    #expect(
+      truncatedTypes(in: aggregates, limitPerType: 1) == ["activity_summaries", "workouts"],
+      "workouts and activity summaries are counted as their own buckets"
+    )
+  }
+
+  /// End-to-end visibility: a delta read returning a per-type count at `limitPerType` logs a
+  /// truncation warning on the always-on `.http` category (the Epic-18 convention for audit-critical
+  /// records — `.app` is toggle-gated), so the condition is diagnosable on device.
+  @Test func test_sync_deltaReadAtLimit_logsTruncationWarning_onHttp() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    let seeded = SyncWatermarkRecord(anchor: anchorString(Self.now), serverTime: Date(timeIntervalSince1970: 222))
+    try await db.write { dbx in try seeded.save(dbx) }
+    let recorder = LogRecorder()
+    let full = HealthSampleSet(records: records(HealthReadBounds.defaultLimitPerType))
+
+    _ = try await withDependencies {
+      $0.useEuropeSofia()
+      $0.date = .constant(Self.now)
+      $0.continuousClock = TestClock()
+      $0.log = .recording(into: recorder)
+      $0.healthKitClient = healthKit { _ in full }
+      $0.apiClient = .failing(sync: { _ in syncResponse() })
+      $0.database = db
+      $0.checkInRepository = CheckInRepository(save: { _ in }, current: { _ in nil })
+      $0.strengthTestRepository = StrengthTestRepository(save: { _ in }, current: { _ in nil })
+    } operation: {
+      try await SyncRepository.live.sync()
+    }
+
+    let warnings = recorder.entries.filter { $0.message.contains("truncated") }
+    #expect(warnings.count == 1, "a full per-type bucket logs exactly one truncation warning")
+    #expect(warnings.first?.category == .http, "truncation must land on the always-on .http category")
+    #expect(
+      warnings.first?.message.contains("heart_rate") == true,
+      "the warning names the truncated type(s)"
+    )
   }
 }
