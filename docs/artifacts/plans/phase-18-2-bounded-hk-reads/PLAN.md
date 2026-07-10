@@ -123,6 +123,6 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
 - [x] TASK-001: HealthReadBounds + HealthKitReadError interface; signature + call-site adaptation
-- [ ] TASK-002: Live reads: per-type limit + DESC sort, stop(query) on cancel, in-client timeout (depends on TASK-001)
+- [x] TASK-002: Live reads: per-type limit + DESC sort, stop(query) on cancel, in-client timeout (depends on TASK-001)
 - [ ] TASK-003: SyncRepository bounds wiring: timedOut→transient, outer backstop kept, tests (depends on TASK-002)
 - [ ] TASK-004: Final Validation
