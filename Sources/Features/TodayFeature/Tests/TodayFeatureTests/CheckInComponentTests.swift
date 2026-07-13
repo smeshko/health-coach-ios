@@ -21,12 +21,13 @@ struct CheckInComponentTests {
   }
 
   /// A wall-clock instant in Europe/Sofia (mirrors `CalendarTests.sofiaDate`).
-  private func sofiaDate(year: Int, month: Int, day: Int, hour: Int = 9) -> Date {
+  private func sofiaDate(year: Int, month: Int, day: Int, hour: Int = 9, minute: Int = 0) -> Date {
     var components = DateComponents()
     components.year = year
     components.month = month
     components.day = day
     components.hour = hour
+    components.minute = minute
     return Calendar.europeSofia.date(from: components)!
   }
 
@@ -84,6 +85,27 @@ struct CheckInComponentTests {
     await store.receive(\._currentLoaded) // nil → no mutation
   }
 
+  /// The `_currentLoaded` day guard (review #1.1, defense in depth on the rollover cancellation): a
+  /// pre-midnight load that races the cancel can still deliver yesterday's record after midnight —
+  /// it must seed nothing (no `existing`, no field values).
+  @Test func test_currentLoaded_yesterdaysRecord_isIgnored() async {
+    let justPastMidnight = sofiaDate(year: 2026, month: 6, day: 11, hour: 0, minute: 1)
+    let stale = DomainModels.CheckIn(
+      date: Calendar.europeSofia.startOfDay(for: sofiaDate(year: 2026, month: 6, day: 10)),
+      giSymptoms: true,
+      kneePain: 3,
+      illness: true
+    )
+    let store = TestStore(initialState: CheckInComponent.State()) {
+      CheckInComponent()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(justPastMidnight)
+    }
+
+    await store.send(._currentLoaded(stale)) // dropped by the day guard — the exhaustive store pins it
+  }
+
   @Test func test_save_callsRepoWithLatestValues_andEmitsDelegate() async {
     let recorder = SaveRecorder()
     let instant = sofiaDate(year: 2026, month: 6, day: 10)
@@ -124,6 +146,62 @@ struct CheckInComponentTests {
     await store.send(.saveTapped) { $0.isSaving = true }
     await store.receive(\.saveResponse) { $0.isSaving = false }
     // No `.delegate(.checkInSaved)` — the exhaustive store fails on any unexpected received action.
+  }
+
+  /// Day-scoped save success (review #2.1): a response that crosses midnight without a scene
+  /// re-activation carries yesterday's day key — it clears the spinner but must NOT stamp the footer
+  /// with today's clock or emit the delegate (whose orchestration would stamp `contentDay` to today
+  /// and permanently mask the rollover).
+  @Test func test_saveResponse_staleDaySuccess_clearsSavingOnly() async {
+    let justPastMidnight = sofiaDate(year: 2026, month: 6, day: 11, hour: 0, minute: 1)
+    let yesterdayKey = Calendar.europeSofia.startOfDay(for: sofiaDate(year: 2026, month: 6, day: 10))
+    let store = TestStore(initialState: CheckInComponent.State(isSaving: true)) {
+      CheckInComponent()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(justPastMidnight)
+    }
+
+    await store.send(.saveResponse(.success(yesterdayKey))) { $0.isSaving = false }
+    // No `lastSavedAt`, no `.delegate(.checkInSaved)` — the exhaustive store fails on either.
+  }
+
+  // MARK: - "Saved earlier today" footer day guard (defense in depth on the rollover reset — D3)
+
+  /// The Sofia-midnight boundary pair: a check-in stamped 23:59 is still "today" at 23:59 and stops
+  /// being "today" at 00:01. The 23:59 date is deliberately un-normalized — the guard must use
+  /// `isDate(_:inSameDayAs:)` (not `==`) so a non-`startOfDay` value from any future source stays correct.
+  @Test func test_isSameSofiaDay_boundaryPair_2359True_0001False() {
+    let lateEvening = sofiaDate(year: 2026, month: 6, day: 10, hour: 23, minute: 59)
+    let justPastMidnight = sofiaDate(year: 2026, month: 6, day: 11, hour: 0, minute: 1)
+    let checkIn = DomainModels.CheckIn(date: lateEvening, giSymptoms: false, kneePain: 0, illness: false)
+
+    #expect(CheckInComponent.isSameSofiaDay(checkIn, now: lateEvening, calendar: .europeSofia))
+    #expect(!CheckInComponent.isSameSofiaDay(checkIn, now: justPastMidnight, calendar: .europeSofia))
+  }
+
+  /// A yesterday-dated `existing` (normalized `startOfDay`, as the repo stores it) renders no footer.
+  @Test func test_isSameSofiaDay_yesterdayExisting_isFalse() {
+    let now = sofiaDate(year: 2026, month: 6, day: 11)
+    let yesterday = Calendar.europeSofia.startOfDay(for: sofiaDate(year: 2026, month: 6, day: 10))
+    let checkIn = DomainModels.CheckIn(date: yesterday, giSymptoms: false, kneePain: 0, illness: false)
+
+    #expect(!CheckInComponent.isSameSofiaDay(checkIn, now: now, calendar: .europeSofia))
+  }
+
+  /// A today-dated `existing` keeps the footer (the unchanged same-day behavior).
+  @Test func test_isSameSofiaDay_todayExisting_isTrue() {
+    let now = sofiaDate(year: 2026, month: 6, day: 10)
+    let today = Calendar.europeSofia.startOfDay(for: now)
+    let checkIn = DomainModels.CheckIn(date: today, giSymptoms: false, kneePain: 0, illness: false)
+
+    #expect(CheckInComponent.isSameSofiaDay(checkIn, now: now, calendar: .europeSofia))
+  }
+
+  /// No check-in loaded → no footer (the unchanged nil behavior).
+  @Test func test_isSameSofiaDay_nilExisting_isFalse() {
+    let now = sofiaDate(year: 2026, month: 6, day: 10)
+    #expect(!CheckInComponent.isSameSofiaDay(nil, now: now, calendar: .europeSofia))
   }
 
   /// D7 re-entry guard: a second `.saveTapped` while a save is in flight is a no-op — no second save

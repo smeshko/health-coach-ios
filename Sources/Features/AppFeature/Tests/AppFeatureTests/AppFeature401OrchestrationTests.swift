@@ -62,13 +62,14 @@ struct AppFeature401OrchestrationTests {
 
     // Subscribe to the 401 stream, then start the morning orchestration. It runs the check-in gate +
     // sync, reaches `.generating`, and parks on the brief request.
+    let day = Calendar.europeSofia.startOfDay(for: now)
     await store.send(._appWillAppear)
-    await store.send(.main(.todayRoot(.onAppOpen)))
+    await store.send(.main(.todayRoot(.onAppOpen))) { $0.route = .main(Self.main(day: day)) }
     await store.receive(\.main.todayRoot._syncStarted) {
-      $0.route = .main(Self.main { $0.todayRoot.briefState = .syncing })
+      $0.route = .main(Self.main(day: day) { $0.todayRoot.briefState = .syncing })
     }
     await store.receive(\.main.todayRoot._generating) {
-      $0.route = .main(Self.main {
+      $0.route = .main(Self.main(day: day) {
         $0.todayRoot.lastSyncedAt = now
         $0.todayRoot.briefState = .generating
       })
@@ -92,9 +93,13 @@ struct AppFeature401OrchestrationTests {
     #expect(store.state.onboardingRoute != nil, "the 401 swapped to onboarding, containing the Today chain")
   }
 
-  /// A `MainTabs.State` built with a mutating closure (keeps the `receive` mutation expressions terse).
-  private static func main(_ mutate: (inout MainTabs.State) -> Void) -> MainTabs.State {
+  /// A `MainTabs.State` built with a mutating closure (keeps the `receive` mutation expressions terse);
+  /// `day` pre-stamps the Today root's `contentDay` (Phase 19.3 — every orchestration trigger stamps it).
+  private static func main(
+    day: Date? = nil, _ mutate: (inout MainTabs.State) -> Void = { _ in }
+  ) -> MainTabs.State {
     var state = MainTabs.State()
+    state.todayRoot.contentDay = day
     mutate(&state)
     return state
   }

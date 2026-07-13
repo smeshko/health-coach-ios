@@ -66,6 +66,12 @@ public struct TodayFeature {
     /// first `hydrate` to seed the carousel's `selectedIndex` by value (DECISIONS D4/D5). Thereafter the
     /// session child's own `selectedSession` is what a background re-seed preserves, so this lingers unused.
     public var restoredSelection: SessionBlock?
+    /// The Sofia `startOfDay` the current content was orchestrated for (Phase 19.3, DECISIONS D2) —
+    /// stamped ONLY by the `inout` orchestration-effect factories (one conceptual write point; background
+    /// triggers deliberately never stamp) and read by `sceneActivated`'s rollover leg, so yesterday's
+    /// terminals (`.checkInRequired`/`.error`/`.syncFailed`) and in-flight states are rollover-detectable,
+    /// not just `.ready`. `nil` (orchestration never ran) never triggers the rollover leg.
+    public var contentDay: Date?
 
     public init(
       briefState: BriefViewState = .idle,
@@ -77,7 +83,8 @@ public struct TodayFeature {
       lastSyncedAt: Date? = nil,
       isBackgroundRefreshing: Bool = false,
       lastRefreshAttemptAt: Date? = nil,
-      restoredSelection: SessionBlock? = nil
+      restoredSelection: SessionBlock? = nil,
+      contentDay: Date? = nil
     ) {
       self.briefState = briefState
       self.checkIn = checkIn
@@ -89,6 +96,7 @@ public struct TodayFeature {
       self.isBackgroundRefreshing = isBackgroundRefreshing
       self.lastRefreshAttemptAt = lastRefreshAttemptAt
       self.restoredSelection = restoredSelection
+      self.contentDay = contentDay
     }
   }
 
@@ -101,8 +109,9 @@ public struct TodayFeature {
     /// Pull-to-refresh from `.ready` (Phase 12.1) — runs the quiet background-refresh pass; a no-op in any
     /// other state.
     case pullToRefresh
-    /// Scene re-activation (Phase 12.1, DECISIONS D6) — from `.ready` only: day rollover re-orchestrates,
-    /// a stale same-day brief background-refreshes, otherwise nothing.
+    /// Scene re-activation (Phase 12.1 D6 / Phase 19.3): a `contentDay` rollover resets the per-day
+    /// state and re-orchestrates from ANY stamped state (terminals and in-flight alike); a stale
+    /// same-day `.ready` brief background-refreshes quietly; otherwise nothing.
     case sceneBecameActive
     /// Cancel the (now-rare) blocking sync/generate screen (Phase 12.1, DECISIONS D4) — cancels the
     /// orchestration and falls back to the cached brief when one exists, else `.syncFailed(.transient)`.
@@ -196,12 +205,12 @@ public struct TodayFeature {
         // cached brief immediately and refresh quietly in the background; on a MISS the blocking
         // sync→generate chain runs unchanged.
         log.info("App-open — starting cache-first orchestration", category: .lifecycle)
-        return cacheFirstOpenEffect()
+        return cacheFirstOpenEffect(&state)
 
       case .retryTapped:
         // Retry from a terminal — re-runs the **blocking** sync-first chain (open path, `refresh: false`).
         // An explicit retry is an honest loading moment, so it never peeks the cache.
-        return orchestrationEffect(refresh: false)
+        return orchestrationEffect(&state, refresh: false)
 
       case .pullToRefresh:
         // Manual refresh (Phase 12.1) — only meaningful over a rendered brief; a no-op otherwise so the
@@ -213,25 +222,9 @@ public struct TodayFeature {
         return backgroundRefreshEffect()
 
       case .sceneBecameActive:
-        // Scene re-activation (Phase 12.1, DECISIONS D6) — only acts over `.ready`; non-ready states are
-        // already showing the right thing (an in-flight chain / a terminal).
-        guard case let .ready(brief, _) = state.briefState else { return .none }
-        if calendar.startOfDay(for: brief.date) != today {
-          // Day rollover: yesterday's brief is stale content → re-run the full cache-first orchestration
-          // (the explicit no-loading-over-content exemption — the new day's gate/loading are honest).
-          log.info("Scene active — day rollover, re-orchestrating", category: .lifecycle)
-          return cacheFirstOpenEffect()
-        }
-        // Same day: refresh only when the freshness reference is past the staleness threshold (both
-        // timestamps nil ⇒ stale). `lastRefreshAttemptAt` (recorded below) throttles a failed refresh.
-        guard Self.isStale(
-          now: date.now, threshold: Self.backgroundRefreshStaleness,
-          lastSyncedAt: state.lastSyncedAt, lastRefreshAttemptAt: state.lastRefreshAttemptAt
-        ) else { return .none }
-        log.info("Scene active — stale, starting background refresh", category: .lifecycle)
-        state.isBackgroundRefreshing = true
-        state.lastRefreshAttemptAt = date.now
-        return backgroundRefreshEffect()
+        // The two-leg detector (rollover reset over any stamped state + the `.ready`-gated same-day
+        // staleness refresh) lives in `TodayOrchestration.swift` (Phase 12.1 D6 / Phase 19.3 D1–D2).
+        return sceneActivated(&state)
 
       case .cancelSyncTapped:
         // Cancel the blocking sync/generate screen (Phase 12.1, DECISIONS D4) — only meaningful while a
@@ -361,7 +354,7 @@ public struct TodayFeature {
         // "Save & build today's brief" — the saved check-in unlocks the gate, so re-enter the chain with
         // `refresh: true` (a corrected check-in regenerates the brief rather than serving the cache).
         log.info("Check-in saved — building today's brief", category: .lifecycle)
-        return orchestrationEffect(refresh: true)
+        return orchestrationEffect(&state, refresh: true)
 
       case .checkIn:
         return .none

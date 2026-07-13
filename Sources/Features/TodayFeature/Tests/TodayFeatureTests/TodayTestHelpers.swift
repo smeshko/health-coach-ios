@@ -46,6 +46,13 @@ func sofiaInstant() -> Date {
   return Calendar.europeSofia.date(from: components)!
 }
 
+/// The Sofia `startOfDay` of `sofiaInstant()` — the `contentDay` stamp every orchestration trigger
+/// (`onAppOpen` / `retryTapped` / a check-in save) writes (Phase 19.3, DECISIONS D2), asserted in the
+/// trigger's `send`/`receive` block across the suites.
+func sofiaToday() -> Date {
+  Calendar.europeSofia.startOfDay(for: sofiaInstant())
+}
+
 /// The default green sample brief with `cached` forced to a known value.
 func sampleBrief(cached: Bool) -> DomainModels.DailyBrief {
   var brief = SampleData.dailyBriefGreen

@@ -53,6 +53,13 @@ public struct CheckInComponent {
   /// regenerates the brief). 1-level nested.
   public enum Delegate: Equatable { case checkInSaved }
 
+  /// The child's in-flight effects, cancellable from the parent's rollover branch (review #1.1): the
+  /// reset is a pure state mutation, so without cancellation a pre-midnight load/save suspended across
+  /// midnight would deliver into the freshly reset state — re-seeding yesterday's answers, stamping
+  /// `lastSavedAt` with the new day's clock, or firing a stale `checkInSaved` delegate for a check-in
+  /// persisted under yesterday's day key.
+  enum CancelID { case load, save }
+
   public enum Action {
     /// View `task` — load today's existing check-in to seed the fields.
     case task
@@ -67,8 +74,10 @@ public struct CheckInComponent {
     // swiftlint:disable identifier_name
     /// The loaded check-in (or `nil`) routed back from the `task` effect to seed state.
     case _currentLoaded(DomainModels.CheckIn?)
-    /// The `save` effect's result — success clears `isSaving` + emits the delegate; failure reverts.
-    case saveResponse(Result<Void, any Error>)
+    /// The `save` effect's result — success carries the day key the record persisted under, clears
+    /// `isSaving`, and (same-day only, review #2.1) stamps the footer + emits the delegate; failure
+    /// reverts.
+    case saveResponse(Result<Date, any Error>)
     // swiftlint:enable identifier_name
   }
 
@@ -82,6 +91,18 @@ public struct CheckInComponent {
   /// to start-of-day, but computing it here keeps the saved `CheckIn.date` deterministic + assertable.
   private var today: Date { calendar.startOfDay(for: date.now) }
 
+  /// The one day guard for the "Saved earlier today" footer (defense in depth on top of the rollover
+  /// reset — DECISIONS D3): true only when `existing` is dated the same Sofia day as `now`, so a
+  /// delayed/missed reset or a child-reload window can never present yesterday's save as today's. Pure
+  /// (no dependency reads) so the view can call it deterministically and tests can pin the exact
+  /// Sofia-midnight boundary. Uses `isDate(_:inSameDayAs:)` — not `==` — because although the repo
+  /// normalizes `CheckIn.date` to `startOfDay` on save, an un-normalized value from any future source
+  /// must still compare correctly.
+  public static func isSameSofiaDay(_ existing: DomainModels.CheckIn?, now: Date, calendar: Calendar) -> Bool {
+    guard let existing else { return false }
+    return calendar.isDate(existing.date, inSameDayAs: now)
+  }
+
   public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
@@ -91,9 +112,13 @@ public struct CheckInComponent {
           let existing = await (try? checkInRepository.current(day)) ?? nil
           await send(._currentLoaded(existing))
         }
+        .cancellable(id: CancelID.load, cancelInFlight: true)
 
       case let ._currentLoaded(checkIn):
         guard let checkIn else { return .none }
+        // Defense in depth on top of the rollover cancellation (review #1.1): a load that raced the
+        // cancel can still deliver yesterday's record after midnight — never seed a stale day.
+        guard Self.isSameSofiaDay(checkIn, now: date.now, calendar: calendar) else { return .none }
         state.existing = checkIn
         state.giSymptoms = checkIn.giSymptoms
         state.illness = checkIn.illness
@@ -130,14 +155,22 @@ public struct CheckInComponent {
         return .run { [checkInRepository] send in
           do {
             try await checkInRepository.save(checkIn)
-            await send(.saveResponse(.success(())))
+            await send(.saveResponse(.success(checkIn.date)))
           } catch {
             await send(.saveResponse(.failure(error)))
           }
         }
+        .cancellable(id: CancelID.save)
 
-      case .saveResponse(.success):
+      case let .saveResponse(.success(savedDay)):
         state.isSaving = false
+        // Day-scope the success (review #2.1): a save whose response crosses midnight WITHOUT a scene
+        // re-activation (continuously active scene, or a response already queued when the cancel
+        // lands) persisted under YESTERDAY's key. Stamping the footer with today's clock or emitting
+        // the delegate would let the delegate-triggered orchestration stamp `contentDay` to today —
+        // permanently masking the rollover, so even the next activation would never reset. Dropping
+        // both leaves detection to the next `sceneBecameActive`, exactly the D6 boundary.
+        guard calendar.isDate(savedDay, inSameDayAs: date.now) else { return .none }
         state.lastSavedAt = date.now
         return .send(.delegate(.checkInSaved))
 
