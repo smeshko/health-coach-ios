@@ -1,6 +1,9 @@
+import Clocks
 import ComposableArchitecture
 import DomainModels
 import Foundation
+import SampleData
+import SyncRepository
 import Testing
 
 @testable import TodayFeature
@@ -129,5 +132,89 @@ struct TodayFeatureRolloverRaceTests {
     }
     await store.receive(\._checkInRequired) // the rollover still fires — nothing masked it
     await store.finish()
+  }
+
+  /// Review #3.2: the scene stays CONTINUOUSLY ACTIVE across midnight — `sceneBecameActive` never
+  /// fires, so the first post-midnight save is what enters orchestration. The entry guard must reset
+  /// the per-day state BEFORE the factory stamps `contentDay`: yesterday's `restoredSelection` (still
+  /// among today's candidates here) must not seed today's carousel, and the stamp move must not mask
+  /// the rollover.
+  @Test func test_postMidnightSave_entryGuardResets_noStalePickSeed() async {
+    let todayBrief: DomainModels.DailyBrief = {
+      var sample = SampleData.dailyBriefGreen
+      sample.date = Self.newDay
+      sample.cached = false
+      return sample
+    }()
+    let yesterdayPick = todayBrief.alternatives[0] // would hydrate selectedIndex 1 if it survived
+    let store = TestStore(
+      initialState: TodayFeature.State(
+        briefState: .checkInRequired,
+        checkIn: CheckInComponent.State(giSymptoms: true, kneePain: 4),
+        restoredSelection: yesterdayPick,
+        contentDay: Self.day
+      )
+    ) {
+      TodayFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(Self.postMidnight)
+      $0.continuousClock = ImmediateClock()
+      $0.checkInRepository.save = { _ in } // persists under today's key (captured post-midnight)
+      $0.checkInRepository.current = { _ in
+        DomainModels.CheckIn(date: Self.newDay, giSymptoms: true, kneePain: 4, illness: false)
+      }
+      $0.sessionSelectionRepository.current = { _ in nil } // no pick persisted for the new day
+      $0.syncRepository.sync = { sampleSyncResult() }
+      $0.briefRepository.dailyBrief = { _ in todayBrief }
+      $0.profileRepository.zones = { sampleZones() }
+    }
+
+    await store.send(.checkIn(.saveTapped)) { $0.checkIn.isSaving = true }
+    await store.receive(\.checkIn.saveResponse) {
+      $0.checkIn.isSaving = false
+      $0.checkIn.lastSavedAt = Self.postMidnight
+    }
+    // The delegate enters orchestration: the entry guard resets per-day state, THEN the factory stamps.
+    await store.receive(\.checkIn.delegate) {
+      $0.checkIn = CheckInComponent.State()
+      $0.restoredSelection = nil
+      $0.contentDay = Self.newDay
+    }
+    await receiveSuccessChain(
+      store, brief: todayBrief, freshness: .fresh, now: Self.postMidnight, zones: sampleZones()
+    )
+    #expect(store.state.session?.selectedIndex == 0, "yesterday's pick must not seed today's carousel")
+  }
+
+  /// Review #3.2, retry variant: a post-midnight `retryTapped` from yesterday's terminal (scene
+  /// continuously active) resets via the entry guard and re-gates the new day with a CLEAN check-in
+  /// child — yesterday's residual answers, footer state, and restored pick are all gone.
+  @Test func test_postMidnightRetry_entryGuardResets_reGatesClean() async {
+    let yesterdayRecord = DomainModels.CheckIn(date: Self.day, giSymptoms: true, kneePain: 4, illness: true)
+    let store = TestStore(
+      initialState: TodayFeature.State(
+        briefState: .error(.transientGenerationFailed),
+        checkIn: CheckInComponent.State(
+          giSymptoms: true, illness: true, kneePain: 4,
+          existing: yesterdayRecord, lastSavedAt: Self.preMidnight
+        ),
+        restoredSelection: SampleData.dailyBriefGreen.alternatives[0],
+        contentDay: Self.day
+      )
+    ) {
+      TodayFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(Self.postMidnight)
+      $0.checkInRepository.current = { _ in nil } // the new day's gate check: nothing saved
+    }
+
+    await store.send(.retryTapped) {
+      $0.checkIn = CheckInComponent.State()
+      $0.restoredSelection = nil
+      $0.contentDay = Self.newDay
+    }
+    await store.receive(\._checkInRequired) { $0.briefState = .checkInRequired }
   }
 }

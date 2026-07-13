@@ -27,10 +27,11 @@ extension TodayFeature {
   /// Takes `state` **inout** to stamp `contentDay` (Phase 19.3, DECISIONS D2): the two orchestration
   /// factories are the single conceptual write point, so every reducer trigger site inherits the stamp.
   func orchestrationEffect(_ state: inout State, refresh: Bool) -> Effect<Action> {
+    let rolloverCancels = rolloverGuardOnEntry(&state)
     let day = today
     state.contentDay = day
     let deps = OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
-    return .run { [checkInRepository, sessionSelectionRepository, clock] send in
+    let chain: Effect<Action> = .run { [checkInRepository, sessionSelectionRepository, clock] send in
       // 1. The check-in gates the chain (2026-06-10 design): nothing saved today → show the check-in
       //    screen and stop. A read error degrades to the same gate (the user saves their way through).
       let existing = await (try? checkInRepository.current(day)) ?? nil
@@ -49,6 +50,7 @@ extension TodayFeature {
       await runBlockingChain(refresh: refresh, send: send, clock: clock, deps: deps)
     }
     .cancellable(id: CancelID.orchestration, cancelInFlight: true)
+    return .merge(rolloverCancels, chain)
   }
 
   /// Cache-first app-open (Phase 12.1, revised D15) as **one** chained, cancellable effect: the check-in
@@ -61,10 +63,11 @@ extension TodayFeature {
   ///
   /// Takes `state` **inout** to stamp `contentDay` (Phase 19.3, DECISIONS D2) — see `orchestrationEffect`.
   func cacheFirstOpenEffect(_ state: inout State) -> Effect<Action> {
+    let rolloverCancels = rolloverGuardOnEntry(&state)
     let day = today
     state.contentDay = day
     let deps = OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
-    return .run { [checkInRepository, sessionSelectionRepository, briefRepository, clock] send in
+    let chain: Effect<Action> = .run { [checkInRepository, sessionSelectionRepository, briefRepository, clock] send in
       // The check-in gates the chain (unchanged) — a read error degrades to the gate, exactly as before.
       let existing = await (try? checkInRepository.current(day)) ?? nil
       try Task.checkCancellation()
@@ -89,6 +92,24 @@ extension TodayFeature {
       await runBackgroundPass(send: send, deps: deps)
     }
     .cancellable(id: CancelID.orchestration, cancelInFlight: true)
+    return .merge(rolloverCancels, chain)
+  }
+
+  /// The stamp-write entry guard (review #3.2): an orchestration entered WITHOUT a scene
+  /// re-activation — a post-midnight save or retry on a continuously active scene — would otherwise
+  /// move `contentDay` over a stale day and permanently mask the rollover, carrying yesterday's
+  /// `restoredSelection` (and any resident children) into today's hydrate. Detect it exactly like
+  /// `sceneActivated`'s rollover leg: reset the per-day state and cancel the check-in child's
+  /// in-flight effects before the factory stamps and runs. Same-day entries (the overwhelmingly
+  /// common case) find `contentDay == today` (or `nil` on first run) and are untouched.
+  private func rolloverGuardOnEntry(_ state: inout State) -> Effect<Action> {
+    guard let contentDay = state.contentDay, contentDay != today else { return .none }
+    log.info("Orchestration entry — stale contentDay, resetting per-day state", category: .lifecycle)
+    Self.rolloverReset(&state)
+    return .merge(
+      .cancel(id: CheckInComponent.CancelID.load),
+      .cancel(id: CheckInComponent.CancelID.save)
+    )
   }
 
   /// The quiet background-refresh pass, shared by pull-to-refresh and the scene-staleness trigger
@@ -131,16 +152,12 @@ extension TodayFeature {
   func sceneActivated(_ state: inout State) -> Effect<Action> {
     if let contentDay = state.contentDay, contentDay != today {
       // Day rollover: yesterday's content (whatever terminal or in-flight shape it is in) is stale →
-      // reset the per-day state and re-run the full cache-first orchestration. The reset alone is not
-      // an async barrier (review #1.1): the check-in child's load/save effects must be cancelled too,
-      // or a pre-midnight effect suspended across midnight delivers into the freshly reset state.
-      log.info("Scene active — day rollover, resetting per-day state", category: .lifecycle)
-      Self.rolloverReset(&state)
-      return .merge(
-        .cancel(id: CheckInComponent.CancelID.load),
-        .cancel(id: CheckInComponent.CancelID.save),
-        cacheFirstOpenEffect(&state)
-      )
+      // re-run the full cache-first orchestration. Its entry guard (`rolloverGuardOnEntry`) performs
+      // the reset AND cancels the check-in child's in-flight effects (reviews #1.1/#3.2) — the reset
+      // alone is not an async barrier: a pre-midnight load/save suspended across midnight would
+      // otherwise deliver into the freshly reset state.
+      log.info("Scene active — day rollover", category: .lifecycle)
+      return cacheFirstOpenEffect(&state)
     }
     // Same day (or no stamp yet): refresh only over a rendered brief whose freshness reference is past
     // the staleness threshold. `lastRefreshAttemptAt` (recorded below) throttles a failed refresh.
@@ -156,7 +173,8 @@ extension TodayFeature {
   }
 
   /// The per-day state contract (Phase 19.3, DECISIONS D1) — everything belonging to ONE Sofia day,
-  /// cleared at the rollover detection point before re-orchestration: the check-in child (answers,
+  /// cleared by `rolloverGuardOnEntry` (every orchestration entry that finds a stale `contentDay`,
+  /// review #3.2) before re-orchestration: the check-in child (answers,
   /// `existing`, the "Last saved" footer), the session carousel + the restored pick (yesterday's pick
   /// must never seed today's carousel), the readiness card, and the refresh throttle.
   /// `isBackgroundRefreshing` clears too: the rollover's `cancelInFlight` kills an in-flight background
