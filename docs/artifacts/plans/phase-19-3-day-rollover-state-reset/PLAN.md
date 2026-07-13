@@ -1,6 +1,6 @@
 # Plan: Day-rollover state reset
 
-Status: in-progress
+Status: done
 Branch: fix/phase-19-3-day-rollover-state-reset
 Risk: medium
 Epic: 19 — Make the numbers trustworthy (audit wave 2) ([epic](../../epics/19-trustworthy-numbers.md))
@@ -110,32 +110,51 @@ depth; D4 in-module `Zones.range(for:)` (not DomainModels — Epic 20.1 owns SSO
 
 ## Acceptance Criteria
 
-- [ ] Crossing a Sofia midnight and re-activating the scene from `.ready` resets:
+- [x] Crossing a Sofia midnight and re-activating the scene from `.ready` resets:
   check-in child (no `lastSavedAt`, no `existing`, answers back to defaults), `session`
   (nil), `restoredSelection` (nil), `readiness` (nil), `lastRefreshAttemptAt` (nil),
   and `isBackgroundRefreshing` (false — a rollover-cancelled background pass can never
   strand the "Updating…" pill) — pinned by a `TodayFeatureSceneStalenessTests` case
-  that seeds all of them with yesterday's values.
-- [ ] A rollover from a non-`.ready` state stamped with yesterday's `contentDay` also
+  that seeds all of them with yesterday's values. *(Landed as
+  `test_dayRollover_fromReady_resetsAllPerDayState` in the new
+  `TodayFeatureRolloverResetTests` — same harness/serialization as the staleness
+  suite — seeding all six with yesterday's values; sim green 2026-07-10.)*
+- [x] A rollover from a non-`.ready` state stamped with yesterday's `contentDay` also
   re-orchestrates and resets — terminals (`.checkInRequired`, `.error`, `.syncFailed`)
   and in-flight `.syncing`/`.generating` (cancelInFlight restart) alike.
-- [ ] Same-day scene activation resets nothing and keeps the existing staleness/throttle
+  *(Parameterized `test_dayRollover_fromTerminal_reOrchestrates` +
+  `test_dayRollover_fromInFlight_reOrchestrates` cover all five states — sim green.)*
+- [x] Same-day scene activation resets nothing and keeps the existing staleness/throttle
   behavior (existing tests pass after the mechanical sweep: the one existing rollover
   test gains a `contentDay` seed, and ~29 exhaustive trigger-action sends across ~5
   files gain a one-line `$0.contentDay` assert — intent unchanged everywhere,
-  round-2 #2).
-- [ ] Yesterday's pick cannot seed today's carousel: after rollover reset, hydrate's
+  round-2 #2). *(`test_sameDayActivation_resetsNothing` + the whole
+  `TodayFeatureSceneStalenessTests` suite green post-sweep;
+  `test_pullToRefresh_doesNotMoveStaleContentDayStamp` pins the no-stamp rule.)*
+- [x] Yesterday's pick cannot seed today's carousel: after rollover reset, hydrate's
   preferred pick is `nil` (falls to the primary at index 0) unless today's own persisted
   selection exists — pinned by a hydrate-after-rollover test.
-- [ ] The "Saved earlier today" footer renders only when `existing.date` is today
+  *(`test_dayRollover_hydrate_prefersPrimary_noStalePickSeed` +
+  `test_dayRollover_hydrate_todaysPersistedPick_seedsCarousel` — sim green.)*
+- [x] The "Saved earlier today" footer renders only when `existing.date` is today
   (Sofia); yesterday's `existing` renders no footer — component-level test.
-- [ ] The forced-REST override card resolves its zone chip: an `active_recovery`
+  *(`CheckInComponent.isSameSofiaDay` drives the footer in `CheckInSection`;
+  `CheckInComponentTests` pin the 23:59/00:01 Sofia boundary pair plus
+  yesterday=false / today=true / nil=false.)*
+- [x] The forced-REST override card resolves its zone chip: an `active_recovery`
   override with `zoneTarget: .z1` + loaded zones renders the Z1 bpm range; `rest`/
   `mobility` overrides (no `zoneTarget`) still render no chip. The hardcoded
   `zoneRange: nil` and its "when that lands" comment are gone.
-- [ ] All package tests green on the canonical sim; SafetyRest/Today snapshots
+  *(`TodaySessionMode.overrideZoneRange` via the shared `Zones.range(for:)`;
+  `SafetyRestComponentTests` chip triple green; the hardcode + comment removed
+  from `TodayReadyContent.swift`.)*
+- [x] All package tests green on the canonical sim; SafetyRest/Today snapshots
   unchanged unless a new chip fixture is deliberately added (then re-recorded on the
-  pinned device).
+  pinned device). *(Full suite on iPhone 17 Pro / OS 26.0: TEST SUCCEEDED — 634
+  tests across 32 run bundles, 0 failures, `SafetyRestSnapshotTests` +
+  `TodayViewSnapshotTests` green with zero PNG diffs (no new fixture);
+  `swiftlint --strict` 0 violations in 388 files; sim smoke: fresh Debug build
+  launched clean, no app-level error/fault in the log.)*
 
 ## Tasks
 
@@ -145,4 +164,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-001: Rollover reset of per-day Today state (contentDay stamp + child reset)
 - [x] TASK-002: Day-guard the check-in footer copy
 - [x] TASK-003: Resolve the forced-REST override card zone chip
-- [ ] TASK-004: Final Validation
+- [x] TASK-004: Final Validation
