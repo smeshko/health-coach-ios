@@ -53,6 +53,13 @@ public struct CheckInComponent {
   /// regenerates the brief). 1-level nested.
   public enum Delegate: Equatable { case checkInSaved }
 
+  /// The child's in-flight effects, cancellable from the parent's rollover branch (review #1.1): the
+  /// reset is a pure state mutation, so without cancellation a pre-midnight load/save suspended across
+  /// midnight would deliver into the freshly reset state — re-seeding yesterday's answers, stamping
+  /// `lastSavedAt` with the new day's clock, or firing a stale `checkInSaved` delegate for a check-in
+  /// persisted under yesterday's day key.
+  enum CancelID { case load, save }
+
   public enum Action {
     /// View `task` — load today's existing check-in to seed the fields.
     case task
@@ -103,9 +110,13 @@ public struct CheckInComponent {
           let existing = await (try? checkInRepository.current(day)) ?? nil
           await send(._currentLoaded(existing))
         }
+        .cancellable(id: CancelID.load, cancelInFlight: true)
 
       case let ._currentLoaded(checkIn):
         guard let checkIn else { return .none }
+        // Defense in depth on top of the rollover cancellation (review #1.1): a load that raced the
+        // cancel can still deliver yesterday's record after midnight — never seed a stale day.
+        guard Self.isSameSofiaDay(checkIn, now: date.now, calendar: calendar) else { return .none }
         state.existing = checkIn
         state.giSymptoms = checkIn.giSymptoms
         state.illness = checkIn.illness
@@ -147,6 +158,7 @@ public struct CheckInComponent {
             await send(.saveResponse(.failure(error)))
           }
         }
+        .cancellable(id: CancelID.save)
 
       case .saveResponse(.success):
         state.isSaving = false

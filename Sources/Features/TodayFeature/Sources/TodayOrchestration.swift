@@ -131,10 +131,16 @@ extension TodayFeature {
   func sceneActivated(_ state: inout State) -> Effect<Action> {
     if let contentDay = state.contentDay, contentDay != today {
       // Day rollover: yesterday's content (whatever terminal or in-flight shape it is in) is stale →
-      // reset the per-day state and re-run the full cache-first orchestration.
+      // reset the per-day state and re-run the full cache-first orchestration. The reset alone is not
+      // an async barrier (review #1.1): the check-in child's load/save effects must be cancelled too,
+      // or a pre-midnight effect suspended across midnight delivers into the freshly reset state.
       log.info("Scene active — day rollover, resetting per-day state", category: .lifecycle)
       Self.rolloverReset(&state)
-      return cacheFirstOpenEffect(&state)
+      return .merge(
+        .cancel(id: CheckInComponent.CancelID.load),
+        .cancel(id: CheckInComponent.CancelID.save),
+        cacheFirstOpenEffect(&state)
+      )
     }
     // Same day (or no stamp yet): refresh only over a rendered brief whose freshness reference is past
     // the staleness threshold. `lastRefreshAttemptAt` (recorded below) throttles a failed refresh.

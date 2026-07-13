@@ -63,7 +63,8 @@ struct CheckInSection: View {
         }
         // The footer shows a precise clock time only for a save made this session (`lastSavedAt`); a
         // check-in loaded from earlier today has only a day-key, so it shows day-relative copy instead.
-        // `lastSavedAt` needs no day guard — it is session-local and cleared by the rollover reset.
+        // `lastSavedAt` needs no day guard — it is session-local, cleared by the rollover reset, and
+        // the reset also cancels an in-flight save (review #1.1) so a pre-midnight save can't re-set it.
         if let savedAt = store.lastSavedAt {
           CheckInFooter(text: "Last saved \(savedTime(savedAt)) · tap any answer to edit")
         } else if CheckInComponent.isSameSofiaDay(store.existing, now: date.now, calendar: calendar) {

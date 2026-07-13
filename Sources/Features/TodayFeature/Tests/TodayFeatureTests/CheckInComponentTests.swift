@@ -85,6 +85,27 @@ struct CheckInComponentTests {
     await store.receive(\._currentLoaded) // nil → no mutation
   }
 
+  /// The `_currentLoaded` day guard (review #1.1, defense in depth on the rollover cancellation): a
+  /// pre-midnight load that races the cancel can still deliver yesterday's record after midnight —
+  /// it must seed nothing (no `existing`, no field values).
+  @Test func test_currentLoaded_yesterdaysRecord_isIgnored() async {
+    let justPastMidnight = sofiaDate(year: 2026, month: 6, day: 11, hour: 0, minute: 1)
+    let stale = DomainModels.CheckIn(
+      date: Calendar.europeSofia.startOfDay(for: sofiaDate(year: 2026, month: 6, day: 10)),
+      giSymptoms: true,
+      kneePain: 3,
+      illness: true
+    )
+    let store = TestStore(initialState: CheckInComponent.State()) {
+      CheckInComponent()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(justPastMidnight)
+    }
+
+    await store.send(._currentLoaded(stale)) // dropped by the day guard — the exhaustive store pins it
+  }
+
   @Test func test_save_callsRepoWithLatestValues_andEmitsDelegate() async {
     let recorder = SaveRecorder()
     let instant = sofiaDate(year: 2026, month: 6, day: 10)
