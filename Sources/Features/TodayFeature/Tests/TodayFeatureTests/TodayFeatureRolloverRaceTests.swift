@@ -90,4 +90,44 @@ struct TodayFeatureRolloverRaceTests {
       "a pre-midnight save must not stamp the new day's footer or re-enter orchestration"
     )
   }
+
+  /// The ordering the cancellation can't cover (review #2.1): the save response crosses midnight
+  /// while the scene stays CONTINUOUSLY ACTIVE — no `sceneBecameActive`, so no cancel. The
+  /// day-scoped response clears the spinner only: no footer stamp, no delegate, no orchestration
+  /// (which would stamp `contentDay` to today and permanently mask the rollover) — and the NEXT
+  /// activation still detects the stale stamp and resets.
+  @Test func test_saveCompletionAfterMidnight_doesNotMaskRollover() async {
+    let clock = LockIsolated(Self.preMidnight)
+    let (saveGate, saveRelease) = AsyncStream.makeStream(of: Void.self)
+    let store = TestStore(
+      initialState: TodayFeature.State(
+        briefState: .checkInRequired,
+        checkIn: CheckInComponent.State(giSymptoms: true, kneePain: 4),
+        contentDay: Self.day
+      )
+    ) {
+      TodayFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = DateGenerator { clock.value }
+      $0.checkInRepository.current = { _ in nil } // the eventual rollover re-gate: nothing saved
+      $0.checkInRepository.save = { _ in
+        for await _ in saveGate {} // resolves only after the clock rolls past midnight
+      }
+    }
+
+    await store.send(.checkIn(.saveTapped)) { $0.checkIn.isSaving = true }
+    clock.setValue(Self.postMidnight)
+    saveRelease.finish() // the save resolves past midnight — scene continuously active, no cancel
+    await store.receive(\.checkIn.saveResponse) { $0.checkIn.isSaving = false }
+    #expect(store.state.checkIn.lastSavedAt == nil, "yesterday's save must not stamp today's footer")
+    #expect(store.state.contentDay == Self.day, "no orchestration may move the stamp and mask the rollover")
+
+    await store.send(.sceneBecameActive) {
+      $0.checkIn = CheckInComponent.State()
+      $0.contentDay = Self.newDay
+    }
+    await store.receive(\._checkInRequired) // the rollover still fires — nothing masked it
+    await store.finish()
+  }
 }

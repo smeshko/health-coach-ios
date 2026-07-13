@@ -74,8 +74,10 @@ public struct CheckInComponent {
     // swiftlint:disable identifier_name
     /// The loaded check-in (or `nil`) routed back from the `task` effect to seed state.
     case _currentLoaded(DomainModels.CheckIn?)
-    /// The `save` effect's result — success clears `isSaving` + emits the delegate; failure reverts.
-    case saveResponse(Result<Void, any Error>)
+    /// The `save` effect's result — success carries the day key the record persisted under, clears
+    /// `isSaving`, and (same-day only, review #2.1) stamps the footer + emits the delegate; failure
+    /// reverts.
+    case saveResponse(Result<Date, any Error>)
     // swiftlint:enable identifier_name
   }
 
@@ -153,15 +155,22 @@ public struct CheckInComponent {
         return .run { [checkInRepository] send in
           do {
             try await checkInRepository.save(checkIn)
-            await send(.saveResponse(.success(())))
+            await send(.saveResponse(.success(checkIn.date)))
           } catch {
             await send(.saveResponse(.failure(error)))
           }
         }
         .cancellable(id: CancelID.save)
 
-      case .saveResponse(.success):
+      case let .saveResponse(.success(savedDay)):
         state.isSaving = false
+        // Day-scope the success (review #2.1): a save whose response crosses midnight WITHOUT a scene
+        // re-activation (continuously active scene, or a response already queued when the cancel
+        // lands) persisted under YESTERDAY's key. Stamping the footer with today's clock or emitting
+        // the delegate would let the delegate-triggered orchestration stamp `contentDay` to today —
+        // permanently masking the rollover, so even the next activation would never reset. Dropping
+        // both leaves detection to the next `sceneBecameActive`, exactly the D6 boundary.
+        guard calendar.isDate(savedDay, inSameDayAs: date.now) else { return .none }
         state.lastSavedAt = date.now
         return .send(.delegate(.checkInSaved))
 

@@ -148,6 +148,24 @@ struct CheckInComponentTests {
     // No `.delegate(.checkInSaved)` — the exhaustive store fails on any unexpected received action.
   }
 
+  /// Day-scoped save success (review #2.1): a response that crosses midnight without a scene
+  /// re-activation carries yesterday's day key — it clears the spinner but must NOT stamp the footer
+  /// with today's clock or emit the delegate (whose orchestration would stamp `contentDay` to today
+  /// and permanently mask the rollover).
+  @Test func test_saveResponse_staleDaySuccess_clearsSavingOnly() async {
+    let justPastMidnight = sofiaDate(year: 2026, month: 6, day: 11, hour: 0, minute: 1)
+    let yesterdayKey = Calendar.europeSofia.startOfDay(for: sofiaDate(year: 2026, month: 6, day: 10))
+    let store = TestStore(initialState: CheckInComponent.State(isSaving: true)) {
+      CheckInComponent()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(justPastMidnight)
+    }
+
+    await store.send(.saveResponse(.success(yesterdayKey))) { $0.isSaving = false }
+    // No `lastSavedAt`, no `.delegate(.checkInSaved)` — the exhaustive store fails on either.
+  }
+
   // MARK: - "Saved earlier today" footer day guard (defense in depth on the rollover reset — D3)
 
   /// The Sofia-midnight boundary pair: a check-in stamped 23:59 is still "today" at 23:59 and stops
