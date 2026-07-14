@@ -37,7 +37,7 @@ small-to-medium pull request and maps to exactly one plan under
 | 16 | [Pluggable LLM layer (local + BYO keys)](./16-pluggable-llm.md) | 5 | Epic 13, Epic 15 | Planned |
 | 17 | [App Store hardening](./17-appstore-hardening.md) | 3 | Epic 15 | Planned |
 | 18 | [Make it run on device (audit wave 1)](./18-run-on-device.md) | 4 | none | Implemented — owner device validation pending |
-| 19 | [Make the numbers trustworthy (audit wave 2)](./19-trustworthy-numbers.md) | 5 | Epic 18 | Implemented — 19.6 zone-source follow-up + owner device validation pending |
+| 19 | [Make the numbers trustworthy (audit wave 2)](./19-trustworthy-numbers.md) | 7 | Epic 18 | Implemented — owner device validation pending |
 | 20 | [Make it adjustable (audit wave 3)](./20-adjustable-architecture.md) | 4 | Epic 19 | Planned |
 
 ## How to work with these epics

@@ -254,9 +254,9 @@ profile-write divergence).
 
 ---
 
-## Phase 19.6 — Runtime measured max-HR anchor source (follow-up, NOT STARTED)
+## Phase 19.6 — Runtime measured max-HR anchor source ✅ DONE
 
-**Plan**: _not yet created_
+**Plan**: (backend repo) `docs/artifacts/plans/phase-19-6-runtime-measured-max-hr` · status: done · **PR smeshko/health-coach-be#47**
 
 **Linear**: none
 
@@ -283,8 +283,55 @@ with real zone-corruption risk (max-HR drives *every* bound), so it was split ou
 
 ### Acceptance criteria
 
-- [ ] A real measured max-HR shift (from `records`) re-derives HR zones end-to-end in the
-  weekly recompute; a quiet window or sensor artifact does not move the anchor.
+- [x] A real measured max-HR shift (from `records`) re-derives HR zones end-to-end in the
+  weekly recompute; a quiet window or sensor artifact does not move the anchor. *(Backend
+  PR #47: runtime `measured_max_hr(session, as_of, current_max_hr)` — whole-corpus bounded
+  MAX, physiological clamp, dual type-alias, conservative-inclusive `as_of` cutoff,
+  ratchet-up only — feeds `RecomputeConstants`'s `rederive_zones`. Demonstrated by
+  `tests/core/test_weekly_planner.py::test_recompute_measured_max_hr_shift_re_derives_zones`
+  (shift → `zones.z5.high == new max_hr`), `…_quiet_window_leaves_anchor`, and
+  `…_artifact_clamped_leaves_anchor`. Owner on-device demonstration still pending.)*
+
+---
+
+## Phase 19.7 — profile.yaml durability across redeploys ✅ DONE
+
+**Plan**: (backend repo) `docs/artifacts/plans/phase-19-7-profile-yaml-durable-volume` · status: done · **PR smeshko/health-coach-be#48**
+
+**Linear**: none
+
+**Goal**: Stop a container redeploy from reverting a recomputed `profile.yaml` — the deploy-durability
+follow-up deferred from Phase 19.5 (backend `RUNBOOK.md §5`).
+
+### Why it's separate (from 19.5 review)
+
+The weekly recompute rewrites `profile.yaml` (the constants source of truth), but that file was
+baked into the **ephemeral `/app` Docker layer** while `app.db` lives on the durable `/data`
+volume (litestream replicates the DB, not the YAML). So a container replacement restored the
+older baked `profile.yaml` while keeping the newer committed plan → cache hits served constants
+diverged from the plan until the next recompute. 19.5 made a *failed* write safe; 19.7 makes a
+*successful* write survive redeploy.
+
+### What to build
+
+- Point `PROFILE_PATH` at the durable volume (`ENV PROFILE_PATH=/data/profile.yaml` in the
+  Dockerfile) — the existing override seam means both `load_profile()` and the recompute
+  `write_profile()` resolve there through the same `_default_profile_path()`, no app-code change.
+- Add an idempotent, non-root-safe entrypoint step (`scripts/seed_profile.sh`) that seeds the
+  baked default into `/data/profile.yaml` **only when absent** (never clobber a recomputed file),
+  copying via temp-file + atomic rename so an interrupted seed self-heals on the next boot.
+- Update `RUNBOOK.md §5` from "Known limitation" → "Resolved," retaining the one-time-cutover note.
+
+### Acceptance criteria
+
+- [x] A redeploy no longer reverts a recomputed `profile.yaml` — the file lives on the durable
+  `/data` volume, seeded from the baked default only when absent. *(Backend PR #48. Demonstrated
+  at runtime: `scripts/profile_seed_smoke.sh` (7/7 — fresh path → seeded byte-equal; existing file
+  → untouched; idempotent), the container-level `scripts/docker_boot_smoke.sh` seed assertion, and
+  the strengthened `tests/core/test_profile.py::test_write_profile_default_path_honours_env_override`
+  round-trip lock. Review hardened the seed to an atomic temp+rename. **One-time cutover:** the
+  first 19.7 deploy onto an existing `/data` with no YAML seeds the baked default — RUNBOOK §5
+  documents the actionable mitigation. Owner on-device/prod cutover still pending.)*
 
 ---
 
@@ -294,19 +341,17 @@ with real zone-corruption risk (max-HR drives *every* bound), so it was split ou
 
 - [~] Readiness, zones, targets, and the weekly plan's periodization reflect the
   athlete's real inputs end-to-end (HealthKit → backend → iOS render), demonstrated
-  on device. *(Readiness, targets, day-rollover, ingest, and the weekly **quality-focus
-  periodization** now reflect real inputs. **Two residuals:** the **zone re-derivation
-  runtime source** is deferred to Phase 19.6 (no safe in-pipeline measured max-HR — see
-  19.4/19.6); and **on-device demonstration is owner-only** (needs the phone + prod backend,
-  as with Epic 18).)*
-- [x] Every phase merged and its acceptance criteria met *(19.1–19.5 all merged with criteria
+  on device. *(Readiness, targets, day-rollover, ingest, the weekly **quality-focus
+  periodization**, the **runtime zone re-derivation source** (19.6), and **profile.yaml
+  redeploy durability** (19.7) now all reflect real inputs. **Sole residual:** on-device
+  end-to-end demonstration is **owner-only** — needs the phone + prod backend, as with Epic 18.)*
+- [x] Every phase merged and its acceptance criteria met *(19.1–19.7 all merged with criteria
   met; 19.4's zone-source half + 19.5's redeploy-durability were split into follow-ups
-  **19.6**/**19.7** rather than left silently incomplete.)*
-- [x] Status row in [EPICS.md](./EPICS.md) updated *(→ "Implemented — 19.6 zone-source
-  follow-up + owner device validation pending".)*
+  **19.6** (PR #47) / **19.7** (PR #48) and shipped rather than left silently incomplete.)*
+- [x] Status row in [EPICS.md](./EPICS.md) updated *(→ "Implemented — owner device validation
+  pending".)*
 
-**Epic status:** the five originally-scoped phases (19.1–19.5) are **shipped**. The epic
-surfaced one real scoping discovery — there is no safe runtime measured-max-HR source, so the
-zone-rederivation branch is correct-when-reachable but not yet production-live — carried as
-**Phase 19.6**. A profile.yaml redeploy-durability hardening is carried as a **19.7** candidate
-(backend `RUNBOOK.md §5`). On-device end-to-end demonstration is owner-only.
+**Epic status:** all seven phases (19.1–19.7) are **shipped**. The epic surfaced two real scoping
+discoveries during its own reviews — no safe runtime measured-max-HR source (→ **Phase 19.6**,
+PR #47) and profile.yaml redeploy-durability (→ **Phase 19.7**, PR #48) — both now built and
+merged. On-device end-to-end demonstration remains owner-only.
