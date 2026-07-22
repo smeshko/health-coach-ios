@@ -108,11 +108,13 @@ struct WeekRhythmTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: plan)
       $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.zonesResolved) { $0.zones = zones }
 
     zonesThrows.setValue(true)
+    // Roll the Sofia clock into the next ISO week so the re-appear is a genuine reload (a same-week
+    // `.task` over `.ready` is now a cache-first no-op, Phase 20.3).
+    store.dependencies.date = .constant(WeeklyTestSupport.sofiaMidday(2026, 6, 15))
     await store.send(.task) { $0.weeklyState = .loading }
     await store.receive(\.weeklyResolved) { $0.weeklyState = .ready(plan, .fresh) }
     await store.receive(\.zonesResolved) // nil → no-op; the prior zones are retained

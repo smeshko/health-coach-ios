@@ -28,7 +28,9 @@ struct MainTabsView: View {
 
       // Week (Epic 9): the real `WeeklyView` root, loading its own weekly plan on tab appear (`.task`
       // → the feature's `task` action — no AppFeature orchestration; the §11 chain stays Epic 07/08
-      // work). The drill-down `weekly` stack is caseless until later; the `EmptyView` arm is unreachable.
+      // work). Cache-first (Phase 20.3): the feature ignores a re-appear over a `.ready` plan for the
+      // current ISO week, so hopping tabs never flashes a full-screen reload. The drill-down `weekly`
+      // stack is caseless until later; the `EmptyView` arm is unreachable.
       NavigationStack(path: $store.scope(state: \.weekly, action: \.weekly)) {
         WeeklyView(store: store.scope(state: \.weeklyRoot, action: \.weeklyRoot))
           .task { store.send(.weeklyRoot(.task)) }
