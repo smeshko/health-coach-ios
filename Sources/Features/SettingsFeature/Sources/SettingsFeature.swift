@@ -68,6 +68,9 @@ public struct SettingsFeature {
 
   public enum Action {
     case onAppear
+    /// The failed-load screen's "Try again" (Phase 20.2). Routed through the same load arm as
+    /// `onAppear` — from `.failed` it restarts the full three-slice load.
+    case retryTapped
     case connectionLoaded(String?)
     case lastSyncLoaded(Date?)
     case constantsLoaded(Result<DomainModels.Profile, ProfileLoadFailure>)
@@ -101,7 +104,7 @@ public struct SettingsFeature {
   public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
-      case .onAppear:
+      case .onAppear, .retryTapped:
         switch state.load {
         case .loading:
           // A first load is already in flight — don't disturb it.
