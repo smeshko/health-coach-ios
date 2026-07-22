@@ -10,7 +10,7 @@ import SwiftUI
 /// "why" is expanded, the **itemized penalty breakdown** renders inline.
 ///
 /// **Reconciled at implement-time (Epic 08 reorder):** there is no `DesignSystem.ReadinessGauge` — the
-/// tri-band meter is the merged `SegmentedBar.readiness(score:)` primitive (Phase 8.2 / epic 08 ✓), so
+/// tri-band meter is the merged `SegmentedBar.readiness(score:band:)` primitive (Phase 8.2 / epic 08 ✓), so
 /// this card is assembled from that primitive rather than a reworked gauge. The `summary` slice is
 /// **parent-filtered** and passed in (the component renders verbatim, principle #1) — it owns no fetching.
 public struct ReadinessComponentView: View {
@@ -63,7 +63,7 @@ public struct ReadinessComponentView: View {
           .foregroundStyle(store.readiness.band.color)
       }
 
-      SegmentedBar.readiness(score: store.readiness.score)
+      SegmentedBar.readiness(score: store.readiness.score, band: store.readiness.band)
         .frame(maxWidth: .infinity, alignment: .leading)
 
       // The itemized "why" breakdown (inline, when expanded) — matches `… — Why open.png`. Enters/leaves

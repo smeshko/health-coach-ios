@@ -16,7 +16,7 @@ public func domainDailyBrief(_ dto: WireModels.DailyBrief) -> DomainModels.Daily
       score: data.readiness.score,
       band: data.readiness.band,
       penalties: data.readiness.penalties.map {
-        DomainModels.ReadinessPenalty(factor: EnumMapping.penaltyFactor($0.factor), points: $0.points)
+        DomainModels.ReadinessPenalty(factor: PenaltyFactor(wireString: $0.factor), points: $0.points)
       }
     ),
     safetyGate: safetyGate(data.safetyGate),
@@ -61,7 +61,7 @@ private func makeSession(_ dto: WireModels.SessionBlock) -> DomainModels.Session
     durationMinHigh: dto.durationMinHigh,
     hrCapBpm: dto.hrCapBpm,
     cadenceSpm: dto.cadenceSpm,
-    flags: dto.flags.map(EnumMapping.flag)
+    flags: dto.flags.map(Flag.init(wireString:))
   )
 }
 
@@ -75,7 +75,7 @@ private func plannedSession(_ dto: WireModels.PlannedSession) -> DomainModels.Pl
     zoneTarget: dto.zoneTarget,
     durationMinLow: dto.durationMinLow,
     durationMinHigh: dto.durationMinHigh,
-    flags: dto.flags.map(EnumMapping.flag)
+    flags: dto.flags.map(Flag.init(wireString:))
   )
 }
 
@@ -84,7 +84,7 @@ private func plannedSession(_ dto: WireModels.PlannedSession) -> DomainModels.Pl
 private func safetyGate(_ dto: WireModels.SafetyGate) -> DomainModels.SafetyGate {
   DomainModels.SafetyGate(
     triggered: dto.triggered,
-    reasons: dto.reasons.map(EnumMapping.safetyReason),
+    reasons: dto.reasons.map(SafetyReason.init(wireString:)),
     overrideTo: dto.overrideTo
   )
 }

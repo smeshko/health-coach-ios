@@ -77,6 +77,11 @@ public struct DayTypePatternEntry: Equatable, Codable, Sendable {
   public var caloriesKcal: Int
   public var carbsG: Int
 
+  /// THE reading of the free `suggestedDay` string (Phase 20.1, D5): case-insensitive `Weekday`
+  /// resolution, `nil` when unrecognised. Consumers must match through this, never re-parse
+  /// `suggestedDay` — the stored string stays verbatim (wire fidelity).
+  public var weekday: Weekday? { Weekday(rawValue: suggestedDay.lowercased()) }
+
   public init(suggestedDay: String, dayType: DayType, caloriesKcal: Int, carbsG: Int) {
     self.suggestedDay = suggestedDay
     self.dayType = dayType

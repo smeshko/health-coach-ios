@@ -24,4 +24,20 @@ struct ValueTypeTests {
     let inverted = SessionBlock(card: .easyRun, intensity: .easy, durationMinLow: 55, durationMinHigh: 40)
     #expect(inverted.durationRange == 40 ... 55, "inverted bounds clamp to a valid min...max window")
   }
+
+  /// Phase 20.1 D5: `DayTypePatternEntry.weekday` is THE reading of the free `suggestedDay` wire
+  /// string — case-insensitive, so a case-mismatched entry ("Tue"/"TUE") resolves to its day instead
+  /// of silently falling through to the rest-day cut; unrecognised strings stay `nil`.
+  @Test func test_dayTypePatternEntry_weekday_normalizesCase() {
+    func entry(_ day: String) -> DayTypePatternEntry {
+      DayTypePatternEntry(suggestedDay: day, dayType: .moderate, caloriesKcal: 2600, carbsG: 300)
+    }
+    #expect(entry("tue").weekday == .tue)
+    #expect(entry("Tue").weekday == .tue)
+    #expect(entry("TUE").weekday == .tue)
+    #expect(entry("notaday").weekday == nil)
+    #expect(entry("").weekday == nil)
+    // The stored string stays verbatim — interpretation-on-read, not coercion.
+    #expect(entry("Tue").suggestedDay == "Tue")
+  }
 }
