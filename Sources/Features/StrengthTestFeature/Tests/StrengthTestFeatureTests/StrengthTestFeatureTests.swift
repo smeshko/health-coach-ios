@@ -179,6 +179,70 @@ struct StrengthTestFeatureTests {
     #expect(saved.value == [DomainModels.StrengthTest(date: now, maxPushups: 42, maxPullups: 11)])
   }
 
+  @Test func testSaveFailureSurfacesFailedStateAndEmitsNoDelegate() async {
+    // Phase 20.2: a thrown save must land the user-visible `.failed` state (error callout + `.error`
+    // haptic in the view) — not silently revert to `.idle` — and must NOT emit `Delegate.saved` (the
+    // parent would pop a screen whose test was never written).
+    struct SaveError: Error {}
+    let now = sofiaDate(year: 2026, month: 6, day: 10)
+    let store = TestStore(
+      initialState: StrengthTestFeature.State(loadState: .loaded, maxPushups: 42, maxPullups: 11, isDue: true)
+    ) {
+      StrengthTestFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
+      $0.strengthTestRepository.save = { _ in throw SaveError() }
+    }
+    await store.send(.saveTapped) { $0.saveState = .saving }
+    // Exhaustive TestStore: receiving ONLY `saveFailed` proves no `saveSucceeded`/`delegate.saved` fired.
+    await store.receive(\.saveFailed) { $0.saveState = .failed }
+  }
+
+  @Test func testRetryAfterSaveFailureSucceeds() async {
+    // The failure is recoverable: the Save button stays live from `.failed`, and once the repo recovers
+    // the retried save completes the normal `.saved` → `Delegate.saved` flow.
+    struct SaveError: Error {}
+    let now = sofiaDate(year: 2026, month: 6, day: 10)
+    let succeed = LockIsolated(false)
+    let saved = LockIsolated<[DomainModels.StrengthTest]>([])
+    let store = TestStore(
+      initialState: StrengthTestFeature.State(
+        loadState: .loaded, maxPushups: 42, maxPullups: 11, isDue: true, saveState: .failed
+      )
+    ) {
+      StrengthTestFeature()
+    } withDependencies: {
+      $0.calendar = .europeSofia
+      $0.date = .constant(now)
+      $0.strengthTestRepository.save = { test in
+        guard succeed.value else { throw SaveError() }
+        saved.withValue { $0.append(test) }
+      }
+    }
+    succeed.setValue(true)
+    await store.send(.saveTapped) { $0.saveState = .saving }
+    await store.receive(\.saveSucceeded) { $0.saveState = .saved }
+    await store.receive(\.delegate.saved)
+    #expect(saved.value == [DomainModels.StrengthTest(date: now, maxPushups: 42, maxPullups: 11)])
+  }
+
+  @Test func testEditAfterSaveFailureClearsTheFailure() async {
+    // An edit invalidates the "couldn't save" callout (it describes the previous attempt) → back to `.idle`.
+    let store = TestStore(
+      initialState: StrengthTestFeature.State(
+        loadState: .loaded, maxPushups: 42, maxPullups: 11, isDue: true, saveState: .failed
+      )
+    ) {
+      StrengthTestFeature()
+    }
+    await store.send(.pushupsChanged(43)) {
+      $0.saveState = .idle
+      $0.userEdited = true
+      $0.maxPushups = 43
+    }
+  }
+
   @Test func testCountChangesIgnoredWhileSaving() async {
     // A stepper edit during an in-flight save would be silently dropped on the pop → ignore it (review #2).
     // Start already `.saving` so no parked effect is needed to hold the window open.

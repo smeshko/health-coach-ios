@@ -65,6 +65,17 @@ public struct StrengthTestView: View {
             value: Binding(get: { store.maxPullups }, set: { store.send(.pullupsChanged($0)) })
           )
 
+          if store.saveState == .failed {
+            // The surfaced save failure (Phase 20.2) — paired with the `.error` haptic below. The Save
+            // button stays live as the retry; an edit clears this back to `.idle` in the reducer.
+            InsetCallout(
+              icon: "exclamationmark.triangle",
+              tone: .warning,
+              headline: "Couldn't save your test",
+              content: "Your numbers are still here — try saving again."
+            )
+          }
+
           PrimaryButton(
             "Save strength test",
             icon: "checkmark",
@@ -84,6 +95,9 @@ public struct StrengthTestView: View {
     // The save's success feedback — fires when the reducer flips `saveState` to `.saved`, before the
     // parent pops on `Delegate.saved` (the haptic-before-pop contract).
     .sensoryFeedback(.success, trigger: store.saveState == .saved)
+    // The save-failure feedback (Phase 20.2) — fires when a failed save flips `saveState` to `.failed`,
+    // alongside the error callout above the Save button.
+    .sensoryFeedback(.error, trigger: store.saveState == .failed)
   }
 }
 
