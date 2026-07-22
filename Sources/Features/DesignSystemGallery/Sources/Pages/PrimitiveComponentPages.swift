@@ -1,4 +1,5 @@
 import DesignSystem
+import DomainModels
 import SwiftUI
 
 // Subpages for the Phase 5.2 primitives — each rendering all of that component's documented states.
@@ -236,8 +237,8 @@ struct SegmentedBarZonesSection: View {
       SegmentedBar.zones(active: [2, 3])
       SegmentedBar.zones(active: [1, 4, 5])
       stateLabel("Readiness (3 bands + marker)")
-      ForEach([10, 60, 88], id: \.self) { score in
-        SegmentedBar.readiness(score: score)
+      ForEach([(10, ReadinessBand.red), (60, .amber), (88, .green)], id: \.0) { score, band in
+        SegmentedBar.readiness(score: score, band: band)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

@@ -1,3 +1,4 @@
+import DomainModels
 import SwiftUI
 
 /// The single horizontal bar primitive. A row of capsule segments with relative widths and per-segment
@@ -6,8 +7,9 @@ import SwiftUI
 ///
 /// - `.zones(active:)` — a 5-segment HR meter (Z1–Z5), markerless: each active zone is shown in its
 ///   full zone color, the rest muted to the same color at low opacity.
-/// - `.readiness(score:)` — a 3-band meter (Recover 50% / Ease off 25% / Ready 25%) with a marker at
-///   the score.
+/// - `.readiness(score:band:)` — a 3-band meter (Recover 50% / Ease Off 25% / Ready 25%) with a
+///   marker at the score. The active band is the backend-computed domain `ReadinessBand` — the shape
+///   never derives it from the score.
 /// - `.range(_:total:tone:)` — a markerless effort meter: `total` equal segments with a contiguous
 ///   filled range (e.g. an RPE 6–7 target across 1–10).
 /// - `.steps(_:tone:)` — a markerless weekly streak: equal segments, each on (a tone) or off (the
@@ -152,17 +154,20 @@ public extension SegmentedBar {
     zones(active: [target])
   }
 
-  /// A 3-band readiness meter (Recover 50% / Ease off 25% / Ready 25%) with the marker at `score`.
-  static func readiness(score: Int) -> SegmentedBar {
-    let bands = ReadinessBand.allCases
-    let active = ReadinessBand.active(for: score)
-    let segments = bands.map { Segment(weight: $0.fraction, color: $0.color) }
-    let labels = bands.map {
-      SegmentLabel(text: $0.label, color: $0.color, isActive: $0 == active, alignment: $0.alignment)
+  /// A 3-band readiness meter (Recover 50% / Ease Off 25% / Ready 25%) with the marker at `score`.
+  /// The highlighted band is `band` — the backend-computed domain value (banding SSOT), never
+  /// re-derived from the score here. Labels and colors are the D19 `ReadinessBand` conformances.
+  static func readiness(score: Int, band: ReadinessBand) -> SegmentedBar {
+    // Meter order is red → amber → green left-to-right; domain `allCases` is green → amber → red,
+    // so the axis keeps its own explicit order.
+    let meterOrder: [ReadinessBand] = [.red, .amber, .green]
+    let segments = meterOrder.map { Segment(weight: $0.meterFraction, color: $0.color) }
+    let labels = meterOrder.map {
+      SegmentLabel(text: $0.label, color: $0.color, isActive: $0 == band, alignment: $0.meterAlignment)
     }
-    let activeIndex = bands.firstIndex(of: active) ?? 0
+    let activeIndex = meterOrder.firstIndex(of: band) ?? 0
     let marker = MarkerPosition(
-      segmentIndex: activeIndex, fraction: active.progress(for: score), glow: active.color
+      segmentIndex: activeIndex, fraction: band.markerProgress(for: score), glow: band.color
     )
     return SegmentedBar(
       segments: segments,
@@ -200,58 +205,40 @@ public extension SegmentedBar {
   }
 }
 
-/// The readiness meter's three bands — proportional widths mirror the score thresholds (Recover 0–50,
-/// Ease off 50–75, Ready 75–100), so the marker lands inside the active band.
-private enum ReadinessBand: CaseIterable {
-  case recover, easeOff, ready
-
-  static func active(for score: Int) -> ReadinessBand {
-    if score >= 75 { .ready } else if score >= 50 { .easeOff } else { .recover }
-  }
-
-  var color: Color {
+/// Meter geometry for the domain `ReadinessBand` — axis scale and marker placement ONLY. Banding is
+/// the backend's (`Readiness.band` is the SSOT, Phase 20.1); labels and colors are the D19
+/// conformances in `ClosedEnumLabels`. The axis widths mirror the score scale (Recover 0–50,
+/// Ease Off 50–75, Ready 75–100) so the marker lands inside the active band.
+private extension ReadinessBand {
+  var meterFraction: CGFloat {
     switch self {
-    case .recover: .coachNegative
-    case .easeOff: .coachWarning
-    case .ready: .coachPositive
+    case .red: 0.5
+    case .amber, .green: 0.25
     }
   }
 
-  var label: String {
+  var meterAlignment: Alignment {
     switch self {
-    case .recover: "Recover"
-    case .easeOff: "Ease off"
-    case .ready: "Ready"
+    case .red: .leading
+    case .amber: .center
+    case .green: .trailing
     }
   }
 
-  var fraction: CGFloat {
+  var axisRange: ClosedRange<CGFloat> {
     switch self {
-    case .recover: 0.5
-    case .easeOff, .ready: 0.25
+    case .red: 0 ... 50
+    case .amber: 50 ... 75
+    case .green: 75 ... 100
     }
   }
 
-  var alignment: Alignment {
-    switch self {
-    case .recover: .leading
-    case .easeOff: .center
-    case .ready: .trailing
-    }
-  }
-
-  var range: ClosedRange<CGFloat> {
-    switch self {
-    case .recover: 0 ... 50
-    case .easeOff: 50 ... 75
-    case .ready: 75 ... 100
-    }
-  }
-
-  /// The score's progress (0…1) within this band, used to place the marker inside the active segment.
-  func progress(for score: Int) -> CGFloat {
-    let clamped = CGFloat(min(max(score, 0), 100))
-    return (clamped - range.lowerBound) / (range.upperBound - range.lowerBound)
+  /// The score's progress (0…1) within this band's axis range, used to place the marker inside the
+  /// active segment. Clamped to 0…1 so an inconsistent (score, band) payload pins the marker at the
+  /// band edge instead of escaping the trusted band's segment.
+  func markerProgress(for score: Int) -> CGFloat {
+    let progress = (CGFloat(score) - axisRange.lowerBound) / (axisRange.upperBound - axisRange.lowerBound)
+    return min(max(progress, 0), 1)
   }
 }
 
