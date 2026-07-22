@@ -1,6 +1,6 @@
 # Plan: SSOT consolidation
 
-Status: planned
+Status: implemented
 Branch: refactor/phase-20-1-ssot-consolidation
 Risk: medium
 Epic: 20 — Make it adjustable (audit wave 3) ([epic](../../epics/20-adjustable-architecture.md))
@@ -111,24 +111,38 @@ axis geometry; D4 label unification on the D19 owner's "Ease Off"; D5
 
 ## Acceptance Criteria
 
-- [ ] Each of `Flag`/`SafetyReason`/`PenaltyFactor` has exactly one wire-string map
+- [x] Each of `Flag`/`SafetyReason`/`PenaltyFactor` has exactly one wire-string map
   (in `DomainModels`); `EnumMapping.swift` and `EnumMappingTests.swift` are gone;
   `BriefMapping` and the `Codable` codecs route through the same `init(wireString:)`/
   `wireString` pair; stale "mapping lives in WireDomainMapping" doc headers corrected.
-- [ ] `WireStringParityTests` fails if a known case round-trips to `.unknown`, if
+  *Evidence: `grep -rn "EnumMapping" Sources` → 0 hits; `"needs_green_knee"` /
+  `"gi_flare"` / `"sleep_below_7h"` each → exactly 1 Swift source hit (the owning
+  enum's `wireString` switch).*
+- [x] `WireStringParityTests` fails if a known case round-trips to `.unknown`, if
   decode(encode(case)) ≠ case for any `knownCases` member, or if two cases claim one
   wire string — for all three enums.
-- [ ] `SegmentedBar` contains no score-threshold banding: the private `ReadinessBand`
+  *Evidence: red demonstrated by omitting `.qualityDay` from `knownCases` (2 failures
+  in `CodableTests` — the D2 functional backstop); green run: parity + Codable +
+  BriefMapping suites, 16 tests passed.*
+- [x] `SegmentedBar` contains no score-threshold banding: the private `ReadinessBand`
   enum is deleted, the active band is the passed domain `ReadinessBand`, labels/colors
   come from the D19 conformances, and 50/75 appear only as marker-axis score ranges in
   one private extension. Both callers pass a band; marker progress is clamped.
-- [ ] The meter axis renders "Recover / Ease Off / Ready" — one spelling everywhere.
-- [ ] `DayTypePatternEntry(suggestedDay: "Tue", …)` renders its bar on Tuesday (and
+  *Evidence: `grep -rn "score >= 75\|score >= 50" Sources` → 0 hits;
+  `SegmentedBarTests` (4 tests) pin meter order, in-segment fraction, and both clamp
+  edges.*
+- [x] The meter axis renders "Recover / Ease Off / Ready" — one spelling everywhere
+  (labels come from `ClosedEnumLabels`; the duplicated "Ease off" table is deleted).
+- [x] `DayTypePatternEntry(suggestedDay: "Tue", …)` renders its bar on Tuesday (and
   `"TUE"` likewise); unknown strings still fall through to the rest-day cut; behavior
   pinned by `ValueTypeTests` weekday cases.
-- [ ] `make lint` (swiftlint --strict) and `make test` (full host package suite) green
+  *Evidence: `test_dayTypePatternEntry_weekday_normalizesCase` passed; no
+  `rawValue`/string comparison left in `CarbCyclingPattern.swift` (grep → 0 hits).*
+- [x] `make lint` (swiftlint --strict) and `make test` (full host package suite) green
   from the worktree root; no snapshot run attempted; expected snapshot diffs enumerated
   in the final report for the ship stage.
+  *Evidence: lint "Found 0 violations, 0 serious in 389 files"; test "Test run with
+  552 tests in 106 suites passed after 2.408 seconds".*
 
 ## Tasks
 
@@ -137,4 +151,4 @@ Task state lives here. Update the checkboxes as work progresses.
 - [x] TASK-001: Collapse the open-enum wire-string maps into DomainModels + parity guard
 - [x] TASK-002: Route the readiness meter through the domain ReadinessBand
 - [x] TASK-003: Case-insensitive suggestedDay matching via DayTypePatternEntry.weekday
-- [ ] TASK-004: Final Validation
+- [x] TASK-004: Final Validation
