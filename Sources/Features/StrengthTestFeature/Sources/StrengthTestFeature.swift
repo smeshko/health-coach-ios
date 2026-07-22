@@ -35,10 +35,13 @@ public struct StrengthTestFeature {
 
   /// The save lifecycle. `saving` drives the primary button's busy state; `saved` is the transient
   /// terminal the view fires its `.success` haptic off (before the parent pops on `Delegate.saved`).
+  /// `failed` is the user-visible save-failure state (Phase 20.2) — the view shows an error callout and
+  /// fires an `.error` haptic; it is recoverable (the Save button stays live, and an edit clears it).
   public enum SaveState: Equatable {
     case idle
     case saving
     case saved
+    case failed
   }
 
   @ObservableState
@@ -130,12 +133,14 @@ public struct StrengthTestFeature {
         // Ignore edits while a save is in flight — the save snapshots the counts, so a late edit would be
         // silently dropped on the pop (review #2). The view also shows the controls as busy.
         guard state.saveState != .saving else { return .none }
+        clearSaveFailure(&state)
         state.userEdited = true
         state.maxPushups = value.clamped(to: Self.countRange)
         return .none
 
       case let .pullupsChanged(value):
         guard state.saveState != .saving else { return .none }
+        clearSaveFailure(&state)
         state.userEdited = true
         state.maxPullups = value.clamped(to: Self.countRange)
         return .none
@@ -163,14 +168,22 @@ public struct StrengthTestFeature {
         return .send(.delegate(.saved))
 
       case .saveFailed:
-        // A rare on-device save failure → back to idle so the user can retry.
-        state.saveState = .idle
+        // Surface the failure (Phase 20.2): `.failed` renders an error callout + `.error` haptic instead
+        // of silently reverting to `.idle`. Recoverable — `saveTapped` still fires from `.failed`, and
+        // an edit clears it back to `.idle`.
+        state.saveState = .failed
         return .none
 
       case .delegate:
         return .none
       }
     }
+  }
+
+  /// Clears a surfaced save failure once the user edits — the error callout describes the *previous*
+  /// attempt, so it must not linger over fresh numbers (Phase 20.2).
+  private func clearSaveFailure(_ state: inout State) {
+    if state.saveState == .failed { state.saveState = .idle }
   }
 
   /// Reads the latest test → `loaded`, or `loadFailed` on a thrown read. Catching the error (rather than

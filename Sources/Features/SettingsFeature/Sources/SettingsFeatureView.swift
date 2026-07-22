@@ -22,18 +22,52 @@ public struct SettingsFeatureView: View {
 
   public var body: some View {
     List {
-      // Production sections: CONNECTION, STRENGTH (#2 — review), PROFILE (Phase 10.2), REMINDERS
-      // (Phase 10.3). The APPLE HEALTH "categories shared" section was dropped (review) along with its
-      // probe. Rows sit on `coachSurface` over a `coachBackground` page so the You tab matches the
-      // Today/Week tabs (hides the system grouped-grey List background).
-      ConnectionSection(store: store)
-        .listRowBackground(Color.coachSurface)
-      StrengthTestSection(store: store)
-        .listRowBackground(Color.coachSurface)
-      ProfileConstantsSection(store: store)
-        .listRowBackground(Color.coachSurface)
-      RemindersSection(store: store)
-        .listRowBackground(Color.coachSurface)
+      // The screen-level load lifecycle (Phase 20.2): the production sections render only from a settled
+      // `.loaded`; `.idle`/`.loading` show a spinner row and `.failed` shows an inline error with a
+      // working retry (the StrengthTestView callout + secondary-button pattern) instead of the silently
+      // empty screen the old always-rendered sections produced.
+      switch store.load {
+      case .idle, .loading:
+        Section {
+          HStack {
+            Spacer()
+            ProgressView().tint(.coachAccent)
+            Spacer()
+          }
+          .padding(.vertical, CoachSpacing.spaceLg)
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+
+      case .failed:
+        Section {
+          InsetCallout(
+            icon: "exclamationmark.triangle",
+            tone: .warning,
+            headline: "Couldn't load your settings",
+            content: "Check your connection to your data and try again."
+          )
+          SecondaryButton("Try again", icon: "arrow.clockwise") {
+            store.send(.retryTapped)
+          }
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+
+      case .loaded:
+        // Production sections: CONNECTION, STRENGTH (#2 — review), PROFILE (Phase 10.2), REMINDERS
+        // (Phase 10.3). The APPLE HEALTH "categories shared" section was dropped (review) along with its
+        // probe. Rows sit on `coachSurface` over a `coachBackground` page so the You tab matches the
+        // Today/Week tabs (hides the system grouped-grey List background).
+        ConnectionSection(store: store)
+          .listRowBackground(Color.coachSurface)
+        StrengthTestSection(store: store)
+          .listRowBackground(Color.coachSurface)
+        ProfileConstantsSection(store: store)
+          .listRowBackground(Color.coachSurface)
+        RemindersSection(store: store)
+          .listRowBackground(Color.coachSurface)
+      }
       #if DEBUG
         Section("Dev") {
           // The dev menu is TCA-routed (state-driven), so it's a Button with a manual disclosure chevron
