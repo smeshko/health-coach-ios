@@ -42,8 +42,10 @@ case-mismatched `suggestedDay` no longer silently renders as a rest day.
 - Phase 20.2 (silent-failure surfacing) and 20.3 (weekly ISO-week rollover).
 - Any change to the wire contract, persisted format, or backend banding thresholds —
   this phase moves code, it does not change what any value means.
-- New test *targets* (DesignSystem has snapshot tests only; adding a host unit-test
-  target is not warranted for presentation geometry — see DECISIONS D3).
+- New test *targets*. DesignSystem already has a host-runnable pure-logic target
+  (`DesignSystemTests`, `@testable import DesignSystem`, Package.swift ≈:956 — it pins
+  `PainSeverity`/`effortBand`/`RangeFormatter`/`CoachMotion`); the D3 marker clamp gets
+  a case there (TASK-002), so no new target is needed.
 - Running snapshot tests / re-recording PNGs (ship stage owns the simulator). Expected
   diffs are flagged in Risks and must be carried into the final report.
 - The closed enums (`Card`, `Zone`, …) — already single-declaration since Phase 11.3.

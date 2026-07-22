@@ -32,6 +32,13 @@ extension (DECISIONS D3/D4).
 - `Sources/Features/DesignSystemGallery/Sources/Pages/PrimitiveComponentPages.swift`
   :239–241 — explicit consistent pairs, e.g.
   `[(10, ReadinessBand.red), (60, .amber), (88, .green)]`, `ForEach(…, id: \.0)`.
+- `Sources/DesignSystem/Tests/DesignSystemTests/` — **new**
+  `SegmentedBarTests.swift` (Swift Testing, `import DomainModels` +
+  `@testable import DesignSystem`, matching the sibling label/effort-band tests). Pins
+  the D3 clamp through the public shape: `SegmentedBar.readiness(score:band:)`'s
+  resulting `marker` (both `.marker?.segmentIndex` and `.marker?.fraction` are
+  internal, so `@testable` reaches them). This is the existing host target — NOT a new
+  one — so it runs under plain `make test`.
 
 ## Acceptance
 
@@ -43,8 +50,11 @@ extension (DECISIONS D3/D4).
   "Ease Off" — the deliberate D4 unification).
 - [ ] Both call sites compile passing a band; no other caller exists (grep
   `readiness(score` clean).
-- [ ] Marker fraction is clamped: an inconsistent pair like (80, .amber) cannot place
-  the marker outside its segment (code-reviewable — see Notes on testability).
+- [ ] Marker fraction is clamped: `SegmentedBarTests` pins that the inconsistent pair
+  `(score: 80, band: .amber)` yields `marker.fraction == 1.0` (band edge, not the
+  unclamped 1.2 the raw axis math gives) and `marker.segmentIndex` = the amber slot;
+  a consistent pair (e.g. `(60, .amber)`) keeps its in-segment fraction. Runs on the
+  existing host `DesignSystemTests` target under `make test`.
 - [ ] Full host suite (`make test`) green; no snapshot run.
 
 Evidence: `make lint` + `make test` output; grep transcript for the threshold check.
@@ -52,8 +62,13 @@ Evidence: `make lint` + `make test` output; grep transcript for the threshold ch
 ## Steps
 
 ### RED
-- [ ] No host-runnable test target covers DesignSystem (snapshot-only, UIKit-gated) —
-  the red state is the two callers failing to compile against the new signature.
+- [ ] Write the `SegmentedBarTests` clamp case against the new `readiness(score:band:)`
+  signature first — it fails to compile until the shape is rewritten, then (with an
+  un-clamped `markerProgress`) asserts-red at `marker.fraction == 1.0` for `(80,
+  .amber)`. The two feature callers also fail to compile against the new signature —
+  that compile break is caught by `make test` building the package.
+  (DesignSystem DOES have a host-runnable pure-logic test target — `DesignSystemTests`,
+  `@testable import DesignSystem` — the earlier "snapshot-only" framing was wrong.)
 
 ### GREEN
 - [ ] Rewrite the shape + geometry extension; delete the private enum; update both
@@ -72,8 +87,10 @@ Evidence: `make lint` + `make test` output; grep transcript for the threshold ch
   by "Ease off" → "Ease Off". Carry this list into the final report for the ship
   stage's re-record. No other pixel should move: colors, fractions, alignments, marker
   math (for consistent pairs) are value-identical.
-- Adding a host unit-test target for DesignSystem just to test `markerProgress`
-  clamping is out of scope (PLAN Out of Scope); the clamp is one `min(max(…))`
-  reviewed in code and exercised by the gallery snapshots at ship.
+- The clamp is a genuinely NEW behavior (D3 Risk "band/score disagreement"), so it is
+  unit-tested — cheaply, in the EXISTING `DesignSystemTests` host target, no new target
+  needed. The test reaches the internal `marker` through the public shape under
+  `@testable`; it does not touch the `private` geometry extension (`markerProgress` can
+  stay private). No snapshot run is involved.
 - `LabelsGalleryPage` iterates domain `allCases` — untouched by keeping `meterOrder`
   local.
