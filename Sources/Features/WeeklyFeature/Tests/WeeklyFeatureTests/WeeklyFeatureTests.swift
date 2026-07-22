@@ -11,11 +11,8 @@ import Testing
 @testable import WeeklyFeature
 
 /// The target/harness smoke test + the new-ISO-week detection (TASK-002) + the get-or-cache fetch effect
-/// (TASK-003). The rhythm + toggles (TASK-004) cases grow this suite.
-///
-/// `.serialized` because the `@Shared(.appStorage)` watermark is process-global app state — parallel tests
-/// would race on it; serial execution + a per-test nil reset (`makeStore`) gives each test a clean baseline.
-@Suite(.serialized)
+/// (TASK-003). The rhythm + toggles (TASK-004) cases grow this suite; the Phase 20.3 cache-first
+/// re-appear behaviour lives in `WeeklyCacheFirstTests`.
 @MainActor
 struct WeeklyFeatureTests {
   @Test func test_initialState_isIdle() {
@@ -52,27 +49,9 @@ struct WeeklyFeatureTests {
     #expect(w24 != w25)
   }
 
-  @Test func test_isNewWeek_predicate() {
-    withDependencies {
-      // A fresh in-memory appStorage suite so the watermark never leaks between tests / real UserDefaults.
-      $0.defaultAppStorage = UserDefaults(suiteName: "weekly-isnewweek-\(UUID().uuidString)")!
-      $0.useEuropeSofia()
-      $0.date = .constant(WeeklyTestSupport.sofiaMidday(2026, 6, 8))
-    } operation: {
-      let feature = WeeklyFeature()
-      let state = WeeklyFeature.State()
-      #expect(state.lastSeenISOWeek == nil)
-      #expect(feature.isNewWeek(state) == true) // nil watermark → new
-      state.$lastSeenISOWeek.withLock { $0 = "2025-W01" }
-      #expect(feature.isNewWeek(state) == true) // differs → new
-      state.$lastSeenISOWeek.withLock { $0 = feature.currentISOWeekKey }
-      #expect(feature.isNewWeek(state) == false) // matches → not new
-    }
-  }
-
   // MARK: - Get-or-cache fetch effect (TASK-003)
 
-  @Test func test_task_fetchOnNewWeek_landsReadyFresh() async throws {
+  @Test func test_task_coldOpen_landsReadyFresh() async throws {
     let plan = try WeeklyTestSupport.deloadPlan() // cached == false, isoWeek "2026-W24"
     let zones = WeeklyTestSupport.sampleZones()
     let refreshArgs = LockIsolated<[Bool]>([])
@@ -90,11 +69,9 @@ struct WeeklyFeatureTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: plan)
       $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.zonesResolved) { $0.zones = zones } // then zones hydrate
     #expect(refreshArgs.value == [false], "the appear path calls weeklyBrief once with refresh: false")
-    #expect(store.state.lastSeenISOWeek == plan.isoWeek)
   }
 
   @Test func test_task_sameWeek_servesCache_neverRefreshTrue() async throws {
@@ -115,7 +92,6 @@ struct WeeklyFeatureTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: cached)
       $0.adherence = AdherenceComponent.make(from: cached.nutrition)
       $0.weeklyState = .ready(cached, .cached) // the cached flag drives .cached
-      $0.$lastSeenISOWeek.withLock { $0 = cached.isoWeek }
     }
     await store.receive(\.zonesResolved) { $0.zones = zones }
     #expect(refreshArgs.value == [false], "a same-week open is refresh: false — never refresh: true")
@@ -143,7 +119,6 @@ struct WeeklyFeatureTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: plan)
       $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.zonesResolved) { $0.zones = zones }
   }
@@ -174,7 +149,6 @@ struct WeeklyFeatureTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: plan)
       $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.zonesResolved) // nil (throw degraded) → merge no-op, zones stays nil
     #expect(store.state.zones == nil, "a throwing zones read is non-fatal — the plan still lands ready")
@@ -199,10 +173,6 @@ struct WeeklyFeatureTests {
     await clock.advance(by: WeeklyFeature.refreshDebounceDuration)
     await store.receive(\.refreshRequested) {
       $0.weeklyState = .loading
-      // `@Shared` is a reference: the refreshRequested → fetch → weeklyResolved chain settles before this
-      // first receive, so the watermark is already written here (it's asserted at the first receive that
-      // observes the change, not the reducer step that wrote it).
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.weeklyResolved) {
       $0.rhythm = WeekRhythmComponent.rhythm(from: plan)
@@ -238,7 +208,6 @@ struct WeeklyFeatureTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: plan)
       $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.zonesResolved) { $0.zones = zones }
   }
@@ -265,7 +234,6 @@ struct WeeklyFeatureTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: plan)
       $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     #expect(store.state.zones == nil, "the plan is ready before the parked zones read resolves")
     await clock.advance(by: .seconds(3600)) // release the parked zones → it hydrates after the fact
@@ -305,7 +273,6 @@ struct WeeklyFeatureTests {
       $0.nutrition = WeeklyNutritionComponent.make(from: plan)
       $0.adherence = AdherenceComponent.make(from: plan.nutrition)
       $0.weeklyState = .ready(plan, .fresh)
-      $0.$lastSeenISOWeek.withLock { $0 = plan.isoWeek }
     }
     await store.receive(\.zonesResolved) { $0.zones = zones }
     #expect(store.state.isCoreExpanded == false, "group flags survive a re-supplied plan")
