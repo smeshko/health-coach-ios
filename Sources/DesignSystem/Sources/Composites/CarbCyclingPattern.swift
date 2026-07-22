@@ -37,11 +37,12 @@ public struct CarbCyclingPattern: View {
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  /// One resolved Mon–Sun slot: a pattern entry on its `suggestedDay`, else the `restDay` cut, else empty.
+  /// One resolved Mon–Sun slot: a pattern entry on its day (matched via `entry.weekday` — the domain's
+  /// case-insensitive reading of the free string), else the `restDay` cut, else empty.
   private var resolvedDays: [DaySlot] {
     Weekday.allCases.map { weekday in
       let label = String(weekday.label.prefix(2)) // "Mo"/"Tu"/… (2-letter, unambiguous unlike the dot-row)
-      if let entry = dayTypePattern.first(where: { $0.suggestedDay == weekday.rawValue }) {
+      if let entry = dayTypePattern.first(where: { $0.weekday == weekday }) {
         return DaySlot(label: label, carbsG: entry.carbsG, kind: .dayType(entry.dayType))
       }
       if let restDay {

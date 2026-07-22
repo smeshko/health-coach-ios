@@ -136,5 +136,5 @@ Task state lives here. Update the checkboxes as work progresses.
 
 - [x] TASK-001: Collapse the open-enum wire-string maps into DomainModels + parity guard
 - [x] TASK-002: Route the readiness meter through the domain ReadinessBand
-- [ ] TASK-003: Case-insensitive suggestedDay matching via DayTypePatternEntry.weekday
+- [x] TASK-003: Case-insensitive suggestedDay matching via DayTypePatternEntry.weekday
 - [ ] TASK-004: Final Validation
