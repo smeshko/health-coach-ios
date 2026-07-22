@@ -95,9 +95,11 @@ public struct StrengthTestView: View {
     // The save's success feedback — fires when the reducer flips `saveState` to `.saved`, before the
     // parent pops on `Delegate.saved` (the haptic-before-pop contract).
     .sensoryFeedback(.success, trigger: store.saveState == .saved)
-    // The save-failure feedback (Phase 20.2) — fires when a failed save flips `saveState` to `.failed`,
-    // alongside the error callout above the Save button.
-    .sensoryFeedback(.error, trigger: store.saveState == .failed)
+    // The save-failure feedback (Phase 20.2) — fires only on the RISING edge into `.failed` (a failed
+    // save), via the closure overload (the TodayView edge-trigger precedent). A plain Bool trigger would
+    // also fire on `.failed → .idle`/`.saving`, buzzing an error haptic exactly when the user recovers
+    // (edits a stepper, or taps Save to retry) — since `.failed` is recoverable, unlike terminal `.saved`.
+    .sensoryFeedback(trigger: store.saveState) { _, new in new == .failed ? .error : nil }
   }
 }
 
