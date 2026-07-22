@@ -53,6 +53,13 @@ public actor LogFileWriter {
     self.directory = directory
     self.maxBytes = max(1, maxBytes)
     self.maxFiles = max(1, maxFiles)
+    // Restore the rotation cursor a previous process left on disk (Phase 20.4). Without this, a
+    // relaunched writer would restart at `coach-0.log` with a zero size counter — appending new
+    // lines *before* the older rotated files (breaking `recentLines` chronology) and never counting
+    // the stale on-disk bytes against `maxBytes` (files could grow past the cap on every relaunch).
+    let restored = Self.restoredRotationState(directory: directory, maxBytes: max(1, maxBytes))
+    self.fileIndex = restored.fileIndex
+    self.currentSize = restored.currentSize
     let (stream, continuation) = AsyncStream<Command>.makeStream()
     self.continuation = continuation
     Task { [weak self] in
@@ -89,6 +96,24 @@ public actor LogFileWriter {
   /// Unparseable names sort first.
   private static func rotationIndex(_ url: URL) -> Int {
     Int(url.deletingPathExtension().lastPathComponent.dropFirst("coach-".count)) ?? -1
+  }
+
+  /// The rotation state a previous process left in `directory`: the newest `coach-<n>.log` index plus
+  /// that file's on-disk size, so appends resume where the last launch stopped. When the newest file is
+  /// already at/over `maxBytes` it advances to a fresh index instead — the full file must never grow
+  /// further. `(0, 0)` for a missing/empty directory (first launch). Best-effort like the rest of the
+  /// writer: an unreadable size counts as 0.
+  private static func restoredRotationState(
+    directory: URL,
+    maxBytes: Int
+  ) -> (fileIndex: Int, currentSize: Int) {
+    let urls = ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [])
+      .filter { $0.pathExtension == "log" && $0.lastPathComponent.hasPrefix("coach-") }
+    guard let newestIndex = urls.map(rotationIndex).filter({ $0 >= 0 }).max() else { return (0, 0) }
+    let newestURL = directory.appendingPathComponent("coach-\(newestIndex).log")
+    let size = ((try? newestURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize) ?? 0
+    guard size < maxBytes else { return (newestIndex + 1, 0) }
+    return (newestIndex, size)
   }
 
   /// Enqueue a line for appending — synchronous and non-blocking (off the caller's thread).
