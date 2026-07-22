@@ -53,8 +53,30 @@ public struct WeeklyView: View {
       .padding(.vertical, CoachSpacing.spaceMd)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .refreshableIf(pullToRefresh)
     .background(.coachBackground)
     .navigationTitle("This Week")
+  }
+
+  /// Pull-to-refresh — the manual escape hatch for a stale/bad plan the per-ISO-week cache would
+  /// otherwise pin for the whole week. Attached only over a `.ready` plan (the loading/terminal states
+  /// carry explicit Retry instead); `nil` ⇒ no `.refreshable`.
+  ///
+  /// We deliberately avoid `store.send(.refreshTapped).finish()`: `StoreTask.finish()` awaits
+  /// `cancellableValue`, so SwiftUI cancelling the refresh task would propagate into the debounced
+  /// fetch effect and kill it mid-flight (the TodayView pull-to-refresh gotcha). Instead we fire the
+  /// action so the effect runs in the store independently of this task, then hold the system spinner by
+  /// polling until the debounced `refreshRequested` flips the screen to `.loading` (≤ the 300 ms
+  /// debounce window) — a cancelled gesture just drops the spinner; the refresh still runs.
+  private var pullToRefresh: (@Sendable () async -> Void)? {
+    guard case .ready = store.weeklyState else { return nil }
+    return { [store] in
+      await store.send(.refreshTapped)
+      while await MainActor.run(body: { store.weeklyState.isReady }) {
+        if Task.isCancelled { break }
+        try? await Task.sleep(for: .milliseconds(50))
+      }
+    }
   }
 
   /// "Jun 1 – 7 · a menu, not a schedule" (deload → "… · easy on purpose"). The week range is the plan's
@@ -97,6 +119,20 @@ public struct WeeklyView: View {
     case .validation: .validationError
     case .serverError: .internalError
     case .unauthorized: .unauthorized
+    }
+  }
+}
+
+private extension View {
+  /// Attaches `.refreshable` only when a refresh closure is supplied (the `.ready` scroll), so the
+  /// loading/terminal scrolls — which use explicit Retry — don't gain a pull gesture. Mirrors
+  /// `TodayView.refreshableIf`.
+  @ViewBuilder
+  func refreshableIf(_ action: (@Sendable () async -> Void)?) -> some View {
+    if let action {
+      refreshable { await action() }
+    } else {
+      self
     }
   }
 }

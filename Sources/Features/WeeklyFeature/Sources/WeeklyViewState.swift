@@ -20,6 +20,13 @@ public enum WeeklyViewState: Equatable, Sendable {
   case ready(DomainModels.WeeklyPlan, Freshness)
   /// A generation / transport / sync-required failure.
   case error(BriefError)
+
+  /// Whether a resolved plan is on screen — the pull-to-refresh gate (`WeeklyView` attaches the gesture
+  /// only over `.ready`, and its spinner-hold poll exits the moment the state leaves `.ready`).
+  public var isReady: Bool {
+    if case .ready = self { return true }
+    return false
+  }
 }
 
 /// Whether a `ready` plan was served fresh (this request generated it) or from the per-ISO-week cache
