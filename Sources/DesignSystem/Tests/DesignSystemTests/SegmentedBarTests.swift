@@ -7,6 +7,10 @@ import Testing
 /// domain `ReadinessBand` (Phase 20.1, DECISIONS D3): the marker sits in the passed band's segment,
 /// and its in-segment fraction is clamped to 0…1 so an inconsistent (score, band) payload pins the
 /// marker at the band edge instead of escaping the segment.
+///
+/// `@MainActor`: `SegmentedBar` conforms to `View`, which the current SDK isolates to the main
+/// actor — calling `.readiness` from a nonisolated test context traps the isolation precondition.
+@MainActor
 struct SegmentedBarTests {
   /// Meter order is red → amber → green (left to right).
   private let amberIndex = 1
