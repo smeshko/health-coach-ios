@@ -178,5 +178,18 @@
 
       #expect(cleared.value, "resetTokenTapped must clear the stored bearer token")
     }
+
+    /// The menu itself stays repository-free (D25 app-spine carve-out): the tap only bubbles the
+    /// delegate — the anchor clear runs in the parent.
+    @Test func test_forceFullResyncTapped_emitsDelegateOnly() async {
+      let store = TestStore(initialState: DevMenuFeature.State()) {
+        DevMenuFeature()
+      } withDependencies: {
+        $0.devSettings = .testValue
+      }
+
+      await store.send(.forceFullResyncTapped)
+      await store.receive(\.delegate, .fullResyncRequested)
+    }
   }
 #endif

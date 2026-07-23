@@ -24,6 +24,10 @@
     public enum Delegate: Equatable {
       /// The bearer token was cleared — the parent routes the app back to onboarding (the connect flow).
       case tokenReset
+      /// "Force full re-sync" was tapped — the parent clears the sync watermark anchor via
+      /// `SyncRepository.resetWatermark` (the menu itself stays repository-free, D25's app-spine
+      /// carve-out), so the next sync re-exports the whole history from the backfill floor.
+      case fullResyncRequested
     }
 
     @ObservableState
@@ -48,6 +52,7 @@
       case viewLogsTapped
       case logViewer(PresentationAction<LogViewerFeature.Action>)
       case resetTokenTapped
+      case forceFullResyncTapped
       case delegate(Delegate)
     }
 
@@ -101,6 +106,10 @@
             try? await tokenClient.clear()
             await send(.delegate(.tokenReset))
           }
+        case .forceFullResyncTapped:
+          // Bubble only — the anchor clear runs in the parent (`SettingsFeature` owns the
+          // `SyncRepository` dependency; this menu touches only the app-spine interfaces).
+          return .send(.delegate(.fullResyncRequested))
         case .delegate:
           return .none
         }

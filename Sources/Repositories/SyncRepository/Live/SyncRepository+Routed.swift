@@ -25,7 +25,10 @@ public extension SyncRepository {
             live: { try await live.lastSync() },
             mock: { _ in try await mock.lastSync() }
           )
-        }
+        },
+        // Deliberately NOT routed: the dev-menu anchor reset targets the real watermark row
+        // regardless of the mock toggle — resetting a mock would be a no-op surprise.
+        resetWatermark: { try await live.resetWatermark() }
       )
     #else
       return .live

@@ -11,13 +11,20 @@ public struct SyncRepository: Sendable {
   /// cache read (`Database.read`) with **no** network round-trip, so a passive surface like Settings
   /// can show "last sync" without triggering a sync (Phase 10.2 DECISIONS #1).
   public var lastSync: @Sendable () async throws -> Date?
+  /// DEBUG affordance (dev menu → Settings): clear the watermark **anchor only** (serverTime and
+  /// the strength-test week marker stay), so the next `sync()` re-reads from the backfill floor
+  /// (2026-05-23) and — via the chunked windows — re-exports the full history. Safe to repeat: the
+  /// backend upserts by uuid, so re-sent samples dedup.
+  public var resetWatermark: @Sendable () async throws -> Void
 
   public init(
     sync: @escaping @Sendable () async throws -> SyncResult,
-    lastSync: @escaping @Sendable () async throws -> Date? = { nil }
+    lastSync: @escaping @Sendable () async throws -> Date? = { nil },
+    resetWatermark: @escaping @Sendable () async throws -> Void = {}
   ) {
     self.sync = sync
     self.lastSync = lastSync
+    self.resetWatermark = resetWatermark
   }
 }
 

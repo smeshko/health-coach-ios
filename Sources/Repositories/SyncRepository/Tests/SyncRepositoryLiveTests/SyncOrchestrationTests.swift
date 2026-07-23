@@ -127,6 +127,13 @@ struct SyncOrchestrationTests {
 
   @Test func test_sync_success_buildsPayload_advancesWatermark_storesServerTime() async throws {
     let db = try DatabaseClient.makeInMemory()
+    // A recent anchor keeps this a single-window delta (the everyday path this test characterizes);
+    // the multi-window backfill is covered by SyncChunkingTests.
+    let recent = SyncWatermarkRecord(
+      anchor: anchorString(Self.now.addingTimeInterval(-3600)),
+      serverTime: Date(timeIntervalSince1970: 1)
+    )
+    try await db.write { dbx in try recent.save(dbx) }
     let checkin = DomainModels.CheckIn(date: Self.now, giSymptoms: false, kneePain: 1, illness: false)
     let strength = DomainModels.StrengthTest(date: Self.now, maxPushups: 30, maxPullups: 8)
     let stubs = SyncStubs(
@@ -305,7 +312,11 @@ struct SyncOrchestrationTests {
     let db = try DatabaseClient.makeInMemory() // no watermark
     let stubs = SyncStubs(apiResult: .success(syncResponse()))
 
-    _ = try await run(stubs: stubs, database: db) { try await SyncRepository.live.sync() }
+    // `now` within one chunk of the floor keeps the backfill a single window, so the (last-argument)
+    // recorder sees the floor read itself; multi-window starts are covered by SyncChunkingTests.
+    _ = try await run(stubs: stubs, database: db, now: backfillFloor.addingTimeInterval(3 * 24 * 60 * 60)) {
+      try await SyncRepository.live.sync()
+    }
 
     #expect(stubs.capturedSince == backfillFloor, "first-ever sync reads from the bounded backfill floor")
     let mark = try await watermark(db)

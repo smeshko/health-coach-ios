@@ -80,6 +80,20 @@
           }
         }
         .listRowBackground(Color.coachSurface)
+
+        Section {
+          Button("Force full re-sync (clear sync anchor)") {
+            store.send(.forceFullResyncTapped)
+          }
+        } header: {
+          Text("Sync")
+        } footer: {
+          Text(
+            "Deletes the sync watermark anchor. The next sync re-exports all HealthKit history "
+              + "since the backfill floor (2026-05-23) in weekly chunks; the server dedups by uuid."
+          )
+        }
+        .listRowBackground(Color.coachSurface)
       }
       .scrollContentBackground(.hidden)
       .background(Color.coachBackground)

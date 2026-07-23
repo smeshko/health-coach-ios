@@ -20,7 +20,11 @@ extension SyncRepository: DependencyKey {
   /// success only** advances the watermark + stores `serverTime` in one `Database.write`. On failure
   /// the watermark is untouched (idempotent, freely retryable; zero-upsert = success).
   public static var live: SyncRepository {
-    SyncRepository(sync: { try await runSync() }, lastSync: { try await runLastSync() })
+    SyncRepository(
+      sync: { try await runSync() },
+      lastSync: { try await runLastSync() },
+      resetWatermark: { try await runResetWatermark() }
+    )
   }
 }
 
@@ -34,6 +38,25 @@ private func runLastSync() async throws -> Date? {
   }
 }
 
+/// Clear the watermark **anchor only** (dev-menu "force full re-sync"). `serverTime` and the
+/// strength-test week marker are kept — the next `sync()` resolves its read floor to
+/// `backfillFloor` (nil anchor) and the chunked windows re-export the full history; the backend
+/// dedups by uuid, and keeping the strength marker avoids re-attaching an already-synced test.
+private func runResetWatermark() async throws {
+  @Dependency(\.database) var database
+  @Dependency(\.log) var log
+  try await database.write { db in
+    guard let existing = try SyncWatermarkRecord.fetchOne(db, key: 1) else { return }
+    let cleared = SyncWatermarkRecord(
+      anchor: nil,
+      serverTime: existing.serverTime,
+      lastStrengthTestSyncedWeek: existing.lastStrengthTestSyncedWeek
+    )
+    try cleared.save(db)
+  }
+  log.notice("sync anchor cleared — next sync backfills from the floor", category: .http)
+}
+
 // No in-flight guard: `runSync()` is a stateless free function (read watermark → POST → write
 // watermark), so two concurrent calls both read the same anchor and the last writer wins — but the
 // only caller, `TodayFeature`'s orchestration, runs sync under `.cancellable(cancelInFlight: true)`,
@@ -41,8 +64,6 @@ private func runLastSync() async throws -> Date? {
 // The behavior is characterized — not serialized — by `test_concurrentSync_lastWriterWins_noGuard`
 // (SyncOrchestrationTests); see DECISIONS.md D2. A second caller would be the cue to revisit a guard.
 private func runSync() async throws -> SyncResult {
-  @Dependency(\.healthKitClient) var healthKit
-  @Dependency(\.apiClient) var apiClient
   @Dependency(\.database) var database
   @Dependency(\.checkInRepository) var checkInRepository
   @Dependency(\.strengthTestRepository) var strengthTestRepository
@@ -58,32 +79,16 @@ private func runSync() async throws -> SyncResult {
   //    land during the in-flight POST (DECISIONS #1; at worst re-sent — sync is idempotent).
   let readInstant = date.now
 
-  // 3. HK deltas since the anchor, BOUNDED (Phase 18.2): since = the anchor floor plus the `.since(_:)`
-  //    defaults (per-type row limit, 15s in-client timeout). HK-unavailable/partial degrades to an empty
-  //    set inside the client. Caller cancellation (Today's Cancel) forwards through `withSyncTimeout`
-  //    as structured cancellation into `deltaSamples`, where the live client STOPS its queries; the
-  //    in-client 15s timeout also stops them and throws `.timedOut` → mapped to `SyncError.transient`
-  //    here (one retryable-failure vocabulary). The 20s `healthReadTimeout` backstop remains ONLY for a
-  //    `stop()` that itself wedges — it abandons the read. Every failure throws BEFORE the watermark
-  //    write below, so the unread window is simply re-read on the next sync — no data loss.
-  let bounds = HealthReadBounds.since(deltaReadSince(existing.anchor))
-  let samples: HealthSampleSet
-  do {
-    samples = try await withSyncTimeout(healthReadTimeout, clock: clock) {
-      try await healthKit.deltaSamples(bounds)
-    }
-  } catch HealthKitReadError.timedOut {
-    throw SyncError.transient
-  }
-  // Review #1.1: cancellation can land in the same instant the read resumes success (the operation
-  // task claims `SyncTimeoutState`'s once-guard first) — never carry a cancelled sync into side
-  // effects. Re-checked before each irreversible boundary below.
-  try Task.checkCancellation()
-
-  logDeltaTruncation(samples, bounds: bounds)
+  // 3. Split the read window into bounded chunks. The daily delta ([anchor − 48h, now)) is always a
+  //    single open-topped window — byte-identical to the pre-chunking read. A long window (first-ever
+  //    sync, or a dev-menu anchor reset) becomes several `[start, until)` windows of at most
+  //    `syncChunkLength`, each read AND POSTed separately, so the Phase 18.2 per-type row cap can no
+  //    longer silently truncate a backfill to its newest ~10k samples per type, and no single POST
+  //    carries the whole history.
+  let windows = syncWindows(from: deltaReadSince(existing.anchor), to: readInstant)
 
   // 4. Today's check-in (a read failure degrades to nil — the check-in is optional) + the strength
-  //    test only when due.
+  //    test only when due. Attached to the FINAL chunk only — they are today's data.
   let today = readInstant
   let checkin = try? await checkInRepository.current(today)
   let currentWeek = ISOWeek.current
@@ -97,35 +102,27 @@ private func runSync() async throws -> SyncResult {
     lastSyncedWeek: existing.lastStrengthTestSyncedWeek
   ).map { DomainModels.StrengthTest(date: today, maxPushups: $0.maxPushups, maxPullups: $0.maxPullups) }
 
-  // 5. Build the request.
-  let request = buildSyncRequest(samples: samples, checkin: checkin, strengthTest: strengthTest)
+  // 5. Per chunk: bounded HK read → POST (see `uploadChunks` — same read contract as before, per
+  //    chunk). Any failure throws BEFORE the watermark write, so a partially-POSTed backfill is
+  //    simply re-run — the backend upserts by uuid, so re-sent chunks dedup (idempotent).
+  let result = try await uploadChunks(
+    windows, checkin: checkin, strengthTest: strengthTest, clock: clock
+  )
 
-  // 6. POST. Cancellation during the optional local reads above is swallowed by the check-in's
-  //    `try?` — re-check before the irreversible POST (review #1.1). A 401 propagates as the raw
-  //    `APIError` (session-stream-handled); other errors → SyncError.
-  try Task.checkCancellation()
-  let response: SyncResponse
-  do {
-    response = try await apiClient.sync(request)
-  } catch let apiError as APIError {
-    if isUnauthorized(apiError) { throw apiError }
-    throw syncError(apiError)
-  }
-
-  // 7. Success only: advance the watermark + store serverTime + (if a strength test was attached) the
-  //    year-qualified ISO-week marker — in one write. If cancellation landed during the POST, skip
+  // 6. Success only: advance the watermark + store serverTime + (if a strength test was attached) the
+  //    year-qualified ISO-week marker — in one write. If cancellation landed during a POST, skip
   //    the advance (review #1.1) — sync is idempotent, so the same window is simply re-sent next time.
   try Task.checkCancellation()
   try await database.write { db in
     let updated = SyncWatermarkRecord(
       anchor: anchorString(readInstant),
-      serverTime: response.serverTime,
+      serverTime: result.serverTime,
       lastStrengthTestSyncedWeek: strengthTest != nil ? currentWeek : existing.lastStrengthTestSyncedWeek
     )
     try updated.save(db)
   }
 
-  return syncResult(response)
+  return result
 }
 
 /// The strength test to attach, or `nil` when not due. Due = not already synced this ISO week **and**
@@ -183,7 +180,7 @@ func anchorString(_ date: Date) -> String {
 /// old-startDate sample sorts — so the lookback cannot recover them. Log on the always-on `.http`
 /// category (the Epic-18 convention for audit-critical records; `.app` is toggle-gated) so the
 /// condition is diagnosable on device.
-private func logDeltaTruncation(_ samples: HealthSampleSet, bounds: HealthReadBounds) {
+func logDeltaTruncation(_ samples: HealthSampleSet, bounds: HealthReadBounds) {
   @Dependency(\.log) var log
   let truncated = truncatedTypes(in: samples, limitPerType: bounds.limitPerType)
   guard !truncated.isEmpty else { return }

@@ -36,5 +36,23 @@
       }
       await store.receive(\.delegate, .tokenReset)
     }
+
+    /// The dev menu's full-re-sync delegate clears the watermark anchor via the repository seam the
+    /// parent owns; the sheet stays presented (nothing to navigate).
+    @Test func test_devMenuFullResync_clearsWatermarkAnchor() async {
+      let reset = LockIsolated(false)
+      var initial = SettingsFeature.State()
+      initial.devMenu = DevMenuFeature.State()
+      let store = TestStore(initialState: initial) {
+        SettingsFeature()
+      } withDependencies: {
+        $0.syncRepository.resetWatermark = { reset.setValue(true) }
+      }
+
+      await store.send(.devMenu(.presented(.delegate(.fullResyncRequested))))
+      await store.finish()
+
+      #expect(reset.value, "the delegate must clear the sync watermark anchor")
+    }
   }
 #endif
