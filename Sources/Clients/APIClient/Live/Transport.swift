@@ -12,14 +12,18 @@ import WireModels
 struct Transport: Sendable {
   let baseURL: URL
   let session: URLSession
+  /// Extra headers attached to every request (Cloudflare Access service token); empty when the
+  /// edge gate is unconfigured.
+  let extraHeaders: [String: String]
   /// Explicit override for tests; when `nil`, `send` resolves `@Dependency(\.tokenClient)`.
   let tokenClientOverride: TokenClient?
   let sessionEvents: AsyncStream<SessionEvent>
   private let continuation: AsyncStream<SessionEvent>.Continuation
 
-  init(baseURL: URL, session: URLSession, tokenClient: TokenClient?) {
+  init(baseURL: URL, session: URLSession, tokenClient: TokenClient?, extraHeaders: [String: String] = [:]) {
     self.baseURL = baseURL
     self.session = session
+    self.extraHeaders = extraHeaders
     tokenClientOverride = tokenClient
     // Default `.unbounded` buffering retains a 401 yielded before the consumer iterates (Decision 3).
     let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
@@ -42,7 +46,7 @@ struct Transport: Sendable {
     var retryCount = 0
     while true {
       let bearer = try await tokenClient.read()
-      let request = try urlRequest(for: endpoint, baseURL: baseURL, bearer: bearer)
+      let request = try urlRequest(for: endpoint, baseURL: baseURL, bearer: bearer, extraHeaders: extraHeaders)
       logRequest(request, endpoint: endpoint, log)
 
       let data: Data
@@ -109,14 +113,19 @@ struct Transport: Sendable {
     return apiError
   }
 
-  /// Render the request headers for logging with the `Authorization` bearer masked — the credential
-  /// is materialised only here, so this is the exact, single redaction site (DECISIONS 4). Bodies are
-  /// logged in full; only the bearer is sensitive.
+  /// Render the request headers for logging with the credentials masked — they are materialised
+  /// only here, so this is the exact, single redaction site (DECISIONS 4): the `Authorization`
+  /// bearer and the Cloudflare Access client secret (the client id is not sensitive — it appears
+  /// in Cloudflare's own logs). Bodies are logged in full.
   private static func redactedHeaders(_ request: URLRequest) -> String {
     let headers = request.allHTTPHeaderFields ?? [:]
     return headers
       .map { key, value in
-        let shown = key.lowercased() == "authorization" ? "Bearer <redacted>" : value
+        let shown = switch key.lowercased() {
+        case "authorization": "Bearer <redacted>"
+        case CFAccessCredentials.clientSecretHeader.lowercased(): "<redacted>"
+        default: value
+        }
         return "\(key)=\(shown)"
       }
       .sorted()

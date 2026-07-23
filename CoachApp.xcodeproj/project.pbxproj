@@ -29,6 +29,7 @@
 /* Begin PBXFileReference section */
 		CA0000000000000000000006 /* CoachApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoachApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA0000000000000000000007 /* CoachApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachApp.swift; sourceTree = "<group>"; };
+		CA00000000000000000000A1 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Base.xcconfig; path = Config/Base.xcconfig; sourceTree = "<group>"; };
 		CA00000000000000000000F1 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		CA00000000000000000000F3 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		CA0000000000000000000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -62,6 +63,7 @@
 			isa = PBXGroup;
 			children = (
 				CA0000000000000000000003 /* App */,
+				CA00000000000000000000A1 /* Base.xcconfig */,
 				CA0000000000000000000004 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -301,6 +303,7 @@
 		};
 		CA0000000000000000000013 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CA00000000000000000000A1 /* Base.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -308,7 +311,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
-				API_BASE_URL = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health & Coach reads your Apple Health data (heart rate, HRV, sleep, workouts, nutrition, and activity) to generate your daily and weekly training briefs.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -332,6 +334,7 @@
 		};
 		CA0000000000000000000014 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CA00000000000000000000A1 /* Base.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -339,7 +342,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
-				API_BASE_URL = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Health & Coach reads your Apple Health data (heart rate, HRV, sleep, workouts, nutrition, and activity) to generate your daily and weekly training briefs.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

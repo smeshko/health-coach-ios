@@ -21,5 +21,15 @@
 	-->
 	<key>APIBaseURL</key>
 	<string>$(API_BASE_URL)</string>
+	<!--
+	  Cloudflare Access service-token seam, same shape as APIBaseURL: the build settings come from
+	  Config/Base.xcconfig (empty in the repo) overridden by the git-ignored Config/Secrets.xcconfig.
+	  `CFAccessCredentials.resolve(bundle:)` reads both keys; either one empty/unsubstituted disables
+	  the headers entirely (a partial pair is treated as unconfigured, never sent half-filled).
+	-->
+	<key>CFAccessClientId</key>
+	<string>$(CF_ACCESS_CLIENT_ID)</string>
+	<key>CFAccessClientSecret</key>
+	<string>$(CF_ACCESS_CLIENT_SECRET)</string>
 </dict>
 </plist>

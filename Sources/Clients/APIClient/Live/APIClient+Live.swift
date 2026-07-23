@@ -11,9 +11,12 @@ public extension APIClient {
   static func live(
     baseURL: URL,
     session: URLSession = .shared,
-    tokenClient: TokenClient? = nil
+    tokenClient: TokenClient? = nil,
+    extraHeaders: [String: String] = [:]
   ) -> APIClient {
-    let transport = Transport(baseURL: baseURL, session: session, tokenClient: tokenClient)
+    let transport = Transport(
+      baseURL: baseURL, session: session, tokenClient: tokenClient, extraHeaders: extraHeaders
+    )
     return APIClient(
       // /probe returns a bare `[String: Bool]`; Connect only needs reachable+authed → 200 ⇒ true
       // (a 401 throws `.unauthorized` from `send` and emits on the stream).
@@ -54,6 +57,8 @@ extension APIClient: DependencyKey {
   /// `APIBaseURL.resolve(bundle:)` (localhost fallback only on DEBUG + simulator); an
   /// unresolvable configuration yields the throwing `.unconfigured` client — never a trap.
   public static var liveValue: APIClient {
-    APIBaseURL.resolve(bundle: .main).map { live(baseURL: $0) } ?? .unconfigured
+    APIBaseURL.resolve(bundle: .main)
+      .map { live(baseURL: $0, extraHeaders: CFAccessCredentials.resolve(bundle: .main) ?? [:]) }
+      ?? .unconfigured
   }
 }

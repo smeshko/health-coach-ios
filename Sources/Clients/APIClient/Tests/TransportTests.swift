@@ -239,6 +239,26 @@ extension URLProtocolStubSerialized {
       )
     }
 
+    /// Cloudflare Access seam end-to-end through the live client: the service-token headers set
+    /// at construction reach the wire on every request, alongside the bearer.
+    @Test func test_extraHeaders_reachTheWire() async throws {
+      let tokenClient = TokenClient(read: { "tok-123" }, write: { _ in }, clear: {})
+      let client = APIClient.live(
+        baseURL: baseURL, session: URLProtocolStub.makeSession(), tokenClient: tokenClient,
+        extraHeaders: [
+          "CF-Access-Client-Id": "coach-ios.access",
+          "CF-Access-Client-Secret": "s3cret",
+        ]
+      )
+
+      URLProtocolStub.box.setResponses([.init(status: 200, data: profileJSON)])
+      _ = try await client.profile()
+      let request = URLProtocolStub.box.recordedRequests.last
+      #expect(request?.value(forHTTPHeaderField: "CF-Access-Client-Id") == "coach-ios.access")
+      #expect(request?.value(forHTTPHeaderField: "CF-Access-Client-Secret") == "s3cret")
+      #expect(request?.value(forHTTPHeaderField: "Authorization") == "Bearer tok-123")
+    }
+
     // MARK: - Helper
 
     /// Run a throwing call under an `ImmediateClock` (so backoff sleeps return instantly) and return

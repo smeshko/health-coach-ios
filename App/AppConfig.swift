@@ -10,4 +10,10 @@ enum AppConfig {
   /// setting, shipped empty in the repo). `nil` ⇒ unconfigured: `CoachApp` installs the throwing
   /// `.unconfigured` client and seeds mock on a DEBUG first launch.
   static let apiBaseURL: URL? = APIBaseURL.resolve(bundle: .main)
+
+  /// Cloudflare Access service-token headers from the `CFAccessClientId`/`CFAccessClientSecret`
+  /// Info.plist keys (backed by `CF_ACCESS_*` build settings in the git-ignored
+  /// `Config/Secrets.xcconfig`). Empty when unconfigured — the app then talks to origins with no
+  /// edge gate (localhost dev) exactly as before.
+  static let cfAccessHeaders: [String: String] = CFAccessCredentials.resolve(bundle: .main) ?? [:]
 }
