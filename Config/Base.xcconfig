@@ -1,0 +1,11 @@
+// Committed base configuration for the CoachApp target. Ships empty values so a fresh clone
+// builds unchanged (DEBUG+simulator falls back to localhost, everything else resolves to the
+// throwing `.unconfigured` client). Real values live in the OPTIONAL, git-ignored
+// `Config/Secrets.xcconfig` (see Secrets.example.xcconfig) — the `#include?` makes its absence
+// a non-event, never a build error.
+
+API_BASE_URL =
+CF_ACCESS_CLIENT_ID =
+CF_ACCESS_CLIENT_SECRET =
+
+#include? "Secrets.xcconfig"

@@ -97,4 +97,31 @@ struct RequestBuildingTests {
     #expect(nilWeek.httpBody != nil)
     #expect(try decodeBody(WeeklyBriefRequest.self, nilWeek) == WeeklyBriefRequest(isoWeek: nil))
   }
+
+  /// Cloudflare Access seam: extra headers ride every request alongside — never instead of —
+  /// the bearer, and omitting them changes nothing (the default is empty).
+  @Test func test_extraHeaders_attachedAlongsideAuth() throws {
+    let extra = [
+      "CF-Access-Client-Id": "coach-ios.access",
+      "CF-Access-Client-Secret": "s3cret",
+    ]
+    let request = try urlRequest(for: Routes.probe, baseURL: baseURL, bearer: bearer, extraHeaders: extra)
+    #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Id") == "coach-ios.access")
+    #expect(request.value(forHTTPHeaderField: "CF-Access-Client-Secret") == "s3cret")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+
+    let without = try urlRequest(for: Routes.probe, baseURL: baseURL, bearer: bearer)
+    #expect(without.value(forHTTPHeaderField: "CF-Access-Client-Id") == nil)
+    #expect(without.value(forHTTPHeaderField: "CF-Access-Client-Secret") == nil)
+  }
+
+  /// An extra header colliding with a builder-owned header loses — `Authorization` stays the
+  /// bearer's even if a misconfigured extra-header dict tries to claim it.
+  @Test func test_extraHeaders_neverOverrideBuilderHeaders() throws {
+    let request = try urlRequest(
+      for: Routes.probe, baseURL: baseURL, bearer: bearer,
+      extraHeaders: ["Authorization": "stolen"]
+    )
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token")
+  }
 }

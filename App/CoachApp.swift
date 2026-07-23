@@ -51,7 +51,7 @@ struct CoachApp: App {
       // (API_BASE_URL build setting → Info.plist → AppConfig → here). Unconfigured installs get the
       // throwing `.unconfigured` client — loud at first use, never a silent localhost target.
       if let baseURL = AppConfig.apiBaseURL {
-        $0.apiClient = .live(baseURL: baseURL)
+        $0.apiClient = .live(baseURL: baseURL, extraHeaders: AppConfig.cfAccessHeaders)
       } else {
         $0.apiClient = .unconfigured
         // `.http`, not `.app`: the misconfiguration diagnostic must ride the ALWAYS-ON network

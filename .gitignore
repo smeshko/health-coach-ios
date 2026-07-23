@@ -39,3 +39,6 @@ build/
 
 # Note: Package.resolved (root + xcodeproj) is intentionally NOT ignored so
 # dependency versions are reproducible from a clean clone.
+
+# Local build secrets (Cloudflare Access service token, prod base URL)
+Config/Secrets.xcconfig
