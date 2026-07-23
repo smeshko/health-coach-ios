@@ -102,7 +102,9 @@ struct SyncBoundedReadTests {
       $0.date = .constant(Self.now)
       $0.continuousClock = TestClock()
       $0.healthKitClient = healthKit { bounds in
-        captured.setValue(bounds)
+        // FIRST window only — a near-floor anchor makes this a chunked backfill, and the clamp
+        // under test applies to where the whole read STARTS.
+        if captured.value == nil { captured.setValue(bounds) }
         return HealthSampleSet()
       }
       $0.apiClient = .failing(sync: { _ in syncResponse() })

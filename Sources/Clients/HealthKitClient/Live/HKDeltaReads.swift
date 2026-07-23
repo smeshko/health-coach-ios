@@ -106,8 +106,11 @@
     return reads
   }
 
-  private func samplePredicate(since: Date) -> NSPredicate {
-    HKQuery.predicateForSamples(withStart: since, end: nil, options: .strictStartDate)
+  /// `[since, until)` — `strictStartDate` keeps the lower bound exact; a `nil` `until` reads
+  /// open-topped (the delta default). Chunk boundaries are half-open, so adjacent backfill windows
+  /// never double-read a sample.
+  private func samplePredicate(bounds: HealthReadBounds) -> NSPredicate {
+    HKQuery.predicateForSamples(withStart: bounds.since, end: bounds.until, options: .strictStartDate)
   }
 
   /// Newest first, so a `limitPerType`-truncated read drops the OLDEST samples (PLAN.md Decision —
@@ -126,7 +129,7 @@
       makeHandle: {
         let query = HKSampleQuery(
           sampleType: spec.sampleType,
-          predicate: samplePredicate(since: bounds.since),
+          predicate: samplePredicate(bounds: bounds),
           limit: bounds.limitPerType,
           sortDescriptors: [newestFirst()]
         ) { _, samples, _ in
@@ -151,7 +154,7 @@
       makeHandle: {
         let query = HKSampleQuery(
           sampleType: HKObjectType.workoutType(),
-          predicate: samplePredicate(since: bounds.since),
+          predicate: samplePredicate(bounds: bounds),
           limit: bounds.limitPerType,
           sortDescriptors: [newestFirst()]
         ) { _, samples, _ in
@@ -254,6 +257,11 @@
     // same per-type row cardinality as the sample queries; the `.distantPast` probe no longer
     // requests an unbounded range).
     let since = bounds.activitySince(now: now, calendar: calendar)
+    // A chunked window caps the summary range too — otherwise every backfill chunk would re-read
+    // (and re-send) the full activity history up to now. Summaries are one-per-day and the
+    // activity predicate is inclusive at both endpoints, so the half-open sample-window contract
+    // is approximated by capping at `until`; the boundary day dedups server-side by date.
+    let activityEnd = min(bounds.until ?? now, now)
 
     // Activity-summary predicates require each `DateComponents` to carry its own calendar — the
     // components returned by `dateComponents(_:from:)` do **not** (HealthKit raises
@@ -262,7 +270,7 @@
     let units: Set<Calendar.Component> = [.era, .year, .month, .day]
     var startComponents = calendar.dateComponents(units, from: since)
     startComponents.calendar = calendar
-    var endComponents = calendar.dateComponents(units, from: now)
+    var endComponents = calendar.dateComponents(units, from: activityEnd)
     endComponents.calendar = calendar
     // Immutable snapshots: `@Sendable` closures may not capture mutated `var`s.
     let start = startComponents

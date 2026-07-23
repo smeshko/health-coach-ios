@@ -14,6 +14,11 @@ public struct HealthReadBounds: Sendable, Equatable {
   public static let defaultTimeout: Duration = .seconds(15)
 
   public let since: Date
+  /// Exclusive upper bound for the window — `nil` reads open-topped to "now" (the delta default,
+  /// byte-identical to the pre-chunking behavior). Chunked backfill (SyncRepository) sets it so a
+  /// long window becomes several bounded `[since, until)` reads instead of one truncated read —
+  /// the per-type row cap stays, the interface still cannot express an unbounded read.
+  public let until: Date?
   /// Always `>= 1` — the init clamps, so HealthKit's no-limit sentinel (`HKObjectQueryNoLimit`
   /// == 0) and negative values are unrepresentable and can never reach an `HKSampleQuery.limit`
   /// (review #2.3: the "cannot express an unbounded read" claim must hold for every input, not
@@ -21,8 +26,9 @@ public struct HealthReadBounds: Sendable, Equatable {
   public let limitPerType: Int
   public let timeout: Duration
 
-  public init(since: Date, limitPerType: Int, timeout: Duration) {
+  public init(since: Date, until: Date? = nil, limitPerType: Int, timeout: Duration) {
     self.since = since
+    self.until = until
     self.limitPerType = max(1, limitPerType)
     self.timeout = timeout
   }
@@ -30,6 +36,12 @@ public struct HealthReadBounds: Sendable, Equatable {
   /// The standard bounds: everything after `date`, capped by the documented defaults.
   public static func since(_ date: Date) -> HealthReadBounds {
     HealthReadBounds(since: date, limitPerType: defaultLimitPerType, timeout: defaultTimeout)
+  }
+
+  /// One backfill chunk: `[start, until)` with the documented defaults. `until == nil` is the
+  /// final (open-topped) chunk.
+  public static func window(_ start: Date, until: Date?) -> HealthReadBounds {
+    HealthReadBounds(since: start, until: until, limitPerType: defaultLimitPerType, timeout: defaultTimeout)
   }
 
   /// The onboarding **presence-probe** bounds: "is anything there at all", not a delta read. Sized

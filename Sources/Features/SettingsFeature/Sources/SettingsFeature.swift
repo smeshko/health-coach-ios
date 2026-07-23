@@ -299,6 +299,13 @@ public struct SettingsFeature {
           // up to the shell (navigation lives at the root — D7).
           state.devMenu = nil
           return .send(.delegate(.tokenReset))
+        case .devMenu(.presented(.delegate(.fullResyncRequested))):
+          // Clear the sync watermark anchor (the menu itself is repository-free — D25). The next
+          // sync (app-open / Today refresh) then backfills the full history in chunks. A failure is
+          // swallowed: this is a DEBUG affordance and the reset is freely re-tappable.
+          return .run { [syncRepository] _ in
+            try? await syncRepository.resetWatermark()
+          }
         case .devMenu:
           return .none
       #endif
