@@ -27,6 +27,7 @@ let package = Package(
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
     .library(name: "WidgetSnapshotClient", targets: ["WidgetSnapshotClient"]),
     .library(name: "WidgetSnapshotClientLive", targets: ["WidgetSnapshotClientLive"]),
+    .library(name: "WidgetsUI", targets: ["WidgetsUI"]),
     .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
@@ -648,6 +649,49 @@ let package = Package(
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Repositories/ProfileRepository/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ALL widget implementation (views, providers, `Widget` conformances) — the CoachWidgets
+    // extension target holds ONLY the `@main` bundle listing widgets from here, so 21.2–21.5 ship by
+    // adding Swift files to this module + one line to the bundle (zero Package/Makefile/pbxproj
+    // edits; DECISIONS D4). Providers read via the WidgetSnapshotClient INTERFACE — the extension
+    // process links `*Live`, so the dynamic `liveValue` lookup resolves the real store. DesignSystem
+    // lands now so 21.2's styled widgets need no Package.swift edit; the transitive closure stays
+    // pure value code — no Database/GRDB/APIClient. WidgetKit-touching files are
+    // `#if canImport(WidgetKit)`-guarded for the macOS host.
+    .target(
+      name: "WidgetsUI",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "DesignSystem",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Features/WidgetsUI/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // Widget view snapshots (skeleton populated/stale, light + dark) — iOS 26 simulator only, via
+    // `xcodebuild test` (`make test-snapshots` lists this target). `#if canImport(UIKit)`-guarded so
+    // it compiles to an empty module on the host.
+    .testTarget(
+      name: "WidgetsUISnapshotTests",
+      dependencies: [
+        "WidgetsUI",
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "SampleData",
+        "CoachTestSupport",
+        "DesignSystem",
+        "CoachCore",
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/WidgetsUI/Tests/WidgetsUISnapshotTests",
+      exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]

@@ -120,7 +120,7 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-001: WidgetSnapshotClient interface: full WidgetSnapshot schema + Sofia staleness/timeline helpers
 - [x] TASK-002: WidgetSnapshotClientLive: atomic App-Group JSON store + WidgetCenter reload (depends on TASK-001)
 - [x] TASK-003: URL-scheme deep links: coachapp:// routes into AppFeature (Today / Weekly / check-in)
-- [ ] TASK-004: WidgetsUI module: skeleton widget, snapshot-test target, Makefile registration (depends on TASK-001,TASK-002)
+- [x] TASK-004: WidgetsUI module: skeleton widget, snapshot-test target, Makefile registration (depends on TASK-001,TASK-002)
 - [ ] TASK-005: Snapshot writer hook in BriefRepositoryLive + composition-root install (depends on TASK-001,TASK-002)
 - [ ] TASK-006: CoachWidgets extension target: pbxproj, App Group entitlements, embed (depends on TASK-004,TASK-005)
 - [ ] TASK-007: Final Validation
