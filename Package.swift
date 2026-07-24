@@ -8,10 +8,10 @@ let package = Package(
   // platforms line makes the host build fail to compile (validation round-2 #12, verified). The
   // .macOS line governs only host build/test; the shipped app target stays iOS-only (xcodeproj).
   platforms: [.iOS(.v26), .macOS(.v14)],
-  // Products = EXACTLY the package modules the app target (`App/CoachApp.swift`) imports — one
-  // `.library` per app-imported module, nothing speculative (Phase 11.7 / DECISIONS D3). Same-package
-  // test targets reference targets directly and need no products; anything re-needed later is a one-line
-  // `.library` addition.
+  // Products = EXACTLY the package modules the app + CoachWidgets extension targets link — one
+  // `.library` per xcodeproj-linked module, nothing speculative (Phase 11.7 / DECISIONS D3; Phase 21.1
+  // added the extension as a second product consumer). Same-package test targets reference targets
+  // directly and need no products; anything re-needed later is a one-line `.library` addition.
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
@@ -28,6 +28,7 @@ let package = Package(
     .library(name: "WidgetSnapshotClient", targets: ["WidgetSnapshotClient"]),
     .library(name: "WidgetSnapshotClientLive", targets: ["WidgetSnapshotClientLive"]),
     .library(name: "WidgetsUI", targets: ["WidgetsUI"]),
+    .library(name: "DomainModels", targets: ["DomainModels"]),
     .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
