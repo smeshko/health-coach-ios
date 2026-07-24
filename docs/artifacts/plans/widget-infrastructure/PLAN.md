@@ -76,6 +76,11 @@ writer on the generate path only, D7 hand-authored appex target conventions + Ap
   (RESEARCH.md documents the free id ranges and required settings, incl. `DEVELOPMENT_TEAM`).
 - **WidgetKit availability on the macOS host build** — all WidgetKit-importing files
   `#if canImport(WidgetKit)`-guarded; host `swift build`/`swift test` stay green either way.
+- **Lost update on concurrent read-modify-write of the snapshot file** — the store's read→merge→write is
+  not atomic, and 21.1 freezes the merge design for later phases whose sibling section writers
+  (weekly/selected/check-in) all mutate the same file; two interleaved writes drop a section. Mitigated by
+  serializing the live client's writes through a single actor (TASK-002 Notes / validation round-1 #3) so
+  concurrent `update*` calls cannot lose each other's sections; the pure merge stays a free function.
 - **New `@Dependency` breaks existing BriefRepositoryLiveTests** — `WidgetSnapshotClient` ships a no-op
   `testValue`, so unoverridden tests keep passing; the new behaviour is asserted with an explicit
   recording override.

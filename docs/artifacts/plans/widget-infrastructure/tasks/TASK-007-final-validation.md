@@ -17,6 +17,16 @@ Confirm the plan is fully implemented and production-ready.
 - [ ] Module/import boundaries respected: extension links ONLY WidgetsUI + WidgetSnapshotClientLive +
       DomainModels (pbxproj `packageProductDependencies`); no Database/GRDB/APIClient edge anywhere in
       the new modules; `*Live` imports only at composition roots
+- [ ] Acceptance #5 — `WidgetSnapshot` full-schema encode/decode + section-merge (incl. cross-day
+      `selectedSession` drop) host-unit-tests green (`WidgetSnapshotClientTests` +
+      `WidgetSnapshotClientLiveTests` in the `swift test` output)
+- [ ] Acceptance #6 — staleness/timeline helpers (next Sofia midnight, same-Sofia-day, same-ISO-week)
+      host-unit-tests green
+- [ ] Acceptance #7 — `coachapp://today|weekly|checkin` reducer routing + onboarding-drop + unknown-URL
+      no-op tests green (`AppFeatureTests` deep-link suite), and the `reduceSessionRouting` switch still
+      compiles with the new `.deepLink` case
+- [ ] Acceptance #8 — `grep -c "DEVELOPMENT_TEAM = GR9SJM3FZP" CoachApp.xcodeproj/project.pbxproj` == 4
+      (2× CoachApp + 2× CoachWidgets)
 - [ ] Manual smoke test via `verify-on-sim` (the epic's Validation): app + widget installed on the
       canonical sim, skeleton widget added to the home screen, in-app Today refresh → snapshot log line +
       widget shows the new date + readiness score (screenshot + log excerpt = the epic's evidence)

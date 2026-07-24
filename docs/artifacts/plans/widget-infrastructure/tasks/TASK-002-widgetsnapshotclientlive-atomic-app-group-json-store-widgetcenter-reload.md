@@ -26,9 +26,13 @@ each write, and the `DependencyKey` `liveValue` — all failures logged and swal
   - `func mergeDailyBrief(_ brief: DomainModels.DailyBrief)` (or an equivalent pure
     `static merge(daily:into:)` + a thin instance wrapper — pick whichever keeps the merge pure and
     directly testable): map `DailyBrief` → `WidgetDailySnapshot` (`date`, `readiness`, `safetyGate`,
-    `plannedSession: brief.session`, `selectedSession: existing?.daily?.selectedSession` — DELIBERATELY
-    preserved, 21.2 owns writing it; `macroFocus`, `intakeYesterday`), replace only the `daily` section +
-    root `generatedAt`/`schemaVersion`, preserve `weekly` and `checkIn` verbatim.
+    `plannedSession: brief.session`; `selectedSession` — preserve `existing?.daily?.selectedSession`
+    **only when the existing daily is the SAME Sofia day as `brief.date`** (a same-day refresh keeps the
+    athlete's pick; a new-day brief drops the stale prior-day selection → nil). 21.2 owns *writing*
+    selectedSession, but 21.1 freezes this merge rule, so it must be day-guarded here, not carried
+    unconditionally (validation round-1 #2 — reuse `WidgetDailySnapshot.isCurrent(at:calendar:)` / a
+    Sofia `startOfDay` equality, NOT a raw `Date ==`); `macroFocus`, `intakeYesterday`), replace only the
+    `daily` section + root `generatedAt`/`schemaVersion`, preserve `weekly` and `checkIn` verbatim.
 - `Sources/Clients/WidgetSnapshot/Live/WidgetSnapshotClient+Live.swift` — new
   (LogClient+Live.swift / BriefRepositoryLive.swift are the template):
   - `extension WidgetSnapshotClient: DependencyKey { public static var liveValue: WidgetSnapshotClient }`
@@ -51,8 +55,12 @@ each write, and the `DependencyKey` `liveValue` — all failures logged and swal
 ## Acceptance
 
 - [ ] Write→read round-trip over a temp dir returns the identical `WidgetSnapshot`.
-- [ ] `mergeDailyBrief` into a file carrying `weekly` + `checkIn` + a `selectedSession` replaces the
-      daily fields but preserves all three untouched (the no-schema-surgery guarantee 21.2/21.4/21.5 rely on).
+- [ ] `mergeDailyBrief` into a file carrying `weekly` + `checkIn` + a **same-Sofia-day** `selectedSession`
+      replaces the daily fields but preserves `weekly`, `checkIn`, and that `selectedSession` untouched
+      (the no-schema-surgery guarantee 21.2/21.4/21.5 rely on).
+- [ ] `mergeDailyBrief` with a NEW `brief.date` (later Sofia day) over a file whose daily carries a
+      `selectedSession` drops that stale selection (`selectedSession == nil` in the result) while still
+      preserving `weekly`/`checkIn` (validation round-1 #2).
 - [ ] `mergeDailyBrief` with no existing file creates a daily-only snapshot.
 - [ ] `read()` on a corrupt file (garbage bytes) returns nil — no throw, no crash.
 - [ ] Missing store/container path degrades silently (nil-store guard covered by construction — the
@@ -77,8 +85,18 @@ Evidence: `swift test` output listing `WidgetSnapshotClientLiveTests` green.
 
 ## Notes
 
-- `Data.write(.atomic)` is the whole atomicity story — no `NSFileCoordinator` (WidgetKit reloads
-  re-read the file after the rename; a same-instant reader sees the previous complete file, which is fine
-  for a display mirror).
+- **Serialize writes (validation round-1 #3).** `Data.write(.atomic)` stops a reader seeing a torn file,
+  but the read→merge→write cycle is NOT atomic: two concurrent `update*` calls can both read the same
+  base and the second write silently drops the first's section. 21.1 freezes this store for later phases
+  that add sibling section writers (`updateWeeklyPlan`/`updateSelectedSession`/`updateCheckIn`, each
+  read-modify-writing the same file), so the whole class of lost-update is designed-in now unless the
+  writes are serialized. Route the live client's read/merge/write through a SINGLE `actor` (e.g. an
+  `actor WidgetSnapshotFileStore` the `liveValue` holds, or an actor the closures hop through) so all
+  mutations of the file are serialized within the process. Keep the pure `merge(daily:into:)` a free
+  function so it stays host-testable without the actor. The struct-vs-actor split is the implementer's
+  call as long as concurrent `update*` calls cannot lose each other's sections.
+- `Data.write(.atomic)` is the whole cross-process/torn-read story — no `NSFileCoordinator` (WidgetKit
+  reloads re-read the file after the rename; a same-instant reader sees the previous complete file, which
+  is fine for a display mirror). The app writes; the extension only reads.
 - The log category for the success line is `.app` (gated, plenty for the dev-observability criterion);
   failure notices ride `.app` too — this is not network traffic, don't abuse the always-on `.http`.

@@ -30,6 +30,12 @@ phases' widgets can use the same constants in `widgetURL` — all reducer-/parse
     Today tab's `BriefViewState.checkInRequired` gate — an unlogged day surfaces the check-in card
     itself; the distinct case is kept so 21.5 can specialise without a new URL contract). Re-embed via
     `state.route = .main(main)`; one `log.info` route line on `.app`.
+- `Sources/Features/AppFeature/Sources/AppFeature+SessionRouting.swift` — edit: **MANDATORY** — the new
+  `.deepLink` case makes the SECOND, separate exhaustive switch in `reduceSessionRouting` non-exhaustive
+  (its final arm is an explicit case list `._restoreSession, ._tokenChecked, .notificationOpened,
+  .onboarding, .main:` with NO `default:` — line ~44). Add `.deepLink` to that same catch-all arm
+  (routed in `AppFeature.body`, never here — the exact treatment `notificationOpened` already gets there).
+  Omitting this edit is a compile error (validation round-1 #1).
 - `Sources/Features/AppFeature/Sources/AppView.swift` — edit: `.onOpenURL { store.send(.deepLink($0)) }`
   on the single outer `ZStack` (beside the existing `.task`, line 46 — same never-re-mounting container
   reasoning).
@@ -61,7 +67,8 @@ Evidence: `swift test` output for the two new suites; the Info.plist diff.
       ComposableArchitecture for the TestStore file; `test_` prefixes).
 
 ### GREEN
-- [ ] Implement `CoachDeepLink`, the reducer arm, `.onOpenURL`, and the Info.plist entry.
+- [ ] Implement `CoachDeepLink`, the body reducer arm, the `.deepLink` entry in `reduceSessionRouting`'s
+      catch-all arm, `.onOpenURL`, and the Info.plist entry.
 
 ### REFACTOR
 - [ ] Confirm the reducer arm reads like `notificationOpened` (guard shape, logging, re-embed);
