@@ -75,12 +75,28 @@ top of it.
 
 ### Acceptance criteria
 
-- [ ] App and extension both build and run on the canonical sim; all existing
-      tests stay green.
+- [x] App and extension both build and run on the canonical sim; all existing
+      tests stay green. Verified: `xcodebuild ... build` succeeded; the
+      `CoachWidgets` extension launched cleanly on the sim (log shows the
+      extension process starting, its `WidgetBundle` registering
+      `CoachSkeletonWidget`, and a placeholder render completing successfully
+      for two size classes, no faults/crashes); `swift test` 615/615,
+      `make lint` 0 violations, `make test-snapshots` 96/96 (0 ✘, including the
+      two new `SkeletonWidgetView` snapshot references).
 - [ ] Refreshing the Today tab writes/updates the snapshot JSON in the App
-      Group container (observable via log or dev menu).
+      Group container (observable via log or dev menu). Unit-verified
+      (`WidgetSnapshotMirrorTests`, `WidgetSnapshotStoreTests`: the
+      `BriefRepositoryLive` generate path calls the mirror, which atomically
+      merge-writes the App Group JSON and logs `"Widget snapshot updated"`).
+      Live on-device trigger NOT verified this run — the sim's CoachApp
+      install requires an owner-provisioned access token (personal-app,
+      single static token, no sign-up) unavailable in this environment; the
+      App Group container `group.com.smeshko.CoachApp` is confirmed
+      provisioned on the sim but held no snapshot file yet. Pending owner
+      device validation.
 - [ ] The skeleton widget on the sim home screen shows the snapshot's readiness
-      score and date, and updates after an in-app refresh.
+      score and date, and updates after an in-app refresh. Pending owner
+      device validation.
 - [x] The widget extension has no GRDB/Database or APIClient dependency
       (verified by its target/package dependency list).
 
