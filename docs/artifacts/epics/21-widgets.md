@@ -48,7 +48,7 @@ top of it.
 
 ## Phase 21.1 — Widget infrastructure — App Group, extension target, snapshot pipeline
 
-**Plan**: [widget-infrastructure](../plans/widget-infrastructure/PLAN.md) · status: in-progress
+**Plan**: [widget-infrastructure](../plans/widget-infrastructure/PLAN.md) · status: done
 
 **Linear**: none
 
@@ -81,7 +81,7 @@ top of it.
       Group container (observable via log or dev menu).
 - [ ] The skeleton widget on the sim home screen shows the snapshot's readiness
       score and date, and updates after an in-app refresh.
-- [ ] The widget extension has no GRDB/Database or APIClient dependency
+- [x] The widget extension has no GRDB/Database or APIClient dependency
       (verified by its target/package dependency list).
 
 ### Validation

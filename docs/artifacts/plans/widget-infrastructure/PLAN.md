@@ -1,6 +1,6 @@
 # Plan: Widget infrastructure — App Group, CoachWidgets extension, snapshot pipeline
 
-Status: in-progress
+Status: done
 Branch: feat/phase-21-1-widget-infrastructure
 Risk: high
 Epic: 21 — Home-screen widgets ([epic](../../epics/21-widgets.md))
@@ -96,21 +96,21 @@ writer on the generate path only, D7 hand-authored appex target conventions + Ap
 
 From the epic phase, plus the scope additions:
 
-- [ ] App and extension both build for the canonical sim; `swift build`, `swift test`, `make lint` all green.
+- [x] App and extension both build for the canonical sim; `swift build`, `swift test`, `make lint` all green.
 - [ ] Refreshing the Today tab (live route) writes/updates the snapshot JSON in the App Group container,
       observable via a log line; `WidgetCenter.reloadAllTimelines()` fires after each write.
 - [ ] The skeleton widget shows the snapshot's readiness score and date, and updates after an in-app
       refresh (verify-on-sim evidence at implementation time).
-- [ ] The extension's `packageProductDependencies` list contains ONLY WidgetsUI,
+- [x] The extension's `packageProductDependencies` list contains ONLY WidgetsUI,
       WidgetSnapshotClientLive, and DomainModels — no Database/GRDB, no APIClient.
-- [ ] `WidgetSnapshot` carries the FULL schema (daily + optional weekly + optional check-in sections);
+- [x] `WidgetSnapshot` carries the FULL schema (daily + optional weekly + optional check-in sections);
       encode/decode and merge-preservation are unit-tested on the host.
-- [ ] Staleness/timeline helpers (next Sofia midnight, same-Sofia-day, same-ISO-week) are host-unit-tested.
-- [ ] `coachapp://today`, `coachapp://weekly`, `coachapp://checkin` route correctly at the reducer level
+- [x] Staleness/timeline helpers (next Sofia midnight, same-Sofia-day, same-ISO-week) are host-unit-tested.
+- [x] `coachapp://today`, `coachapp://weekly`, `coachapp://checkin` route correctly at the reducer level
       (tab switches, onboarding guard, unknown-URL no-op), unit-tested.
-- [ ] `WidgetsUISnapshotTests` exists, is listed in the Makefile's `SNAPSHOT_TARGETS`, and contains the
-      skeleton widget snapshot test.
-- [ ] `DEVELOPMENT_TEAM = GR9SJM3FZP` present in all four target configurations (2× CoachApp, 2× CoachWidgets).
+- [x] `WidgetsUISnapshotTests` exists, is listed in the Makefile's `SNAPSHOT_TARGETS`, and contains the
+      skeleton widget snapshot test (reference PNGs recorded at the sim-serialized ship stage).
+- [x] `DEVELOPMENT_TEAM = GR9SJM3FZP` present in all four target configurations (2× CoachApp, 2× CoachWidgets).
 
 ## Tasks
 
@@ -123,4 +123,4 @@ Task state lives here. Tasks are appended by `scripts/add_task.py` and
 - [x] TASK-004: WidgetsUI module: skeleton widget, snapshot-test target, Makefile registration (depends on TASK-001,TASK-002)
 - [x] TASK-005: Snapshot writer hook in BriefRepositoryLive + composition-root install (depends on TASK-001,TASK-002)
 - [x] TASK-006: CoachWidgets extension target: pbxproj, App Group entitlements, embed (depends on TASK-004,TASK-005)
-- [ ] TASK-007: Final Validation
+- [x] TASK-007: Final Validation
