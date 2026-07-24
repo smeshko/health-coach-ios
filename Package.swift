@@ -26,6 +26,7 @@ let package = Package(
     .library(name: "DevSettings", targets: ["DevSettings"]),
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
     .library(name: "WidgetSnapshotClient", targets: ["WidgetSnapshotClient"]),
+    .library(name: "WidgetSnapshotClientLive", targets: ["WidgetSnapshotClientLive"]),
     .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
@@ -310,6 +311,42 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/WidgetSnapshot/Interface",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WidgetSnapshotClient.liveValue — the atomic App-Group JSON store (`widget-snapshot.json`) with
+    // section-preserving merge writes serialized through a single actor (no lost updates between the
+    // sibling section writers later phases add), plus the WidgetKit timeline reload after each write
+    // (`#if canImport(WidgetKit)`-guarded for the macOS host). Failures log via the LogClient
+    // INTERFACE and drop — the brief path never fails on the mirror. Linked by the app target AND
+    // the CoachWidgets extension (whose providers resolve it via dynamic `liveValue` lookup).
+    .target(
+      name: "WidgetSnapshotClientLive",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "CoachCore",
+        "LogClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WidgetSnapshotStore write/read/merge tests over a temp directory — host, no simulator; never
+    // the real App Group container. Sibling subfolder to WidgetSnapshotClientTests under `Tests/`.
+    .testTarget(
+      name: "WidgetSnapshotClientLiveTests",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "WidgetSnapshotClientLive",
+        "DomainModels",
+        "SampleData",
+        "CoachCore",
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Tests/WidgetSnapshotClientLiveTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
