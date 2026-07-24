@@ -1,5 +1,7 @@
 import APIClient
+import CoachCore
 import ComposableArchitecture
+import Foundation
 import LogClient
 import OnboardingFeature
 import StrengthTestFeature
@@ -92,6 +94,10 @@ public struct AppFeature {
     /// (Phase 10.4) with the request identifier. The app-layer half of the 10.3 deep-link seam; kept
     /// driveable purely from a `String` so the mapping is fully unit-testable.
     case notificationOpened(identifier: String)
+    /// An opened `coachapp://` URL (Phase 21.1), forwarded by `AppView`'s `.onOpenURL` — the app-layer
+    /// half of the widget `widgetURL` seam. Parsed via `CoachDeepLink(url:)`; kept driveable purely
+    /// from a `URL` so the routing is fully unit-testable.
+    case deepLink(URL)
     // Internal actions use TCA's `_`-prefix convention (not part of the feature's public contract);
     // the leading underscore trips `identifier_name`, so scope a disable to these two cases.
     // swiftlint:disable identifier_name
@@ -216,6 +222,28 @@ public struct AppFeature {
         if case .strengthTest? = main.settings.last { alreadyOpen = true } else { alreadyOpen = false }
         if !alreadyOpen { main.settings.append(.strengthTest(StrengthTestFeature.State())) }
         state.route = .main(main)
+        return .none
+      case let .deepLink(url):
+        // The `coachapp://` URL routing (Phase 21.1, DECISIONS D5). Guards mirror
+        // `notificationOpened`: only-from-`.main` (dropped while onboarding — nowhere to land).
+        guard let link = CoachDeepLink(url: url) else {
+          log.notice("Unparseable deep link — dropped", category: .app, metadata: ["url": url.absoluteString])
+          return .none
+        }
+        guard case var .main(main) = state.route else { return .none }
+        switch link {
+        case .today:
+          main.selectedTab = .today
+        case .weekly:
+          main.selectedTab = .weekly
+        case .checkIn:
+          // The check-in flow IS the Today tab's `BriefViewState.checkInRequired` gate — an unlogged
+          // day surfaces the check-in card by itself; the route only picks the tab (21.5 may
+          // specialise this case without a new URL contract).
+          main.selectedTab = .today
+        }
+        state.route = .main(main)
+        log.info("Deep link routed", category: .app, metadata: ["url": url.absoluteString])
         return .none
       case .onboarding, .main:
         return .none

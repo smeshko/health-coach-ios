@@ -47,5 +47,8 @@ public struct AppView: View {
       store.send(._appWillAppear)
       store.send(._restoreSession)
     }
+    // `coachapp://` deep links (Phase 21.1) — on the same never-re-mounting outer container as the
+    // lifecycle hook, so URL opens are received regardless of which route branch is showing.
+    .onOpenURL { store.send(.deepLink($0)) }
   }
 }

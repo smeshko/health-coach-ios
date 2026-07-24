@@ -31,5 +31,21 @@
 	<string>$(CF_ACCESS_CLIENT_ID)</string>
 	<key>CFAccessClientSecret</key>
 	<string>$(CF_ACCESS_CLIENT_SECRET)</string>
+	<!--
+	  Phase 21.1: the `coachapp` URL scheme for widget deep links (`CoachDeepLink` in CoachCore owns
+	  the URL vocabulary; AppFeature routes coachapp://today|weekly|checkin). Merged into the generated
+	  Info.plist the same way as the keys above (GENERATE_INFOPLIST_FILE = YES).
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.smeshko.CoachApp.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>coachapp</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
