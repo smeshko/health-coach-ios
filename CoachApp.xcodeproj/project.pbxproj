@@ -22,6 +22,7 @@
 		CA0000000000000000000039 /* LocalRepositories in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000029 /* LocalRepositories */; };
 		CA000000000000000000003B /* LogClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA000000000000000000002B /* LogClientLive */; };
 		CA000000000000000000003C /* NotificationClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA000000000000000000002C /* NotificationClientLive */; };
+		CA0000000000000000000202 /* WidgetSnapshotClientLive in Frameworks */ = {isa = PBXBuildFile; productRef = CA0000000000000000000201 /* WidgetSnapshotClientLive */; };
 		CA00000000000000000000B2 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CA00000000000000000000B1 /* AppIcon.icon */; };
 		CA00000000000000000000F0 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA00000000000000000000F1 /* AppDelegate.swift */; };
 		CA00000000000000000000F2 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA00000000000000000000F3 /* AppConfig.swift */; };
@@ -55,6 +56,7 @@
 				CA0000000000000000000039 /* LocalRepositories in Frameworks */,
 				CA000000000000000000003B /* LogClientLive in Frameworks */,
 				CA000000000000000000003C /* NotificationClientLive in Frameworks */,
+				CA0000000000000000000202 /* WidgetSnapshotClientLive in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -120,6 +122,7 @@
 				CA0000000000000000000029 /* LocalRepositories */,
 				CA000000000000000000002B /* LogClientLive */,
 				CA000000000000000000002C /* NotificationClientLive */,
+				CA0000000000000000000201 /* WidgetSnapshotClientLive */,
 			);
 			productName = CoachApp;
 			productReference = CA0000000000000000000006 /* CoachApp.app */;
@@ -451,6 +454,10 @@
 		CA000000000000000000002C /* NotificationClientLive */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = NotificationClientLive;
+		};
+		CA0000000000000000000201 /* WidgetSnapshotClientLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WidgetSnapshotClientLive;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

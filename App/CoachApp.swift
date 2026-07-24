@@ -16,6 +16,7 @@ import ProfileRepositoryLive
 import SwiftUI
 import SyncRepositoryLive
 import TokenClient
+import WidgetSnapshotClientLive
 
 /// The composition root (ARCHITECTURE §7.1 / D25 / D3) — the **only** place `*Live` targets are
 /// imported. Everything below the app target depends on interfaces; the live values are installed here.
@@ -68,6 +69,10 @@ struct CoachApp: App {
       // remaining data-source live values (Database/HealthKitClient/TokenClient/DevSettings)
       // auto-resolve under `.live` because their `*Live` products are linked by the app target —
       // APIClient no longer auto-resolves; it is injected explicitly above.
+      // The widget-snapshot mirror (Phase 21.1): App Group JSON write + timeline reload, fired by
+      // BriefRepositoryLive on every daily cache write.
+      $0.widgetSnapshot = .liveValue
+
       let dev = $0.devSettings
       $0.briefRepository = .routed(dev)
       $0.syncRepository = .routed(dev)

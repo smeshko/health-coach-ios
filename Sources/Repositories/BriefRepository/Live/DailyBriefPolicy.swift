@@ -7,6 +7,7 @@ import Foundation
 import GRDB
 import LogClient
 import PersistenceModels
+import WidgetSnapshotClient
 import WireDomainMapping
 import WireModels
 
@@ -19,6 +20,7 @@ func dailyBriefPolicy(refresh: Bool) async throws -> DomainModels.DailyBrief {
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.database) var database
   @Dependency(\.log) var log
+  @Dependency(\.widgetSnapshot) var widgetSnapshot
 
   let today = sofiaToday()
 
@@ -58,6 +60,9 @@ func dailyBriefPolicy(refresh: Bool) async throws -> DomainModels.DailyBrief {
   try await database.write { db in
     try DailyBriefRecord(domain: domain).save(db)
   }
+  // The Phase 21.1 widget mirror — fired only where the daily cache is WRITTEN (a cache hit was
+  // mirrored when its row was written). Non-throwing by contract, so the brief path can't fail on it.
+  await widgetSnapshot.updateDailyBrief(domain)
   return domain
 }
 

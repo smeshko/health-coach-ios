@@ -540,6 +540,9 @@ let package = Package(
         // Decode-degradation notices (Phase 19.2): a corrupt cached row logs on `.http` and
         // degrades to a miss (the Database/SyncRepositoryLive interface-dependency precedent).
         "LogClient",
+        // The widget-snapshot mirror (Phase 21.1): the daily cache write fires `updateDailyBrief`
+        // through the client INTERFACE (the LogClient-in-repo-live precedent) — never *Live.
+        "WidgetSnapshotClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -985,6 +988,8 @@ let package = Package(
         "DevSettings",
         // The decode-degradation tests assert notices via `LogRecorder` / `.recording(into:)`.
         "LogClient",
+        // The Phase 21.1 mirror tests override `\.widgetSnapshot` with a recording client.
+        "WidgetSnapshotClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
