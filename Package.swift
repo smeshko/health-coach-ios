@@ -25,6 +25,7 @@ let package = Package(
     .library(name: "NotificationClientLive", targets: ["NotificationClientLive"]),
     .library(name: "DevSettings", targets: ["DevSettings"]),
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
+    .library(name: "WidgetSnapshotClient", targets: ["WidgetSnapshotClient"]),
     .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
@@ -292,6 +293,38 @@ let package = Package(
         .product(name: "Dependencies", package: "swift-dependencies"),
       ],
       path: "Sources/Clients/LogClient/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // The widget-snapshot mirror interface (Phase 21.1): the FULL Codable `WidgetSnapshot` schema
+    // (daily + optional weekly/check-in sections — 21.2–21.5 add writers and UI, never schema
+    // surgery), the Sofia staleness/timeline helpers (explicit `Calendar` — the extension process
+    // never runs `prepareDependencies`), and the closure-struct client with a no-op `testValue`.
+    // Consumed by BriefRepositoryLive (the writer hook), WidgetsUI, and the CoachWidgets extension.
+    .target(
+      name: "WidgetSnapshotClient",
+      dependencies: [
+        "CoachCore",
+        "DomainModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Interface",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WidgetSnapshot schema/round-trip + Sofia staleness-helper tests — host, no simulator. Two test
+    // targets nest under `Tests/` (this + WidgetSnapshotClientLiveTests) — the LogClient layout.
+    .testTarget(
+      name: "WidgetSnapshotClientTests",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "SampleData",
+        "CoachCore",
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Tests/WidgetSnapshotClientTests",
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]

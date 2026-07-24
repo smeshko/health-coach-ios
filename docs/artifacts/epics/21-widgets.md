@@ -48,7 +48,7 @@ top of it.
 
 ## Phase 21.1 — Widget infrastructure — App Group, extension target, snapshot pipeline
 
-**Plan**: [widget-infrastructure](../plans/widget-infrastructure/PLAN.md) · status: planned
+**Plan**: [widget-infrastructure](../plans/widget-infrastructure/PLAN.md) · status: in-progress
 
 **Linear**: none
 

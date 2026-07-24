@@ -1,6 +1,7 @@
 # Plan: Widget infrastructure — App Group, CoachWidgets extension, snapshot pipeline
 
-Status: draft
+Status: in-progress
+Branch: feat/phase-21-1-widget-infrastructure
 Risk: high
 Epic: 21 — Home-screen widgets ([epic](../../epics/21-widgets.md))
 Phase: 21.1 — Widget infrastructure — App Group, extension target, snapshot pipeline
@@ -116,7 +117,7 @@ From the epic phase, plus the scope additions:
 Task state lives here. Tasks are appended by `scripts/add_task.py` and
 `scripts/add_final_task.py`. Update the checkboxes as work progresses.
 
-- [ ] TASK-001: WidgetSnapshotClient interface: full WidgetSnapshot schema + Sofia staleness/timeline helpers
+- [x] TASK-001: WidgetSnapshotClient interface: full WidgetSnapshot schema + Sofia staleness/timeline helpers
 - [ ] TASK-002: WidgetSnapshotClientLive: atomic App-Group JSON store + WidgetCenter reload (depends on TASK-001)
 - [ ] TASK-003: URL-scheme deep links: coachapp:// routes into AppFeature (Today / Weekly / check-in)
 - [ ] TASK-004: WidgetsUI module: skeleton widget, snapshot-test target, Makefile registration (depends on TASK-001,TASK-002)
