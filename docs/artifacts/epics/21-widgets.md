@@ -1,6 +1,6 @@
 # Epic 21 — Home-screen widgets
 
-Status: in-progress
+Status: implemented — owner device validation pending
 Created: 2026-07-24
 Depends on: Epic 08, Epic 09
 Project: none
@@ -387,5 +387,9 @@ epic convention.
 
 ## Epic-level acceptance criteria
 
-- [ ] Every phase merged and its acceptance criteria met
-- [ ] Status row in [EPICS.md](./EPICS.md) updated to `Done`
+- [x] Every phase merged and its acceptance criteria met (21.1–21.5, PRs
+      #70–#73; test-demonstrated criteria ticked per phase, live on-device
+      behaviour pending owner validation)
+- [ ] Status row in [EPICS.md](./EPICS.md) updated to `Done` (currently
+      "Implemented — owner device validation pending", per Epic 18–20
+      convention)
