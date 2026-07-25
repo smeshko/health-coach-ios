@@ -1,4 +1,5 @@
 import CoachCore
+import CoachTestSupport
 import Database
 import Dependencies
 import DomainModels
@@ -6,6 +7,7 @@ import Foundation
 import GRDB
 import PersistenceModels
 import Testing
+import WidgetSnapshotClient
 
 @testable import LocalRepositories
 
@@ -86,5 +88,34 @@ struct SessionSelectionRepositoryTests {
       try await SessionSelectionRepository.live.current(yesterday)
     }
     #expect(prior == nil, "a different Sofia day has no stored pick")
+  }
+
+  /// The Phase 21.2 widget mirror hook: `save` fires `updateSelectedSession` exactly once per save,
+  /// with the saved block and the normalized Sofia day (not the raw wall-clock instant). Suites
+  /// without an override stay green via the interface's defaulted no-op.
+  @Test func test_save_mirrorsSelectionWithNormalizedSofiaDay() async throws {
+    let db = try DatabaseClient.makeInMemory()
+    let recorder = CallRecorder<(DomainModels.SessionBlock, Date)>()
+    let block = Self.easyRun()
+
+    try await withDependencies {
+      $0.useEuropeSofia()
+      $0.date = .constant(Self.now)
+      $0.database = db
+      $0.widgetSnapshot = WidgetSnapshotClient(
+        updateDailyBrief: { _ in },
+        updateSelectedSession: { recorder.record(($0, $1)) },
+        read: { nil }
+      )
+    } operation: {
+      try await SessionSelectionRepository.live.save(block, Self.now)
+    }
+
+    #expect(recorder.count == 1, "one save → one mirror")
+    #expect(recorder.lastArgument?.0 == block, "the mirror receives the saved block")
+    #expect(
+      recorder.lastArgument?.1 == Calendar.europeSofia.startOfDay(for: Self.now),
+      "the mirrored day is the normalized Sofia day the row was keyed on"
+    )
   }
 }

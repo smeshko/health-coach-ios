@@ -19,6 +19,7 @@ extension WidgetSnapshotClient: DependencyKey {
     return WidgetSnapshotClient(
       updateDailyBrief: { brief in await serializer.updateDailyBrief(brief) },
       updateWeeklyPlan: { plan in await serializer.updateWeeklyPlan(plan) },
+      updateSelectedSession: { block, day in await serializer.updateSelectedSession(block, day: day) },
       read: { WidgetSnapshotStore.appGroupStore()?.read() }
     )
   }
@@ -73,6 +74,34 @@ private actor WidgetSnapshotSerializer {
     } catch {
       log.notice(
         "Widget snapshot write failed — dropping",
+        category: .app,
+        metadata: ["error": String(describing: error)]
+      )
+    }
+  }
+
+  /// The Phase 21.2 selection hook: merge the athlete's pick into `daily.selectedSession`. A declined
+  /// merge (no same-Sofia-day daily section to attach to) is a silent no-op, same as a missing
+  /// container — the selection save path never fails because of the mirror.
+  func updateSelectedSession(_ block: DomainModels.SessionBlock, day: Date) {
+    @Dependency(\.log) var log
+    @Dependency(\.date) var date
+
+    guard let store = WidgetSnapshotStore.appGroupStore() else {
+      log.notice("Widget snapshot skipped — App Group container unavailable", category: .app)
+      return
+    }
+    do {
+      guard try store.mergeSelectedSession(block, day: day, generatedAt: date.now) else { return }
+      reloadTimelines()
+      log.info(
+        "Widget snapshot selection updated",
+        category: .app,
+        metadata: ["sofiaDay": sofiaDayKey(day)]
+      )
+    } catch {
+      log.notice(
+        "Widget snapshot selection write failed — dropping",
         category: .app,
         metadata: ["error": String(describing: error)]
       )

@@ -110,7 +110,7 @@ showing live data after an app refresh.
 
 ## Phase 21.2 — Today's session widget + lock-screen accessories
 
-**Plan**: _not yet created_
+**Plan**: direct-implemented from epic spec (no formal plan)
 
 **Linear**: none
 
@@ -136,13 +136,31 @@ showing live data after an app refresh.
 
 ### Acceptance criteria
 
-- [ ] Widget shows today's selected (else planned) session with intensity,
-      duration range, and zone/HR cap when the brief has them.
-- [ ] Rest card and triggered safety gate render their dedicated states.
-- [ ] Inline + rectangular lock-screen families render the one-line summary.
-- [ ] After Sofia midnight with no new brief cached, the widget shows the
-      stale state.
-- [ ] Tapping any family opens the app on the Today tab.
+- [x] Widget shows today's selected (else planned) session with intensity,
+      duration range, and zone/HR cap when the brief has them. Verified:
+      `SessionWidgetViewSnapshotTests` (`test_small_session`,
+      `test_medium_session`, `test_small_selected`, `test_medium_selected`,
+      light+dark) render the selected-vs-planned fallback from a
+      `WidgetDailySnapshot` fixture.
+- [x] Rest card and triggered safety gate render their dedicated states.
+      Verified: `test_small_rest`/`test_medium_rest` and
+      `test_small_gate`/`test_medium_gate` cover the gate>rest>session
+      precedence with dedicated fixture states.
+- [x] Inline + rectangular lock-screen families render the one-line summary.
+      Verified: `test_inline_session`, `test_inline_rest`, `test_inline_gate`,
+      `test_inline_selected`, `test_inline_stale` and the `rectangular`
+      counterparts, light+dark.
+- [x] After Sofia midnight with no new brief cached, the widget shows the
+      stale state. Verified: `test_small_stale`/`test_medium_stale`/
+      `test_inline_stale`/`test_rectangular_stale`, exercising the Sofia
+      calendar-day boundary (`WidgetDailySnapshot.isCurrent(at:)` +
+      `WidgetTimeline.nextSofiaMidnight`); the extension-only
+      `DailyProvider` timeline wiring itself is not host-testable (WidgetKit
+      unavailable off-device) — pending owner device validation.
+- [x] Tapping any family opens the app on the Today tab. Verified in code:
+      `SessionWidget.swift` applies `.widgetURL(CoachDeepLink.today.url)` on
+      every family. Live on-device tap-to-open NOT verified this run —
+      pending owner device validation.
 
 ### Validation
 
@@ -150,11 +168,28 @@ Snapshot tests for the widget views (all families × normal/rest/gate/stale
 states) in the package test target; unit test for the midnight timeline-entry
 dating; `verify-on-sim` screenshots of home-screen and lock-screen placements.
 
+**Ship gate (2026-07-25):** rebase onto `origin/staging` picked up the
+sibling 21.4 weekly-widget PR; additive conflict resolution in
+`WidgetSnapshotClient`/`WidgetSnapshotClient+Live`/`WidgetSnapshotStore` +
+their tests (kept `updateWeeklyPlan` and `updateSelectedSession` side by
+side) and in `CoachWidgetsBundle` (all four widgets registered); `swift
+build` clean; `swift test` 629/629; new `SessionWidgetViewSnapshotTests`
+references recorded on the pinned sim (40 new PNGs, 20 states ×
+light/dark) with pre-existing skeleton/weekly references byte-unchanged;
+`make lint` 0 violations in 424 files; `make test-snapshots` 125/125 (0 ✘,
+99 baseline + 26 new session/macros-widget tests); `xcodebuild ... CoachApp
+... build` succeeded (CoachWidgets extension embeds cleanly, both
+`SessionWidget` and `MacrosWidget` link). Adversarial review found no real
+bugs (verified selected-vs-planned fallback, gate>rest>session precedence,
+Sofia-midnight staleness boundary, and the extension dependency rule). On-sim/
+on-device visual placement and live deep-link/staleness behaviour remain
+pending owner device validation, per epic convention.
+
 ---
 
 ## Phase 21.3 — Macros widget
 
-**Plan**: _not yet created_
+**Plan**: direct-implemented from epic spec (no formal plan)
 
 **Linear**: none
 
@@ -172,17 +207,40 @@ dating; `verify-on-sim` screenshots of home-screen and lock-screen placements.
 
 ### Acceptance criteria
 
-- [ ] Targets match the cached brief's `MacroFocus` for the day; day-type
-      badge follows app colors.
-- [ ] Footer shows calories % and protein ✓/✗ when intake data exists, and is
-      absent — without layout gaps — when it doesn't.
-- [ ] Stale state after Sofia midnight, matching 21.2 behaviour.
-- [ ] Tapping opens the app on the Today tab.
+- [x] Targets match the cached brief's `MacroFocus` for the day; day-type
+      badge follows app colors. Verified: `MacrosWidgetViewSnapshotTests`
+      (`test_small_withIntake`, `test_medium_withIntake`,
+      `test_small_withoutIntake`, `test_medium_withoutIntake`, light+dark)
+      render kcal/protein/carbs (medium adds fat range + hydration) and the
+      `DayType` badge colors matching `CarbCyclingPattern`.
+- [x] Footer shows calories % and protein ✓/✗ when intake data exists, and is
+      absent — without layout gaps — when it doesn't. Verified: the
+      `withIntake` vs `withoutIntake` snapshot pairs cover the collapse; the
+      footer math (`caloriesPct` fraction → `.percent`) matches the app's
+      `YesterdayIntakeView` convention (adversarial review confirmed).
+- [x] Stale state after Sofia midnight, matching 21.2 behaviour. Verified:
+      `test_small_stale`/`test_medium_stale`, sharing the same
+      `DailyProvider`/staleness helper as `SessionWidget` (no duplication).
+- [x] Tapping opens the app on the Today tab. Verified in code:
+      `MacrosWidget.swift` applies `.widgetURL(CoachDeepLink.today.url)`.
+      Live on-device tap-to-open NOT verified this run — pending owner
+      device validation.
 
 ### Validation
 
 Snapshot tests for small/medium × with/without intake × stale;
 `verify-on-sim` screenshot alongside the session widget.
+
+**Ship gate (2026-07-25):** part of the same rebase/gate run as 21.2 (see
+its ship-gate note above) — `swift test` 629/629, new
+`MacrosWidgetViewSnapshotTests` references recorded on the pinned sim (12
+new PNGs, 6 states × light/dark), `make lint` 0 violations, `make
+test-snapshots` 125/125 (0 ✘), sim `xcodebuild ... CoachApp ... build`
+succeeded. Adversarial review found no real bugs (intake-footer math
+verified against `YesterdayIntakeView`, selection writer hook fires after
+the DB write on the correct repo path with same-Sofia-day-only merge and
+cross-day drop). On-sim/on-device visual placement and live behaviour
+remain pending owner device validation, per epic convention.
 
 ---
 
