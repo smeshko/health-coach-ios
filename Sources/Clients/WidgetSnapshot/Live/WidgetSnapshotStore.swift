@@ -67,6 +67,12 @@ public struct WidgetSnapshotStore: Sendable {
     return true
   }
 
+  /// Load-merge-write the check-in display state into the `checkIn` section (Phase 21.5; see
+  /// `merge(checkIn:into:generatedAt:)`).
+  public func mergeCheckIn(_ state: WidgetCheckInState, generatedAt: Date = Date()) throws {
+    try write(Self.merge(checkIn: state, into: read(), generatedAt: generatedAt))
+  }
+
   /// The pure daily merge (host-testable without any file I/O): replace only the `daily` section +
   /// the root `generatedAt`/`schemaVersion`, preserve `weekly` and `checkIn` verbatim. The existing
   /// `selectedSession` survives ONLY when the existing daily is the SAME Sofia day as `brief.date`
@@ -140,5 +146,31 @@ public struct WidgetSnapshotStore: Sendable {
     snapshot.generatedAt = generatedAt
     snapshot.schemaVersion = WidgetSnapshot.currentSchemaVersion
     return snapshot
+  }
+
+  /// The pure check-in merge (host-testable, mirror of the daily merge): replace only the `checkIn`
+  /// section + the root `generatedAt`/`schemaVersion`, preserve `daily` and `weekly` verbatim. A
+  /// PRIOR-day incoming state never replaces a LATER day's (a late drain of yesterday's pending
+  /// entry after midnight must not stomp today's already-logged state); same-day and newer-day
+  /// writes replace.
+  public static func merge(
+    checkIn incoming: WidgetCheckInState,
+    into existing: WidgetSnapshot?,
+    generatedAt: Date,
+    calendar: Calendar = .europeSofia
+  ) -> WidgetSnapshot {
+    let resolved: WidgetCheckInState =
+      if let kept = existing?.checkIn,
+      calendar.startOfDay(for: kept.date) > calendar.startOfDay(for: incoming.date) {
+        kept
+      } else {
+        incoming
+      }
+    return WidgetSnapshot(
+      generatedAt: generatedAt,
+      daily: existing?.daily,
+      weekly: existing?.weekly,
+      checkIn: resolved
+    )
   }
 }

@@ -20,7 +20,11 @@ extension WidgetSnapshotClient: DependencyKey {
       updateDailyBrief: { brief in await serializer.updateDailyBrief(brief) },
       updateWeeklyPlan: { plan in await serializer.updateWeeklyPlan(plan) },
       updateSelectedSession: { block, day in await serializer.updateSelectedSession(block, day: day) },
-      read: { WidgetSnapshotStore.appGroupStore()?.read() }
+      read: { WidgetSnapshotStore.appGroupStore()?.read() },
+      updateCheckIn: { state in await serializer.updateCheckIn(state) },
+      logCheckInFromWidget: { checkIn in await serializer.logCheckInFromWidget(checkIn) },
+      pendingCheckIns: { WidgetCheckInInboxStore.appGroupStore()?.read() ?? [] },
+      clearPendingCheckIns: { await serializer.clearPendingCheckIns() }
     )
   }
 }
@@ -102,6 +106,85 @@ private actor WidgetSnapshotSerializer {
     } catch {
       log.notice(
         "Widget snapshot selection write failed — dropping",
+        category: .app,
+        metadata: ["error": String(describing: error)]
+      )
+    }
+  }
+
+  /// The app-side check-in mirror (Phase 21.5) — fired by `CheckInRepository.save` after each upsert.
+  func updateCheckIn(_ state: WidgetCheckInState) {
+    @Dependency(\.log) var log
+    @Dependency(\.date) var date
+
+    guard let store = WidgetSnapshotStore.appGroupStore() else {
+      log.notice("Widget snapshot skipped — App Group container unavailable", category: .app)
+      return
+    }
+    do {
+      try store.mergeCheckIn(state, generatedAt: date.now)
+      reloadTimelines()
+      log.info(
+        "Widget snapshot check-in updated",
+        category: .app,
+        metadata: ["sofiaDay": sofiaDayKey(state.date), "logged": "\(state.logged)"]
+      )
+    } catch {
+      log.notice(
+        "Widget snapshot check-in write failed — dropping",
+        category: .app,
+        metadata: ["error": String(describing: error)]
+      )
+    }
+  }
+
+  /// The widget "All clear" AppIntent's write (Phase 21.5), running in the EXTENSION process: append
+  /// the pending check-in to the inbox, flip the snapshot to logged (`source: .widget`), reload.
+  /// NOTE the 21.1 cross-process story loosens here by design: the extension now WRITES on an
+  /// explicit tap (still atomic write-then-rename, so neither process ever observes a torn file); a
+  /// same-instant app-side merge racing it remains an accepted single-owner risk.
+  func logCheckInFromWidget(_ checkIn: DomainModels.CheckIn) {
+    @Dependency(\.log) var log
+    @Dependency(\.date) var date
+
+    guard
+      let inbox = WidgetCheckInInboxStore.appGroupStore(),
+      let store = WidgetSnapshotStore.appGroupStore()
+    else {
+      log.notice("Widget check-in skipped — App Group container unavailable", category: .app)
+      return
+    }
+    do {
+      try inbox.append(checkIn)
+      try store.mergeCheckIn(
+        WidgetCheckInState(date: checkIn.date, logged: true, source: .widget),
+        generatedAt: date.now
+      )
+      reloadTimelines()
+      log.info(
+        "Widget all-clear check-in appended to inbox",
+        category: .app,
+        metadata: ["sofiaDay": sofiaDayKey(checkIn.date)]
+      )
+    } catch {
+      log.notice(
+        "Widget check-in inbox write failed — dropping",
+        category: .app,
+        metadata: ["error": String(describing: error)]
+      )
+    }
+  }
+
+  /// Remove the inbox after the app-side drain persisted (or superseded) every pending entry.
+  func clearPendingCheckIns() {
+    @Dependency(\.log) var log
+
+    guard let inbox = WidgetCheckInInboxStore.appGroupStore() else { return }
+    do {
+      try inbox.clear()
+    } catch {
+      log.notice(
+        "Widget check-in inbox clear failed — dropping",
         category: .app,
         metadata: ["error": String(describing: error)]
       )

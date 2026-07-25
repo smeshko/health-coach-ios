@@ -25,6 +25,15 @@ public extension WidgetDailySnapshot {
   }
 }
 
+public extension WidgetCheckInState {
+  /// Whether this check-in state refers to the same Sofia calendar day as `now` (mirror of the daily
+  /// helper). Past Sofia midnight a logged state stops counting — the widget's nudge resets to
+  /// unlogged at the day rollover (Phase 21.5).
+  func isCurrent(at now: Date, calendar: Calendar = .europeSofia) -> Bool {
+    calendar.isDate(date, inSameDayAs: now)
+  }
+}
+
 public extension WidgetWeeklySnapshot {
   /// Whether `isoWeek` is `now`'s ISO week. Formats `now` with the same `"%04d-W%02d"` pattern as
   /// `BriefRepositoryLive.isoWeekKey` (module-internal there, so the 3-line formatter is duplicated
