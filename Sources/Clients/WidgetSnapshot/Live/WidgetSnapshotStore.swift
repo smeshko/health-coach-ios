@@ -49,6 +49,11 @@ public struct WidgetSnapshotStore: Sendable {
     try write(Self.merge(dailyBrief: brief, into: read(), generatedAt: generatedAt))
   }
 
+  /// Load-merge-write the week's plan into the `weekly` section (see `merge(weeklyPlan:into:)`).
+  public func mergeWeeklyPlan(_ plan: DomainModels.WeeklyPlan, generatedAt: Date = Date()) throws {
+    try write(Self.merge(weeklyPlan: plan, into: read(), generatedAt: generatedAt))
+  }
+
   /// The pure daily merge (host-testable without any file I/O): replace only the `daily` section +
   /// the root `generatedAt`/`schemaVersion`, preserve `weekly` and `checkIn` verbatim. The existing
   /// `selectedSession` survives ONLY when the existing daily is the SAME Sofia day as `brief.date`
@@ -77,6 +82,28 @@ public struct WidgetSnapshotStore: Sendable {
         intakeYesterday: brief.intakeYesterday
       ),
       weekly: existing?.weekly,
+      checkIn: existing?.checkIn
+    )
+  }
+
+  /// The pure weekly merge (Phase 21.4): replace only the `weekly` section + the root
+  /// `generatedAt`/`schemaVersion`, preserve `daily` and `checkIn` verbatim. Core sessions only —
+  /// extras never reach the widget (the epic's weekly widget is core-only), and nothing
+  /// progress-shaped is carried (plan-only, epic Out of scope).
+  public static func merge(
+    weeklyPlan plan: DomainModels.WeeklyPlan,
+    into existing: WidgetSnapshot?,
+    generatedAt: Date
+  ) -> WidgetSnapshot {
+    WidgetSnapshot(
+      generatedAt: generatedAt,
+      daily: existing?.daily,
+      weekly: WidgetWeeklySnapshot(
+        isoWeek: plan.isoWeek,
+        budgets: plan.budgets,
+        targets: plan.targets,
+        coreSessions: plan.core
+      ),
       checkIn: existing?.checkIn
     )
   }

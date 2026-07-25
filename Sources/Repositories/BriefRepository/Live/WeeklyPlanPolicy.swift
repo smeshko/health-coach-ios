@@ -8,6 +8,7 @@ import Foundation
 import GRDB
 import LogClient
 import PersistenceModels
+import WidgetSnapshotClient
 import WireDomainMapping
 import WireModels
 
@@ -26,6 +27,7 @@ func weeklyPlanPolicy(isoWeek: ISOWeek?, refresh: Bool) async throws -> DomainMo
   @Dependency(\.apiClient) var apiClient
   @Dependency(\.database) var database
   @Dependency(\.log) var log
+  @Dependency(\.widgetSnapshot) var widgetSnapshot
 
   let week = isoWeek ?? ISOWeek.current
   let key = isoWeekKey(week)
@@ -73,5 +75,8 @@ func weeklyPlanPolicy(isoWeek: ISOWeek?, refresh: Bool) async throws -> DomainMo
   try await database.write { db in
     try WeeklyPlanRecord(domain: domain).save(db)
   }
+  // The Phase 21.4 widget mirror — fired only where the weekly cache is WRITTEN (a cache hit was
+  // mirrored when its row was written; the daily hook's convention). Non-throwing by contract.
+  await widgetSnapshot.updateWeeklyPlan(domain)
   return domain
 }

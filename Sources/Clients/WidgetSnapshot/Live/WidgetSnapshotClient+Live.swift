@@ -18,6 +18,7 @@ extension WidgetSnapshotClient: DependencyKey {
     let serializer = WidgetSnapshotSerializer()
     return WidgetSnapshotClient(
       updateDailyBrief: { brief in await serializer.updateDailyBrief(brief) },
+      updateWeeklyPlan: { plan in await serializer.updateWeeklyPlan(plan) },
       read: { WidgetSnapshotStore.appGroupStore()?.read() }
     )
   }
@@ -43,6 +44,31 @@ private actor WidgetSnapshotSerializer {
         "Widget snapshot updated",
         category: .app,
         metadata: ["sofiaDay": sofiaDayKey(brief.date)]
+      )
+    } catch {
+      log.notice(
+        "Widget snapshot write failed — dropping",
+        category: .app,
+        metadata: ["error": String(describing: error)]
+      )
+    }
+  }
+
+  func updateWeeklyPlan(_ plan: DomainModels.WeeklyPlan) {
+    @Dependency(\.log) var log
+    @Dependency(\.date) var date
+
+    guard let store = WidgetSnapshotStore.appGroupStore() else {
+      log.notice("Widget snapshot skipped — App Group container unavailable", category: .app)
+      return
+    }
+    do {
+      try store.mergeWeeklyPlan(plan, generatedAt: date.now)
+      reloadTimelines()
+      log.info(
+        "Widget snapshot updated",
+        category: .app,
+        metadata: ["isoWeek": plan.isoWeek]
       )
     } catch {
       log.notice(
