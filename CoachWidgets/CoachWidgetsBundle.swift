@@ -12,6 +12,8 @@ import WidgetSnapshotClientLive
 @main
 struct CoachWidgetsBundle: WidgetBundle {
   var body: some Widget {
+    SessionWidget()
+    MacrosWidget()
     SkeletonWidget()
     WeeklyWidget()
   }
