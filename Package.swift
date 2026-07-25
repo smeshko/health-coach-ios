@@ -8,10 +8,10 @@ let package = Package(
   // platforms line makes the host build fail to compile (validation round-2 #12, verified). The
   // .macOS line governs only host build/test; the shipped app target stays iOS-only (xcodeproj).
   platforms: [.iOS(.v26), .macOS(.v14)],
-  // Products = EXACTLY the package modules the app target (`App/CoachApp.swift`) imports — one
-  // `.library` per app-imported module, nothing speculative (Phase 11.7 / DECISIONS D3). Same-package
-  // test targets reference targets directly and need no products; anything re-needed later is a one-line
-  // `.library` addition.
+  // Products = EXACTLY the package modules the app + CoachWidgets extension targets link — one
+  // `.library` per xcodeproj-linked module, nothing speculative (Phase 11.7 / DECISIONS D3; Phase 21.1
+  // added the extension as a second product consumer). Same-package test targets reference targets
+  // directly and need no products; anything re-needed later is a one-line `.library` addition.
   products: [
     .library(name: "AppFeature", targets: ["AppFeature"]),
     .library(name: "CoachCore", targets: ["CoachCore"]),
@@ -25,6 +25,10 @@ let package = Package(
     .library(name: "NotificationClientLive", targets: ["NotificationClientLive"]),
     .library(name: "DevSettings", targets: ["DevSettings"]),
     .library(name: "BriefRepositoryLive", targets: ["BriefRepositoryLive"]),
+    .library(name: "WidgetSnapshotClient", targets: ["WidgetSnapshotClient"]),
+    .library(name: "WidgetSnapshotClientLive", targets: ["WidgetSnapshotClientLive"]),
+    .library(name: "WidgetsUI", targets: ["WidgetsUI"]),
+    .library(name: "DomainModels", targets: ["DomainModels"]),
     .library(name: "LocalRepositories", targets: ["LocalRepositories"]),
     .library(name: "SyncRepositoryLive", targets: ["SyncRepositoryLive"]),
     .library(name: "ProfileRepositoryLive", targets: ["ProfileRepositoryLive"]),
@@ -296,6 +300,74 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    // The widget-snapshot mirror interface (Phase 21.1): the FULL Codable `WidgetSnapshot` schema
+    // (daily + optional weekly/check-in sections — 21.2–21.5 add writers and UI, never schema
+    // surgery), the Sofia staleness/timeline helpers (explicit `Calendar` — the extension process
+    // never runs `prepareDependencies`), and the closure-struct client with a no-op `testValue`.
+    // Consumed by BriefRepositoryLive (the writer hook), WidgetsUI, and the CoachWidgets extension.
+    .target(
+      name: "WidgetSnapshotClient",
+      dependencies: [
+        "CoachCore",
+        "DomainModels",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Interface",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WidgetSnapshotClient.liveValue — the atomic App-Group JSON store (`widget-snapshot.json`) with
+    // section-preserving merge writes serialized through a single actor (no lost updates between the
+    // sibling section writers later phases add), plus the WidgetKit timeline reload after each write
+    // (`#if canImport(WidgetKit)`-guarded for the macOS host). Failures log via the LogClient
+    // INTERFACE and drop — the brief path never fails on the mirror. Linked by the app target AND
+    // the CoachWidgets extension (whose providers resolve it via dynamic `liveValue` lookup).
+    .target(
+      name: "WidgetSnapshotClientLive",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "CoachCore",
+        "LogClient",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WidgetSnapshotStore write/read/merge tests over a temp directory — host, no simulator; never
+    // the real App Group container. Sibling subfolder to WidgetSnapshotClientTests under `Tests/`.
+    .testTarget(
+      name: "WidgetSnapshotClientLiveTests",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "WidgetSnapshotClientLive",
+        "DomainModels",
+        "SampleData",
+        "CoachCore",
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Tests/WidgetSnapshotClientLiveTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // WidgetSnapshot schema/round-trip + Sofia staleness-helper tests — host, no simulator. Two test
+    // targets nest under `Tests/` (this + WidgetSnapshotClientLiveTests) — the LogClient layout.
+    .testTarget(
+      name: "WidgetSnapshotClientTests",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "SampleData",
+        "CoachCore",
+      ],
+      path: "Sources/Clients/WidgetSnapshot/Tests/WidgetSnapshotClientTests",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     // The network client interface — concrete typed closures for the six routes + a session-event
     // stream, plus `APIError`/`SessionEvent`. No URLSession here (that's APIClientLive). Repos/
     // features depend only on this (§4.2/§6.1).
@@ -469,6 +541,9 @@ let package = Package(
         // Decode-degradation notices (Phase 19.2): a corrupt cached row logs on `.http` and
         // degrades to a miss (the Database/SyncRepositoryLive interface-dependency precedent).
         "LogClient",
+        // The widget-snapshot mirror (Phase 21.1): the daily cache write fires `updateDailyBrief`
+        // through the client INTERFACE (the LogClient-in-repo-live precedent) — never *Live.
+        "WidgetSnapshotClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
@@ -578,6 +653,49 @@ let package = Package(
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
       path: "Sources/Repositories/ProfileRepository/Live",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // ALL widget implementation (views, providers, `Widget` conformances) — the CoachWidgets
+    // extension target holds ONLY the `@main` bundle listing widgets from here, so 21.2–21.5 ship by
+    // adding Swift files to this module + one line to the bundle (zero Package/Makefile/pbxproj
+    // edits; DECISIONS D4). Providers read via the WidgetSnapshotClient INTERFACE — the extension
+    // process links `*Live`, so the dynamic `liveValue` lookup resolves the real store. DesignSystem
+    // lands now so 21.2's styled widgets need no Package.swift edit; the transitive closure stays
+    // pure value code — no Database/GRDB/APIClient. WidgetKit-touching files are
+    // `#if canImport(WidgetKit)`-guarded for the macOS host.
+    .target(
+      name: "WidgetsUI",
+      dependencies: [
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "DesignSystem",
+        "CoachCore",
+        .product(name: "Dependencies", package: "swift-dependencies"),
+      ],
+      path: "Sources/Features/WidgetsUI/Sources",
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+      ]
+    ),
+    // Widget view snapshots (skeleton populated/stale, light + dark) — iOS 26 simulator only, via
+    // `xcodebuild test` (`make test-snapshots` lists this target). `#if canImport(UIKit)`-guarded so
+    // it compiles to an empty module on the host.
+    .testTarget(
+      name: "WidgetsUISnapshotTests",
+      dependencies: [
+        "WidgetsUI",
+        "WidgetSnapshotClient",
+        "DomainModels",
+        "SampleData",
+        "CoachTestSupport",
+        "DesignSystem",
+        "CoachCore",
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+      ],
+      path: "Sources/Features/WidgetsUI/Tests/WidgetsUISnapshotTests",
+      exclude: ["__Snapshots__"],
       swiftSettings: [
         .swiftLanguageMode(.v6),
       ]
@@ -871,6 +989,8 @@ let package = Package(
         "DevSettings",
         // The decode-degradation tests assert notices via `LogRecorder` / `.recording(into:)`.
         "LogClient",
+        // The Phase 21.1 mirror tests override `\.widgetSnapshot` with a recording client.
+        "WidgetSnapshotClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ],
