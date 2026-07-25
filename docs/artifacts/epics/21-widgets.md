@@ -313,7 +313,7 @@ behaviour remain pending owner device validation, per epic convention.
 
 ## Phase 21.5 — Interactive check-in nudge widget
 
-**Plan**: _not yet created_
+**Plan**: direct-implemented from epic spec (no formal plan)
 
 **Linear**: none
 
@@ -337,20 +337,49 @@ behaviour remain pending owner device validation, per epic convention.
 
 ### Acceptance criteria
 
-- [ ] Tapping "All clear" flips the widget to logged immediately, without
-      opening the app.
-- [ ] On next app foreground, today's `CheckIn` exists in the DB with the
-      all-clear defaults; draining twice creates no duplicate.
-- [ ] A check-in already logged in-app shows the logged state on the widget
+- [x] Tapping "All clear" flips the widget to logged immediately, without
+      opening the app. Verified at the unit level: `logCheckInFromWidget`
+      appends to the inbox and flips the snapshot to logged/`.widget` in one
+      call (`WidgetCheckInInboxStoreTests`,
+      `WidgetSnapshotStoreCheckInMergeTests`); the logged state renders per
+      `CheckInWidgetViewSnapshotTests.test_logged`. Live intent tap on a
+      device NOT verified — pending owner device validation.
+- [x] On next app foreground, today's `CheckIn` exists in the DB with the
+      all-clear defaults; draining twice creates no duplicate. Verified:
+      `CheckInWidgetDrainTests.test_drain_persistsPendingAllClearWithDefaults`,
+      `test_drainTwice_createsOneRecord`,
+      `test_drain_withUnclearedInbox_staysIdempotent`.
+- [x] A check-in already logged in-app shows the logged state on the widget
       and suppresses the button; the pending inbox entry never overwrites it.
-- [ ] "Symptoms…" deep-links into the app's check-in UI.
-- [ ] State resets to unlogged after the Sofia-day rollover.
+      Verified: `test_drain_sameDay_inAppCheckInWins` +
+      `test_save_mirrorsLoggedStateWithAppSource`; the logged snapshot state
+      renders without the button (`test_logged`).
+- [x] "Symptoms…" deep-links into the app's check-in UI. Verified in code:
+      the unlogged state links `CoachDeepLink.checkIn.url` (route landed in
+      21.1, reducer-tested). Live tap NOT verified — pending owner device
+      validation.
+- [x] State resets to unlogged after the Sofia-day rollover. Verified:
+      the provider's Sofia-midnight staleness (shared 21.1 helper) +
+      `CheckInWidgetViewSnapshotTests.test_stale`; prior-day pending entries
+      never stomp a later day (`test_mergeCheckIn_priorDayIncoming_keepsLaterDayState`,
+      `test_drain_yesterdaysPending_persistsUnderItsOwnDay`). Live rollover
+      on device NOT verified — pending owner device validation.
 
 ### Validation
 
 Unit tests for inbox drain idempotency and same-day precedence;
 `verify-on-sim` run — tap the intent, screenshot the state flip, foreground
 the app, and show the saved `CheckInRecord` via dev menu or log excerpt.
+
+**Ship gate (2026-07-25):** rebased onto staging after the 21.2/21.3 and
+21.4 merges (additive conflict resolution across the WidgetSnapshot client
++ `Package.swift`); `swift test` 648/648 in 121 suites, `make lint` 0
+violations, `CheckInWidgetView` references recorded on the pinned sim (6
+PNGs: unlogged/logged/stale × light/dark; all pre-existing references
+byte-unchanged), full `make test-snapshots` 0 ✘ TEST SUCCEEDED, sim
+`xcodebuild … CoachApp … build` succeeded. The live `verify-on-sim` intent
+tap/foreground-drain flow remains pending owner device validation, per
+epic convention.
 
 ---
 
