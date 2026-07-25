@@ -12,13 +12,20 @@ import Foundation
 public struct CheckInRepository: Sendable {
   public var save: @Sendable (_ checkIn: DomainModels.CheckIn) async throws -> Void
   public var current: @Sendable (_ date: Date) async throws -> DomainModels.CheckIn?
+  /// Drain the widget's App Group check-in inbox into the DB (Phase 21.5), called on launch/
+  /// foreground. Idempotent: a pending entry persists ONLY when no record exists for its Sofia day —
+  /// an in-app check-in (or an already-drained entry) always wins over a pending widget all-clear.
+  public var drainWidgetInbox: @Sendable () async throws -> Void
 
+  /// `drainWidgetInbox` defaults to a no-op so pre-21.5 construction sites keep compiling.
   public init(
     save: @escaping @Sendable (_ checkIn: DomainModels.CheckIn) async throws -> Void,
-    current: @escaping @Sendable (_ date: Date) async throws -> DomainModels.CheckIn?
+    current: @escaping @Sendable (_ date: Date) async throws -> DomainModels.CheckIn?,
+    drainWidgetInbox: @escaping @Sendable () async throws -> Void = {}
   ) {
     self.save = save
     self.current = current
+    self.drainWidgetInbox = drainWidgetInbox
   }
 }
 

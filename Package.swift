@@ -566,7 +566,10 @@ let package = Package(
         "Database",
         "DomainModels",
         "PersistenceModels",
-        // The Phase 21.2 selection→widget-snapshot mirror hook (interface only, no App Group I/O).
+        // The Phase 21.2 selection→widget-snapshot mirror hook plus the widget check-in mirror +
+        // inbox drain (Phase 21.5): `CheckInRepository.save` fires `updateCheckIn` and
+        // `drainWidgetInbox` reads/clears the pending inbox through the client INTERFACE (the
+        // BriefRepositoryLive precedent) — never *Live.
         "WidgetSnapshotClient",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "GRDB", package: "GRDB.swift"),
@@ -1012,6 +1015,7 @@ let package = Package(
         "PersistenceModels",
         "DomainModels",
         "CoachCore",
+        // The Phase 21.5 drain/mirror tests override `\.widgetSnapshot` with a recording client.
         "WidgetSnapshotClient",
         "CoachTestSupport",
         .product(name: "Dependencies", package: "swift-dependencies"),

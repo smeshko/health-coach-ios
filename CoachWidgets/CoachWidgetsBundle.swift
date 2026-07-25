@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 import WidgetsUI
@@ -16,5 +17,15 @@ struct CoachWidgetsBundle: WidgetBundle {
     MacrosWidget()
     SkeletonWidget()
     WeeklyWidget()
+    CheckInWidget()
+  }
+}
+
+/// Registers the WidgetsUI package module with the AppIntents metadata extractor, so intents defined
+/// there (Phase 21.5's "All clear" check-in button) are discoverable and executable in this
+/// extension process.
+struct CoachWidgetsAppIntentsPackage: AppIntentsPackage {
+  static var includedPackages: [any AppIntentsPackage.Type] {
+    [WidgetsUIAppIntentsPackage.self]
   }
 }

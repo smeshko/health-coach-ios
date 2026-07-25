@@ -251,6 +251,19 @@ struct WidgetSnapshotSchemaTests {
     #expect(!yesterdaysBrief.isCurrent(at: now))
   }
 
+  // MARK: - Check-in isCurrent (Phase 21.5)
+
+  @Test func test_checkInIsCurrent_sameSofiaDay_true() {
+    let state = WidgetCheckInState(date: sofiaInstant(2026, 1, 16), logged: true, source: .widget)
+    #expect(state.isCurrent(at: sofiaInstant(2026, 1, 16, 23, 45)))
+  }
+
+  /// The nudge reset: a logged state stops counting the moment the Sofia day rolls over.
+  @Test func test_checkInIsCurrent_justPastSofiaMidnight_false() {
+    let state = WidgetCheckInState(date: sofiaInstant(2026, 1, 16), logged: true, source: .app)
+    #expect(!state.isCurrent(at: sofiaInstant(2026, 1, 17, 0, 10)))
+  }
+
   // MARK: - Weekly isCurrent
 
   @Test func test_weeklyIsCurrent_sameISOWeek_true() {
