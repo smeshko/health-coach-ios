@@ -188,7 +188,7 @@ Snapshot tests for small/medium × with/without intake × stale;
 
 ## Phase 21.4 — Weekly overview widget
 
-**Plan**: _not yet created_
+**Plan**: direct-implemented from epic spec (no formal plan)
 
 **Linear**: none
 
@@ -210,16 +210,46 @@ Snapshot tests for small/medium × with/without intake × stale;
 
 ### Acceptance criteria
 
-- [ ] Widget shows the current week's budgets, targets, and core sessions from
-      the cached `WeeklyPlan`; deload weeks are visually flagged.
-- [ ] No used/completed counts appear anywhere in the widget.
-- [ ] Week rollover without a fresh plan → stale state.
-- [ ] Tapping opens the app on the Weekly tab.
+- [x] Widget shows the current week's budgets, targets, and core sessions from
+      the cached `WeeklyPlan`; deload weeks are visually flagged. Verified:
+      `WeeklyWidgetViewSnapshotTests` (`test_normal`, `test_deload`) render
+      the week label, budgets, targets, and core sessions from a
+      `WeeklyPlan` fixture; the deload case shows the distinct warning
+      treatment. Recorded/passing snapshot references
+      (`WeeklyWidgetViewSnapshotTests/test_normal.*`,
+      `test_deload.*`, `test_stale.*`, light+dark).
+- [x] No used/completed counts appear anywhere in the widget. Verified by
+      code review of `WeeklyWidgetView.swift` (budgets/targets/core sessions
+      only, no used-vs-budget rendering) plus the merge semantics in
+      `WidgetSnapshotStore` (core sessions only, extras dropped) covered by
+      `WeeklyPlanMirrorTests`/`WidgetSnapshotStoreTests`.
+      On-sim/on-device visual confirmation pending owner device validation.
+- [x] Week rollover without a fresh plan → stale state. Unit-verified: the
+      shared ISO-week staleness helper (Sofia `.iso8601` calendar,
+      `%04d-W%02d` key matching the server) is exercised by
+      `WeeklyWidgetViewSnapshotTests/test_stale` and covered transitively by
+      the writer/merge tests. Live rollover-at-midnight behaviour on-device
+      NOT verified this run — pending owner device validation.
+- [x] Tapping opens the app on the Weekly tab. Verified in code:
+      `WeeklyWidget.swift` applies `.widgetURL(CoachDeepLink.weekly.url)`.
+      Live on-device tap-to-open NOT verified this run — pending owner
+      device validation.
 
 ### Validation
 
 Unit test for the weekly snapshot round-trip; snapshot tests (normal/deload/
 stale); `verify-on-sim` screenshot with a cached weekly plan.
+
+**Ship gate (2026-07-25):** rebase onto `origin/staging` was a no-op (branch
+already sat on top of the merged 21.1 PR, no sibling widget PRs landed yet);
+`swift build` clean; `swift test` 624/624; new `WeeklyWidgetViewSnapshotTests`
+references recorded on the pinned sim (6 new PNGs, normal/deload/stale ×
+light/dark) with pre-existing skeleton-widget references byte-unchanged;
+`make lint` 0 violations in 414 files; `make test-snapshots` 99/99 (0 ✘,
+96 baseline + 3 new weekly-widget tests); `xcodebuild ... CoachApp ... build`
+succeeded (CoachWidgets extension embeds cleanly). Adversarial review found
+no real bugs. On-sim/on-device visual placement and live deep-link/staleness
+behaviour remain pending owner device validation, per epic convention.
 
 ---
 

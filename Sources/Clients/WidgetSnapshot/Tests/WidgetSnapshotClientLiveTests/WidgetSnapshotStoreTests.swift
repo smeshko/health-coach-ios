@@ -87,6 +87,36 @@ struct WidgetSnapshotStoreTests {
     card: .strides, intensity: .quality, durationMinLow: 20, durationMinHigh: 30
   )
 
+  /// A domain weekly plan whose `extras` are non-empty — the weekly merge must drop them.
+  private func makeWeeklyPlan(isoWeek: String, weekStart: Date) -> DomainModels.WeeklyPlan {
+    WeeklyPlan(
+      isoWeek: isoWeek,
+      weekStart: weekStart,
+      budgets: WeeklyBudgets(hardDays: 2, strengthSessions: 3, longRunKm: 14, deload: false),
+      core: [
+        PlannedSession(
+          card: .longRun, tier: .core, intensity: .easy, isHardDay: false, suggestedDay: .sat
+        ),
+        PlannedSession(
+          card: .threshold, tier: .core, intensity: .quality, isHardDay: true, suggestedDay: .tue
+        ),
+      ],
+      extras: [
+        PlannedSession(card: .mobility, tier: .extra, intensity: .recovery, isHardDay: false),
+      ],
+      targets: WeeklyTargets(
+        totalRunKm: 30, easyRunRatio: 0.8, strengthSessions: 3, hardDays: 2, cadenceSpm: 170
+      ),
+      nutrition: WeeklyNutrition(
+        proteinG: 150, fatGLow: 60, fatGHigh: 80, hydrationLLow: 2.5, hydrationLHigh: 3.0,
+        avgCaloriesKcal: 2400
+      ),
+      constantsRecomputed: false,
+      generatedAt: weekStart.addingTimeInterval(7 * 3600),
+      cached: false
+    )
+  }
+
   // MARK: - Write / read round-trip
 
   @Test func test_writeThenRead_returnsIdenticalSnapshot() throws {
@@ -171,6 +201,59 @@ struct WidgetSnapshotStoreTests {
     #expect(merged.daily?.date == brief.date)
     #expect(merged.daily?.selectedSession == nil)
     #expect(merged.weekly == nil)
+    #expect(merged.checkIn == nil)
+  }
+
+  // MARK: - Weekly merge (Phase 21.4)
+
+  @Test func test_mergeWeeklyPlan_replacesWeeklyPreservesDailyAndCheckIn() throws {
+    let store = makeStore()
+    let existing = makeExisting(
+      dailyDate: sofiaInstant(2026, 7, 24), selectedSession: alternativeSession
+    ) // carries weekly "2026-W30" + a checkIn
+    try store.write(existing)
+
+    let plan = makeWeeklyPlan(isoWeek: "2026-W31", weekStart: sofiaInstant(2026, 7, 27))
+    let generatedAt = sofiaInstant(2026, 7, 27, 8, 0)
+    try store.mergeWeeklyPlan(plan, generatedAt: generatedAt)
+
+    let merged = try #require(store.read())
+    #expect(merged.generatedAt == generatedAt)
+    #expect(merged.schemaVersion == WidgetSnapshot.currentSchemaVersion)
+    // Weekly fields replaced by the fresh plan…
+    #expect(merged.weekly?.isoWeek == "2026-W31")
+    #expect(merged.weekly?.budgets == plan.budgets)
+    #expect(merged.weekly?.targets == plan.targets)
+    #expect(merged.weekly?.coreSessions == plan.core)
+    // …the sibling sections are untouched (incl. the daily's selection).
+    #expect(merged.daily == existing.daily)
+    #expect(merged.checkIn == existing.checkIn)
+  }
+
+  /// The widget is core-only (epic 21.4: extras excluded) — the merge must never carry `extras`.
+  @Test func test_mergeWeeklyPlan_excludesExtras() throws {
+    let store = makeStore()
+    let plan = makeWeeklyPlan(isoWeek: "2026-W30", weekStart: sofiaInstant(2026, 7, 20))
+
+    try store.mergeWeeklyPlan(plan, generatedAt: sofiaInstant(2026, 7, 20, 8, 0))
+
+    let merged = try #require(store.read())
+    #expect(!plan.extras.isEmpty, "fixture must exercise the exclusion")
+    #expect(merged.weekly?.coreSessions == plan.core)
+    #expect(merged.weekly?.coreSessions.allSatisfy { $0.tier == .core } == true)
+  }
+
+  @Test func test_mergeWeeklyPlan_noExistingFile_createsWeeklyOnlySnapshot() throws {
+    let store = makeStore()
+    let plan = makeWeeklyPlan(isoWeek: "2026-W30", weekStart: sofiaInstant(2026, 7, 20))
+    let generatedAt = sofiaInstant(2026, 7, 20, 8, 0)
+
+    try store.mergeWeeklyPlan(plan, generatedAt: generatedAt)
+
+    let merged = try #require(store.read())
+    #expect(merged.generatedAt == generatedAt)
+    #expect(merged.weekly?.isoWeek == plan.isoWeek)
+    #expect(merged.daily == nil)
     #expect(merged.checkIn == nil)
   }
 }

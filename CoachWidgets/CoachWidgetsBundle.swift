@@ -13,5 +13,6 @@ import WidgetSnapshotClientLive
 struct CoachWidgetsBundle: WidgetBundle {
   var body: some Widget {
     SkeletonWidget()
+    WeeklyWidget()
   }
 }

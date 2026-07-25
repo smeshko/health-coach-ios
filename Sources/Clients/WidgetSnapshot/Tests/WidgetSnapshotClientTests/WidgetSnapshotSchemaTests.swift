@@ -92,6 +92,20 @@ struct WidgetSnapshotSchemaTests {
     #expect(decoded.checkIn == nil)
   }
 
+  @Test func test_roundTrip_weeklyOnly_optionalSectionsStayNil() throws {
+    let snapshot = WidgetSnapshot(
+      generatedAt: sofiaInstant(2026, 7, 24, 7, 30),
+      weekly: makeWeekly(isoWeek: "2026-W30")
+    )
+
+    let data = try WidgetSnapshotCoding.makeEncoder().encode(snapshot)
+    let decoded = try WidgetSnapshotCoding.makeDecoder().decode(WidgetSnapshot.self, from: data)
+
+    #expect(decoded == snapshot)
+    #expect(decoded.daily == nil)
+    #expect(decoded.checkIn == nil)
+  }
+
   @Test func test_schemaVersion_defaultsToCurrent() {
     let snapshot = WidgetSnapshot(generatedAt: sofiaInstant(2026, 7, 24))
     #expect(snapshot.schemaVersion == WidgetSnapshot.currentSchemaVersion)
@@ -140,6 +154,51 @@ struct WidgetSnapshotSchemaTests {
     #expect(decoded.daily?.selectedSession == nil)
     #expect(decoded.daily?.intakeYesterday == nil)
     #expect(decoded.weekly == nil)
+    #expect(decoded.checkIn == nil)
+  }
+
+  /// The FROZEN weekly wire shape (Phase 21.4, still schemaVersion 1 — the section was carried in
+  /// the v1 schema from day one). A widget build must keep decoding files the app wrote earlier.
+  @Test func test_pinnedWeeklySectionJSON_decodes() throws {
+    let json = """
+    {
+      "schemaVersion": 1,
+      "generatedAt": "2026-07-24T04:30:00Z",
+      "weekly": {
+        "isoWeek": "2026-W30",
+        "budgets": { "hardDays": 2, "strengthSessions": 3, "longRunKm": 14, "deload": false },
+        "targets": {
+          "totalRunKm": 30,
+          "easyRunRatio": 0.8,
+          "strengthSessions": 3,
+          "hardDays": 2,
+          "cadenceSpm": 170
+        },
+        "coreSessions": [
+          {
+            "card": "long_run",
+            "tier": "core",
+            "intensity": "easy",
+            "isHardDay": false,
+            "suggestedDay": "sat",
+            "flags": []
+          }
+        ]
+      }
+    }
+    """
+    let decoded = try WidgetSnapshotCoding.makeDecoder().decode(
+      WidgetSnapshot.self, from: Data(json.utf8)
+    )
+
+    #expect(decoded.weekly?.isoWeek == "2026-W30")
+    #expect(decoded.weekly?.budgets.deload == false)
+    #expect(decoded.weekly?.budgets.longRunKm == 14)
+    #expect(decoded.weekly?.targets.cadenceSpm == 170)
+    #expect(decoded.weekly?.coreSessions.count == 1)
+    #expect(decoded.weekly?.coreSessions.first?.card == .longRun)
+    #expect(decoded.weekly?.coreSessions.first?.suggestedDay == .sat)
+    #expect(decoded.daily == nil)
     #expect(decoded.checkIn == nil)
   }
 
