@@ -57,6 +57,7 @@ public struct MainTabs {
   }
 
   @Dependency(\.strengthTestRepository) var strengthTestRepository
+  @Dependency(\.checkInRepository) var checkInRepository
   @Dependency(\.date) var date
 
   public init() {}
@@ -80,10 +81,18 @@ public struct MainTabs {
       case .refreshDue:
         // Read the latest test and derive the due flag (the single rule, TASK-001). `isStrengthTestDue`
         // reads the ambient `\.calendar`/`\.date` itself, so the effect needs no extra args.
-        return .run { [strengthTestRepository, now = date.now] send in
-          let test = try? await strengthTestRepository.current(now)
-          await send(.dueRefreshed(isStrengthTestDue(lastTestDate: test?.date)))
-        }
+        // The same launch/foreground hook drains the widget check-in inbox (Phase 21.5) — a merged
+        // sibling effect so the badge derivation never waits on the DB drain. Failures drop quietly:
+        // the inbox file survives, so the next activation retries.
+        return .merge(
+          .run { [checkInRepository] _ in
+            try? await checkInRepository.drainWidgetInbox()
+          },
+          .run { [strengthTestRepository, now = date.now] send in
+            let test = try? await strengthTestRepository.current(now)
+            await send(.dueRefreshed(isStrengthTestDue(lastTestDate: test?.date)))
+          }
+        )
 
       case let .dueRefreshed(isDue):
         // Write both sinks from the one derivation: the You-tab badge + the Settings row dot.
