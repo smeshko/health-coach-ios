@@ -1,6 +1,6 @@
 # Epic 21 — Home-screen widgets
 
-Status: planned
+Status: in-progress
 Created: 2026-07-24
 Depends on: Epic 08, Epic 09
 Project: none
