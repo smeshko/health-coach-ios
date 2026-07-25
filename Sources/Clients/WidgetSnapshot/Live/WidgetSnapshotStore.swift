@@ -54,6 +54,19 @@ public struct WidgetSnapshotStore: Sendable {
     try write(Self.merge(weeklyPlan: plan, into: read(), generatedAt: generatedAt))
   }
 
+  /// Load-merge-write the athlete's selected block for `day` into `daily.selectedSession` (Phase
+  /// 21.2). Returns `false` (no write) when the merge declines — see `merge(selectedSession:day:)`.
+  @discardableResult
+  public func mergeSelectedSession(
+    _ block: SessionBlock, day: Date, generatedAt: Date = Date()
+  ) throws -> Bool {
+    guard let merged = Self.merge(
+      selectedSession: block, day: day, into: read(), generatedAt: generatedAt
+    ) else { return false }
+    try write(merged)
+    return true
+  }
+
   /// The pure daily merge (host-testable without any file I/O): replace only the `daily` section +
   /// the root `generatedAt`/`schemaVersion`, preserve `weekly` and `checkIn` verbatim. The existing
   /// `selectedSession` survives ONLY when the existing daily is the SAME Sofia day as `brief.date`
@@ -106,5 +119,26 @@ public struct WidgetSnapshotStore: Sendable {
       ),
       checkIn: existing?.checkIn
     )
+  }
+
+  /// The pure selection merge (Phase 21.2): set `daily.selectedSession` + the root `generatedAt`,
+  /// preserving every other field verbatim. `nil` (no write) when there is no existing `daily` or it
+  /// is for a DIFFERENT Sofia day than `day` — a selection without today's brief has nothing to
+  /// attach to, and grafting it onto another day's brief would show a wrong session; the next brief
+  /// mirror rebuilds the section and its same-day merge keeps the pick.
+  public static func merge(
+    selectedSession block: SessionBlock,
+    day: Date,
+    into existing: WidgetSnapshot?,
+    generatedAt: Date
+  ) -> WidgetSnapshot? {
+    guard var snapshot = existing, var daily = snapshot.daily, daily.isCurrent(at: day) else {
+      return nil
+    }
+    daily.selectedSession = block
+    snapshot.daily = daily
+    snapshot.generatedAt = generatedAt
+    snapshot.schemaVersion = WidgetSnapshot.currentSchemaVersion
+    return snapshot
   }
 }

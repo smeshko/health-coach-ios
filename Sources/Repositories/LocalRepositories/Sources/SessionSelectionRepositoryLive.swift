@@ -5,6 +5,7 @@ import DomainModels
 import Foundation
 import GRDB
 import PersistenceModels
+import WidgetSnapshotClient
 
 extension SessionSelectionRepository: DependencyKey {
   public static let liveValue: SessionSelectionRepository = .live
@@ -17,9 +18,13 @@ extension SessionSelectionRepository: DependencyKey {
       save: { block, date in
         @Dependency(\.database) var database
         @Dependency(\.calendar) var calendar
+        @Dependency(\.widgetSnapshot) var widgetSnapshot
         let day = calendar.startOfDay(for: date)
         let record = try SessionSelectionRecord(date: day, block: block)
         try await database.write { db in try record.save(db) }
+        // The Phase 21.2 widget mirror — fired only after the row is written, so the widget shows the
+        // athlete's persisted pick. Non-throwing by contract; the save path can't fail on it.
+        await widgetSnapshot.updateSelectedSession(block, day)
       },
       current: { date in
         @Dependency(\.database) var database

@@ -256,4 +256,70 @@ struct WidgetSnapshotStoreTests {
     #expect(merged.daily == nil)
     #expect(merged.checkIn == nil)
   }
+
+  // MARK: - Selection merge (Phase 21.2)
+
+  @Test func test_mergeSelectedSession_sameDay_setsSelectionPreservesEverythingElse() throws {
+    let store = makeStore()
+    let day = sofiaInstant(2026, 7, 24)
+    let existing = makeExisting(dailyDate: day, selectedSession: nil)
+    try store.write(existing)
+
+    // An afternoon pick on the same Sofia day (the repo normalizes to startOfDay, but the merge
+    // must accept any same-day instant).
+    let generatedAt = sofiaInstant(2026, 7, 24, 14, 30)
+    let wrote = try store.mergeSelectedSession(
+      alternativeSession, day: sofiaInstant(2026, 7, 24, 14, 0), generatedAt: generatedAt
+    )
+
+    #expect(wrote)
+    let merged = try #require(store.read())
+    #expect(merged.generatedAt == generatedAt)
+    #expect(merged.daily?.selectedSession == alternativeSession)
+    // Every other daily field and the sibling sections stay verbatim.
+    #expect(merged.daily?.readiness == existing.daily?.readiness)
+    #expect(merged.daily?.plannedSession == existing.daily?.plannedSession)
+    #expect(merged.daily?.macroFocus == existing.daily?.macroFocus)
+    #expect(merged.weekly == existing.weekly)
+    #expect(merged.checkIn == existing.checkIn)
+  }
+
+  @Test func test_mergeSelectedSession_reSelect_latestWins() throws {
+    let store = makeStore()
+    let day = sofiaInstant(2026, 7, 24)
+    try store.write(makeExisting(dailyDate: day, selectedSession: alternativeSession))
+
+    let second = SessionBlock(
+      card: .strengthFull, intensity: .quality, durationMinLow: 30, durationMinHigh: 30
+    )
+    let wrote = try store.mergeSelectedSession(second, day: day, generatedAt: sofiaInstant(2026, 7, 24, 15, 0))
+
+    #expect(wrote)
+    #expect(store.read()?.daily?.selectedSession == second)
+  }
+
+  @Test func test_mergeSelectedSession_differentSofiaDay_declinesAndLeavesFileUntouched() throws {
+    let store = makeStore()
+    let existing = makeExisting(dailyDate: sofiaInstant(2026, 7, 23), selectedSession: nil)
+    try store.write(existing)
+
+    // A pick for the NEXT day must not graft onto yesterday's daily section.
+    let wrote = try store.mergeSelectedSession(
+      alternativeSession, day: sofiaInstant(2026, 7, 24), generatedAt: sofiaInstant(2026, 7, 24, 8, 0)
+    )
+
+    #expect(!wrote)
+    #expect(store.read() == existing)
+  }
+
+  @Test func test_mergeSelectedSession_noExistingFile_declines() throws {
+    let store = makeStore()
+
+    let wrote = try store.mergeSelectedSession(
+      alternativeSession, day: sofiaInstant(2026, 7, 24), generatedAt: sofiaInstant(2026, 7, 24, 8, 0)
+    )
+
+    #expect(!wrote)
+    #expect(store.read() == nil)
+  }
 }
