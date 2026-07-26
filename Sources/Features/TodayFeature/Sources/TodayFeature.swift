@@ -219,7 +219,7 @@ public struct TodayFeature {
         log.info("Pull-to-refresh — starting background refresh", category: .lifecycle)
         state.isBackgroundRefreshing = true
         state.lastRefreshAttemptAt = date.now
-        return backgroundRefreshEffect()
+        return backgroundRefreshEffect(refresh: true)
 
       case .sceneBecameActive:
         // The two-leg detector (rollover reset over any stamped state + the `.ready`-gated same-day

@@ -56,8 +56,11 @@ extension TodayFeature {
   /// Cache-first app-open (Phase 12.1, revised D15) as **one** chained, cancellable effect: the check-in
   /// **gate** (unchanged, still first) → `cachedDailyBrief()` peek. On a HIT, render the cached brief
   /// immediately (`._cachedBriefLoaded(brief, startBackgroundRefresh: true)`) and continue in the same
-  /// effect with a quiet background pass (sync → `dailyBrief(refresh: true)`, with `zones()` riding
-  /// alongside). On a MISS (nil, or a peek error treated as a miss) fall through to the **blocking** chain
+  /// effect with a quiet background pass (sync → `dailyBrief(refresh: false)`, with `zones()` riding
+  /// alongside). The pass never forces regeneration: a forced `refresh: true` here made every app open
+  /// burn an LLM call and let the non-deterministic session pick flip between opens (2026-07-26 incident);
+  /// forced regeneration is reserved for explicit intent — pull-to-refresh and the check-in save.
+  /// On a MISS (nil, or a peek error treated as a miss) fall through to the **blocking** chain
   /// verbatim — its 1s dwell and `.syncing`/`.generating` screens are the honest first-of-the-day flow.
   /// One `CancelID.orchestration` covers the whole open path (D7).
   ///
@@ -89,7 +92,7 @@ extension TodayFeature {
       }
       // HIT → render immediately + start the background refresh in this same effect.
       await send(._cachedBriefLoaded(cached, startBackgroundRefresh: true))
-      await runBackgroundPass(send: send, deps: deps)
+      await runBackgroundPass(refresh: false, send: send, deps: deps)
     }
     .cancellable(id: CancelID.orchestration, cancelInFlight: true)
     return .merge(rolloverCancels, chain)
@@ -115,9 +118,12 @@ extension TodayFeature {
   /// The quiet background-refresh pass, shared by pull-to-refresh and the scene-staleness trigger
   /// (Phase 12.1). The open-path hit runs its pass INSIDE `cacheFirstOpenEffect` (so this is NOT returned
   /// from `._cachedBriefLoaded`, which would cancel that in-flight pass). Runs on `CancelID.orchestration`.
-  func backgroundRefreshEffect() -> Effect<Action> {
+  /// `refresh` is `true` only for pull-to-refresh (explicit intent); the scene-staleness trigger passes
+  /// `false` — a mere re-foreground must not force an LLM regeneration (cost + session-pick churn).
+  func backgroundRefreshEffect(refresh: Bool) -> Effect<Action> {
     .run { [syncRepository, briefRepository, profileRepository] send in
       await runBackgroundPass(
+        refresh: refresh,
         send: send,
         deps: OrchestrationDeps(sync: syncRepository, brief: briefRepository, profile: profileRepository)
       )
@@ -169,7 +175,7 @@ extension TodayFeature {
     log.info("Scene active — stale, starting background refresh", category: .lifecycle)
     state.isBackgroundRefreshing = true
     state.lastRefreshAttemptAt = date.now
-    return backgroundRefreshEffect()
+    return backgroundRefreshEffect(refresh: false)
   }
 
   /// The per-day state contract (Phase 19.3, DECISIONS D1) — everything belonging to ONE Sofia day,
@@ -319,13 +325,17 @@ private func runBlockingChain(
 /// The quiet background pass (sync → record → brief, with zones alongside) — Phase 12.1. A pre-sync
 /// zones read starts ALONGSIDE `sync()` (`ProfileRepository.zones()` is cache-first, so cached zones
 /// survive a failing sync, DECISIONS D3 round-3 #2); a `sync()` success records `lastSyncedAt` via
-/// `._backgroundSyncCompleted`; `dailyBrief(refresh: true)` (D2) resolves through
+/// `._backgroundSyncCompleted`; `dailyBrief(refresh:)` resolves through
 /// `._backgroundRefreshResolved` (swap-if-changed) or, on any throw, `._backgroundRefreshFailed` — both
-/// merging fetched zones. A SECOND `zones()` read starts right after a successful sync (Phase 19.2
-/// review rounds 1–2): that sync just advanced the watermark `serverTime`, so the post-sync read is the
-/// one that picks up recomputed constants in the same pass, on both the resolved and the failed-brief
-/// paths — the pre-sync value is only the nil fallback. No min-dwell.
+/// merging fetched zones. `refresh` is `true` only for pull-to-refresh: the open and scene-staleness
+/// passes pass `false` so a routine open never forces an LLM regeneration (the pre-2026-07-26 hardcoded
+/// `true` regenerated — and could flip — the brief on every open). A SECOND `zones()` read starts right
+/// after a successful sync (Phase 19.2 review rounds 1–2): that sync just advanced the watermark
+/// `serverTime`, so the post-sync read is the one that picks up recomputed constants in the same pass,
+/// on both the resolved and the failed-brief paths — the pre-sync value is only the nil fallback.
+/// No min-dwell.
 private func runBackgroundPass(
+  refresh: Bool,
   send: Send<TodayFeature.Action>,
   deps: OrchestrationDeps
 ) async {
@@ -348,7 +358,7 @@ private func runBackgroundPass(
   // the recomputed profile. Started alongside the brief so a brief failure still delivers it.
   async let postSyncZonesResult = try? await profileRepository.zones()
   do {
-    let brief = try await briefRepository.dailyBrief(true)
+    let brief = try await briefRepository.dailyBrief(refresh)
     var zones = await postSyncZonesResult
     if zones == nil { zones = await preSyncZones }
     try Task.checkCancellation()
