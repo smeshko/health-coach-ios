@@ -6,7 +6,9 @@ import SwiftUI
 /// The daily session surface (`Today · Exercise.png`) — a horizontal **paged carousel** of the candidate
 /// `SessionCard`s (`[session] + alternatives`): swipe to browse (one full-width card per page), **tap a card to
 /// commit** it as today's pick (green outline), with pager dots tracking the scroll position. The primary is
-/// candidate 0 ("Suggested"); the rest are "Alternative".
+/// candidate 0 ("Suggested"); the rest are "Alternative". The `.session` narrative renders **once** in a
+/// `CoachNoteCard` below the carousel — it is a brief-level slice, so an in-card slot repeated the identical
+/// prose on every candidate.
 ///
 /// A plain store-driven view (not the `@ViewAction` macro). The card stays pure — it renders labels +
 /// forwards the skip tap through `onSkip`; selection is the reducer's (`cardSelected`). **Tap-to-commit vs
@@ -36,7 +38,6 @@ public struct SessionFeatureView: View {
               SessionCardButton(
                 block: block,
                 zoneRange: store.state.zoneRange(for: block),
-                narrative: store.narrative,
                 isSelected: index == store.selectedIndex,
                 roleLabel: roleLabel(at: index),
                 onSkip: store.skipOk ? { store.send(.skipTapped) } : nil,
@@ -69,6 +70,12 @@ public struct SessionFeatureView: View {
       if store.candidates.count > 1 {
         PagerDots(count: store.candidates.count, active: scrollPosition ?? store.selectedIndex)
       }
+
+      // The day's session prose, once for the whole carousel — it describes the day (not a candidate),
+      // so it sits below the cards rather than repeating inside each one.
+      if !store.narrative.isEmpty {
+        CoachNoteCard(store.narrative)
+      }
     }
     // Selection haptic on every commit tap — user-action-scoped (positional token snaps under Reduce Motion).
     .sensoryFeedback(.selection, trigger: tapCount)
@@ -97,7 +104,6 @@ public struct SessionFeatureView: View {
 private struct SessionCardButton: View {
   let block: SessionBlock
   let zoneRange: ZoneRange?
-  let narrative: [NarrativeSection]
   let isSelected: Bool
   let roleLabel: String?
   let onSkip: (() -> Void)?
@@ -108,7 +114,6 @@ private struct SessionCardButton: View {
       SessionCard(
         block,
         zoneRange: zoneRange,
-        narrative: narrative,
         roleLabel: roleLabel,
         isSelected: isSelected,
         onSkip: onSkip
@@ -126,7 +131,7 @@ private struct PagerDots: View {
 
   var body: some View {
     HStack(spacing: CoachSpacing.spaceXs) {
-      ForEach(0..<count, id: \.self) { index in
+      ForEach(0 ..< count, id: \.self) { index in
         Capsule()
           .fill(index == active ? Color.coachAccent : Color.coachBorder)
           .frame(width: index == active ? Metrics.activeDotWidth : Metrics.dotSize, height: Metrics.dotSize)

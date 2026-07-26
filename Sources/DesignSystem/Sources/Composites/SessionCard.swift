@@ -8,8 +8,8 @@ import SwiftUI
 /// `roleLabel`/`isSelected`/`onSkip` (default nil / `false` / hidden).
 ///
 /// The session's `card` selects the layout:
-/// - **rest** (`card == .rest`) — the narrative, an authored optional-activity suggestion box, the "To
-///   help recovery along" recovery row, and the "Rest is training too." footer; no numeral/zone.
+/// - **rest** (`card == .rest`) — an authored optional-activity suggestion box, the "To help recovery
+///   along" recovery row, and the "Rest is training too." footer; no numeral/zone.
 /// - **cardio** (a `zoneTarget`) — the duration numeral + the markerless `SegmentedBar.zones` bar.
 /// - **strength / no-zone** — the duration numeral + the `SegmentedBar.range` 1–10 effort scale with the
 ///   **derived** zone→RPE band (`effortBand(for:)`).
@@ -18,11 +18,11 @@ import SwiftUI
 /// the header icon, the duration, the zone/effort meter, the flags row, the prehab add-on). The only
 /// authored strings are short category chrome (the header sub-line, the rest-day suggestion + recovery
 /// copy, the effort-scale endpoints) and the parent-supplied `roleLabel`; no fabricated RPE / reserve /
-/// rest / lift / cue copy (Decision 3).
+/// rest / lift / cue copy (Decision 3). The coach narrative is **not** the card's — it renders once in
+/// the sibling `CoachNoteCard` (a brief-level slice would repeat identically on every carousel candidate).
 public struct SessionCard: View {
   let block: SessionBlock
   let zoneRange: ZoneRange?
-  let narrative: [NarrativeSection]
   /// The static role eyebrow above the header — "Suggested" (the primary) / "Alternative" (the rest); `nil`
   /// renders no eyebrow (a lone-candidate day / the forced-REST card).
   let roleLabel: String?
@@ -34,14 +34,12 @@ public struct SessionCard: View {
   public init(
     _ block: SessionBlock,
     zoneRange: ZoneRange? = nil,
-    narrative: [NarrativeSection] = [],
     roleLabel: String? = nil,
     isSelected: Bool = false,
     onSkip: (() -> Void)? = nil
   ) {
     self.block = block
     self.zoneRange = zoneRange
-    self.narrative = narrative
     self.roleLabel = roleLabel
     self.isSelected = isSelected
     self.onSkip = onSkip
@@ -54,11 +52,9 @@ public struct SessionCard: View {
       }
       SessionHeader(block: block)
       if block.card == .rest {
-        RestDayBody(narrative: narrative)
+        RestDayBody()
       } else {
-        ActiveSessionBody(
-          block: block, zoneRange: zoneRange, narrative: narrative, onSkip: onSkip
-        )
+        ActiveSessionBody(block: block, zoneRange: zoneRange, onSkip: onSkip)
       }
     }
     .padding(CoachSpacing.spaceMd)
@@ -156,11 +152,10 @@ private struct SessionHeader: View {
 }
 
 /// The active (non-rest) session body — duration numeral, the zone bar **or** the effort scale, the
-/// model's bpm/spm line, the in-card narrative, the flags row + prehab add-on, and the footer slots.
+/// model's bpm/spm line, the flags row + prehab add-on, and the footer slots.
 private struct ActiveSessionBody: View {
   let block: SessionBlock
   let zoneRange: ZoneRange?
-  let narrative: [NarrativeSection]
   let onSkip: (() -> Void)?
 
   var body: some View {
@@ -211,10 +206,6 @@ private struct ActiveSessionBody: View {
         }
       }
 
-      if !narrative.isEmpty {
-        NarrativeRenderer(narrative)
-      }
-
       if !metaFlags.isEmpty {
         Divider().overlay(.coachBorder)
         Text(metaFlags.map(\.label).joined(separator: " · "))
@@ -262,17 +253,11 @@ private struct ActiveSessionBody: View {
   private var prehabFlags: [Flag] { block.flags.filter(\.isPrehab) }
 }
 
-/// The rest-day body — the narrative, an authored optional-activity suggestion box, the "To help recovery
-/// along" recovery row, and the "Rest is training too." footer. No duration / zone / flags / swap.
+/// The rest-day body — an authored optional-activity suggestion box, the "To help recovery along"
+/// recovery row, and the "Rest is training too." footer. No duration / zone / flags / swap.
 private struct RestDayBody: View {
-  let narrative: [NarrativeSection]
-
   var body: some View {
     VStack(alignment: .leading, spacing: CoachSpacing.spaceMd) {
-      if !narrative.isEmpty {
-        NarrativeRenderer(narrative)
-      }
-
       // Authored optional-activity suggestion (DS chrome — the model carries no such prompt).
       InsetCallout(
         icon: "figure.walk", tone: .accent,

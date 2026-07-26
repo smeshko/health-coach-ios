@@ -16,8 +16,9 @@ import SwiftUI
 ///
 /// The readiness gauge sits **above** this view (the parent composes it once over both the forced-REST and
 /// normal branches — see [[TodaySessionMode]] / the parent `ready` switch). The `narrative` is the
-/// parent-filtered session/caution slice, rendered **verbatim** inside the card by `NarrativeRenderer`
-/// (principle #1) — this view authors no coaching prose; the calm reason headline is fixed §7.4.2 UX copy.
+/// parent-filtered session/caution slice, rendered **verbatim** by the `CoachNoteCard` below the override
+/// card (the same once-per-screen surface as the normal carousel — `SessionCard` carries no narrative
+/// slot) — this view authors no coaching prose; the calm reason headline is fixed §7.4.2 UX copy.
 ///
 /// `overrideSession` is the expanded `brief.session` (`SessionBlock`), **not** `gate.overrideTo` (a
 /// `Card?`). `zoneRange` (parent-supplied) feeds the override card's zone chip; `nil` ⇒ no chip
@@ -65,7 +66,12 @@ public struct SafetyRestView: View {
 
       // The override session as the positive action — read-only: no `onSwap`/`onSkip` injected, so the
       // card's footer affordances stay empty (the forbidden swap/skip are structurally absent).
-      SessionCard(overrideSession, zoneRange: zoneRange, narrative: narrative)
+      SessionCard(overrideSession, zoneRange: zoneRange)
+
+      // The session/caution prose, once below the override card (the carousel's `CoachNoteCard` rule).
+      if !narrative.isEmpty {
+        CoachNoteCard(narrative)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

@@ -25,7 +25,7 @@ struct SessionCardPage: View {
 }
 
 /// The **easy-run cardio** variant (`Today · Exercise.png`): a Z2 zone bar + zone-range caption +
-/// cadence line + the in-card session narrative + a prehab add-on + footer slots. Fits one frame.
+/// cadence line + a prehab add-on + footer slots. Fits one frame.
 struct SessionCardEasyRunSection: View {
   var body: some View {
     sessionCardSectionColumn {
@@ -40,14 +40,6 @@ struct SessionCardEasyRunSection: View {
           flags: [.lowImpact, .prehabFoot]
         ),
         zoneRange: ZoneRange(low: 132, high: 146),
-        narrative: [
-          NarrativeSection(
-            type: .session,
-            heading: "",
-            body: "Keep it honestly easy — slow is the point. Walk the hills, breathe through your "
-              + "nose, and finish with a few relaxed strides."
-          ),
-        ],
         roleLabel: "Suggested",
         isSelected: true,
         onSkip: {}
@@ -57,7 +49,7 @@ struct SessionCardEasyRunSection: View {
 }
 
 /// The **quality cardio** variant (`Today · Exercise.png`): a Z4 bar + an hr-cap line (no zone-range
-/// caption) + the in-card session narrative + footer slots. Fits one frame.
+/// caption) + footer slots. Fits one frame.
 struct SessionCardQualitySection: View {
   var body: some View {
     sessionCardSectionColumn {
@@ -71,14 +63,6 @@ struct SessionCardQualitySection: View {
           hrCapBpm: 176,
           flags: [.qualityDay, .effortBased]
         ),
-        narrative: [
-          NarrativeSection(
-            type: .session,
-            heading: "",
-            body: "Settle into a controlled, comfortably-hard effort — strong but repeatable, not a "
-              + "race. Back off if your form starts to slip."
-          ),
-        ],
         roleLabel: "Alternative",
         isSelected: false,
         onSkip: {}
@@ -88,8 +72,8 @@ struct SessionCardQualitySection: View {
 }
 
 /// The **strength / effort-scale** variant (`Strength · Duration-led.png`): the duration numeral + the
-/// 1–10 `SegmentedBar.range` effort scale with the derived band, the narrative, the flags, and a prehab
-/// add-on. Only model-backed data (no fabricated RPE/reserve/rest/lift copy).
+/// 1–10 `SegmentedBar.range` effort scale with the derived band, the flags, and a prehab add-on. Only
+/// model-backed data (no fabricated RPE/reserve/rest/lift copy).
 struct SessionCardStrengthSection: View {
   var body: some View {
     sessionCardSectionColumn {
@@ -101,22 +85,14 @@ struct SessionCardStrengthSection: View {
           durationMinHigh: 45,
           flags: [.qualityDay, .prehabGlute]
         ),
-        narrative: [
-          NarrativeSection(
-            type: .session,
-            heading: "",
-            body: "Leave a couple reps in the tank on every set — we're building, not testing. Add "
-              + "load only when all sets feel clean."
-          ),
-        ],
         onSkip: {}
       )
     }
   }
 }
 
-/// The **rest-day** variant (`Cell.png`): the narrative, the authored optional-activity suggestion box,
-/// the "To help recovery along" recovery row, and the "Rest is training too." footer (no swap).
+/// The **rest-day** variant (`Cell.png`): the authored optional-activity suggestion box, the "To help
+/// recovery along" recovery row, and the "Rest is training too." footer (no swap).
 struct SessionCardRestSection: View {
   var body: some View {
     sessionCardSectionColumn {
@@ -126,15 +102,7 @@ struct SessionCardRestSection: View {
           intensity: .recovery,
           durationMinLow: 0,
           durationMinHigh: 0
-        ),
-        narrative: [
-          NarrativeSection(
-            type: .session,
-            heading: "",
-            body: "Nothing to chase today. Let the week's work settle in — this is when your body "
-              + "actually adapts and gets stronger."
-          ),
-        ]
+        )
       )
     }
   }

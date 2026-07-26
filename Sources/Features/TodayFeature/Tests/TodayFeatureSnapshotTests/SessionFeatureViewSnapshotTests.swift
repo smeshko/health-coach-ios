@@ -57,7 +57,8 @@
       SessionBlock(card: .strengthFull, intensity: .quality, durationMinLow: 30, durationMinHigh: 30)
     }
 
-    /// The "how to run it" `.session` narrative slice the parent passes for the in-card slot.
+    /// The "how to run it" `.session` narrative slice the parent passes — rendered once in the
+    /// `CoachNoteCard` below the carousel (not inside the candidate cards).
     private func sessionNarrative() -> [NarrativeSection] {
       [NarrativeSection(
         type: .session, heading: "",
@@ -76,9 +77,9 @@
 
     // MARK: - Carousel states
 
-    /// Primary selected (default): an easy Z2 run + 2 alternatives + `skipOk`, the in-card session narrative,
-    /// zone bar on Z2. Card 0 carries the green outline + "Suggested" eyebrow; the next card peeks on the
-    /// trailing edge; the pager dots sit beneath (first dot active).
+    /// Primary selected (default): an easy Z2 run + 2 alternatives + `skipOk`, zone bar on Z2. Card 0
+    /// carries the green outline + "Suggested" eyebrow; the next card peeks on the trailing edge; the pager
+    /// dots sit beneath, with the session narrative's `CoachNoteCard` below them.
     @Test func test_carousel_primarySelected() {
       assertCoachSnapshot(of: framed(SessionFeature.State(
         session: easyRun(), alternatives: [altLowImpact(), altStrength()],
