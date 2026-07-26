@@ -74,7 +74,10 @@ struct TodayFeatureRefreshFlagTests {
           narrative: sample.narrative.filter { $0.type == .session }, zones: sampleZones()
         ),
         zones: sampleZones(),
-        lastSyncedAt: now
+        // A fresh sync just happened — pull-to-refresh has no staleness gate, so it must regenerate
+        // anyway. Seeded *behind* the constant clock so `_backgroundSyncCompleted`'s watermark bump is
+        // an observable state change (a `lastSyncedAt: now` seed makes the receive assertion vacuous).
+        lastSyncedAt: now.addingTimeInterval(-60)
       )
     ) {
       TodayFeature()
